@@ -15,8 +15,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { icon: Trophy, label: "Trophy Room", href: "/trophies" },
-    { icon: Map, label: "Expeditions", href: "/expeditions" },
-    { icon: Crosshair, label: "Species ID", href: "/identify" },
     { icon: Shield, label: "The Safe", href: "/safe" },
     { icon: Users, label: "Community", href: "/community" },
     { icon: Calendar, label: "Dashboard", href: "/" },

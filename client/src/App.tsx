@@ -22,12 +22,6 @@ function Router() {
       <Route path="/trophies/:id" component={TrophyDetail} />
       <Route path="/safe" component={Safe} />
       <Route path="/community" component={Community} />
-      <Route path="/expeditions">
-        <Placeholder title="Expedition Planner" />
-      </Route>
-      <Route path="/identify">
-        <Placeholder title="AI Species ID" />
-      </Route>
       <Route component={NotFound} />
     </Switch>
   );
