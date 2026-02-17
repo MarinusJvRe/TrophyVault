@@ -53,7 +53,7 @@ export default function Home() {
         </div>
 
         {/* Stats Overview */}
-        <div className="max-w-7xl mx-auto px-6 md:px-12 -mt-16 relative z-30 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 -mt-8 md:-mt-16 relative z-30 grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatCard 
             icon={Trophy} 
             label="Total Trophies" 
@@ -63,9 +63,9 @@ export default function Home() {
           />
           <StatCard 
             icon={MapPin} 
-            label="Countries Hunted" 
+            label="Species Collected" 
             value="06" 
-            subtext="Last: South Africa" 
+            subtext="Last: Greater Kudu" 
             delay={0.2}
           />
           <StatCard 
