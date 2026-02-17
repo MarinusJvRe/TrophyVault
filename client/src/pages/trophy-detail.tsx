@@ -3,21 +3,37 @@ import { trophies } from "@/lib/mock-data";
 import { useRoute, Link } from "wouter";
 import { 
   ArrowLeft, Share2, Ruler, Target, MapPin, 
-  Calendar, Info, BadgeCheck, Camera 
+  Calendar, Info, BadgeCheck, Camera, MessageCircle 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 export default function TrophyDetail() {
   const [match, params] = useRoute("/trophies/:id");
+  const { toast } = useToast();
   
   if (!match) return <div>Not found</div>;
   
   const trophy = trophies.find(t => t.id === params.id);
   
   if (!trophy) return <div>Trophy not found</div>;
+
+  const handleShare = () => {
+    // Mock WhatsApp Share
+    const text = `Check out my ${trophy.species} trophy on TrophyVault! Score: ${trophy.score}.`;
+    const url = `https://trophyvault.app/t/${trophy.id}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text + " " + url)}`;
+    
+    window.open(whatsappUrl, '_blank');
+    
+    toast({
+      title: "Opening WhatsApp",
+      description: "Preparing your trophy snapshot for sharing...",
+    });
+  };
 
   return (
     <Layout>
@@ -76,7 +92,7 @@ export default function TrophyDetail() {
           >
             <div className="flex justify-between items-start mb-2">
               <div className="text-sm font-medium text-primary tracking-widest uppercase">{trophy.species}</div>
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+              <Button onClick={handleShare} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-green-500/10 hover:text-green-500 transition-colors">
                 <Share2 className="h-4 w-4" />
               </Button>
             </div>
@@ -93,6 +109,10 @@ export default function TrophyDetail() {
                  <span>{trophy.method}</span>
                </div>
             </div>
+            
+            <Button onClick={handleShare} className="w-full mb-6 bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 font-medium">
+              <MessageCircle className="h-4 w-4" /> Share on WhatsApp
+            </Button>
 
             <Separator className="my-6 bg-border/50" />
 

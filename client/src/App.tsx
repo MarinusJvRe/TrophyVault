@@ -11,6 +11,7 @@ import TrophyDetail from "@/pages/trophy-detail";
 import Placeholder from "@/pages/placeholder";
 import Onboarding from "@/pages/onboarding";
 import Safe from "@/pages/safe";
+import Community from "@/pages/community";
 
 function Router() {
   return (
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/trophies" component={TrophyRoom} />
       <Route path="/trophies/:id" component={TrophyDetail} />
       <Route path="/safe" component={Safe} />
+      <Route path="/community" component={Community} />
       <Route path="/expeditions">
         <Placeholder title="Expedition Planner" />
       </Route>
