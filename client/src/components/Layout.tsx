@@ -1,4 +1,4 @@
-import { Trophy, Crosshair, Map, Calendar, User, Settings, LogOut } from "lucide-react";
+import { Trophy, Crosshair, Map, Calendar, User, Settings, LogOut, Shield } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
@@ -17,6 +17,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { icon: Trophy, label: "Trophy Room", href: "/trophies" },
     { icon: Map, label: "Expeditions", href: "/expeditions" },
     { icon: Crosshair, label: "Species ID", href: "/identify" },
+    { icon: Shield, label: "The Safe", href: "/safe" },
     { icon: Calendar, label: "Dashboard", href: "/" },
   ];
 

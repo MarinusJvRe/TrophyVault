@@ -2,6 +2,40 @@ import heroBg from "../assets/hero-bg.png";
 import trophyStag from "../assets/trophy-stag.png";
 import trophyKudu from "../assets/trophy-kudu.png";
 
+export interface Weapon {
+  id: string;
+  name: string;
+  type: "Rifle" | "Bow" | "Muzzleloader" | "Handgun" | "Shotgun";
+  caliber?: string; // e.g. .300 Win Mag
+  make?: string;
+  model?: string;
+  optic?: string;
+  notes?: string;
+  imageUrl?: string;
+}
+
+export const weapons: Weapon[] = [
+  {
+    id: "1",
+    name: "Old Faithful",
+    type: "Rifle",
+    caliber: ".300 Win Mag",
+    make: "Remington",
+    model: "700",
+    optic: "Leupold VX-3i",
+    imageUrl: "https://images.unsplash.com/photo-1595590424283-b8f17842773f?q=80&w=1000&auto=format&fit=crop"
+  },
+  {
+    id: "2",
+    name: "Mathews Phase4",
+    type: "Bow",
+    make: "Mathews",
+    model: "Phase4 29",
+    notes: "70lb draw weight, 28.5\" draw length",
+    imageUrl: "https://images.unsplash.com/photo-1590422749833-2557cb484c0f?q=80&w=1000&auto=format&fit=crop"
+  }
+];
+
 export interface Trophy {
   id: string;
   species: string;
@@ -12,6 +46,7 @@ export interface Trophy {
   imageUrl: string;
   notes: string;
   method: "Rifle" | "Bow" | "Muzzleloader";
+  weaponId?: string; // Link to a weapon in the safe
   featured?: boolean;
 }
 
