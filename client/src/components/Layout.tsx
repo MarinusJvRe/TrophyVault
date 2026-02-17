@@ -2,9 +2,8 @@ import { Trophy, Crosshair, Map, Calendar, User, Settings, LogOut, Shield, Users
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
+import { useAuth } from "@/hooks/use-auth";
 
-// Import theme images for the sidebar check
-// In a real app we'd map these better, but for mockup simplicity:
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
@@ -12,6 +11,7 @@ import themeMinimal from "../assets/theme-minimal.png";
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { theme } = useTheme();
+  const { user, logout } = useAuth();
 
   const navItems = [
     { icon: Trophy, label: "Trophy Room", href: "/trophies" },
@@ -20,15 +20,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { icon: Calendar, label: "Dashboard", href: "/" },
   ];
 
-  // Map theme to background image for the main content area (if we want to show it slightly)
-  // or we can use it for the sidebar texture
   const bgImage = theme === "manor" ? themeManor 
                  : theme === "minimal" ? themeMinimal 
                  : themeLodge;
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden transition-colors duration-700">
-      {/* Sidebar */}
       <aside className="w-64 border-r border-border/40 bg-card/80 backdrop-blur-xl hidden md:flex flex-col relative z-20">
         <div className="p-6">
           <h1 className="font-serif text-2xl font-bold tracking-wider text-primary flex items-center gap-2">
@@ -63,31 +60,42 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-border/40">
            <div className="text-xs font-medium text-muted-foreground mb-4 px-2 tracking-widest uppercase opacity-70">Profile</div>
            <div className="flex items-center gap-3 px-2 py-2 mb-2">
-              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
-                <User className="h-4 w-4 text-primary" />
-              </div>
+              {user?.profileImageUrl ? (
+                <img
+                  src={user.profileImageUrl}
+                  alt="Profile"
+                  className="h-8 w-8 rounded-full border border-primary/30 object-cover"
+                  data-testid="img-avatar"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
+                  <User className="h-4 w-4 text-primary" />
+                </div>
+              )}
               <div className="flex flex-col">
-                <span className="text-sm font-medium">Hunter Doe</span>
+                <span className="text-sm font-medium" data-testid="text-username">
+                  {user?.firstName || ""} {user?.lastName || ""}
+                </span>
                 <span className="text-xs text-muted-foreground">Pro Member</span>
               </div>
            </div>
            
            <div className="flex gap-2 mt-2">
              <Link href="/onboarding">
-               <button className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 rounded-md transition-colors">
+               <button className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 rounded-md transition-colors" data-testid="button-theme-settings">
                  <Settings className="h-3 w-3" /> Theme
                </button>
              </Link>
-             <button className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors">
-               <LogOut className="h-3 w-3" />
-             </button>
+             <a href="/api/logout">
+               <button className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors" data-testid="button-logout">
+                 <LogOut className="h-3 w-3" />
+               </button>
+             </a>
            </div>
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-auto relative">
-        {/* Subtle texture overlay based on theme */}
         <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.02] mix-blend-overlay" style={{backgroundImage: `url(${bgImage})`, backgroundSize: 'cover'}}></div>
         
         {children}

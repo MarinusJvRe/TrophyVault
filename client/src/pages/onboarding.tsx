@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useTheme } from "@/lib/theme-context";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowRight, Home, Feather, Mountain } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Import images directly
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
@@ -46,15 +47,29 @@ export default function Onboarding() {
     units: "imperial"
   });
 
+  const savePreferencesMutation = useMutation({
+    mutationFn: async (data: { theme: string; pursuit: string; scoringSystem: string; units: string }) => {
+      await apiRequest("PUT", "/api/preferences", data);
+    },
+    onSuccess: () => {
+      setTheme(selectedTheme as any);
+      setLocation("/");
+    },
+  });
+
   const handleFinish = () => {
     setTheme(selectedTheme as any);
-    // Here we would save the other preferences
+    savePreferencesMutation.mutate({
+      theme: selectedTheme,
+      pursuit: formData.pursuit,
+      scoringSystem: formData.scoring,
+      units: formData.units,
+    });
     setLocation("/");
   };
 
   return (
     <div className="h-screen w-full bg-black text-white overflow-hidden relative">
-      {/* Dynamic Background */}
       <div className="absolute inset-0 z-0">
         <AnimatePresence mode="wait">
           <motion.img 
@@ -72,7 +87,6 @@ export default function Onboarding() {
 
       <div className="relative z-10 h-full flex flex-col items-center justify-center p-6 md:p-12 max-w-5xl mx-auto">
         
-        {/* Step 1: Theme Selection */}
         {step === 1 && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -91,6 +105,7 @@ export default function Onboarding() {
                 <div 
                   key={theme.id}
                   onClick={() => setSelectedTheme(theme.id)}
+                  data-testid={`button-theme-${theme.id}`}
                   className={cn(
                     "cursor-pointer group relative rounded-xl overflow-hidden border-2 transition-all duration-300 h-[300px]",
                     selectedTheme === theme.id 
@@ -121,6 +136,7 @@ export default function Onboarding() {
                 size="lg" 
                 onClick={() => setStep(2)}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 font-serif"
+                data-testid="button-next-step"
               >
                 Next Step <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
@@ -128,7 +144,6 @@ export default function Onboarding() {
           </motion.div>
         )}
 
-        {/* Step 2: Preferences */}
         {step === 2 && (
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
@@ -151,6 +166,7 @@ export default function Onboarding() {
                     <button
                       key={option}
                       onClick={() => setFormData({...formData, pursuit: option})}
+                      data-testid={`button-pursuit-${option.toLowerCase().replace(/\s/g, '-')}`}
                       className={cn(
                         "py-3 px-4 rounded-lg text-sm border transition-all",
                         formData.pursuit === option
@@ -171,6 +187,7 @@ export default function Onboarding() {
                     <button
                       key={option}
                       onClick={() => setFormData({...formData, scoring: option})}
+                      data-testid={`button-scoring-${option.toLowerCase().replace(/\s/g, '-')}`}
                       className={cn(
                         "py-3 px-4 rounded-lg text-sm border transition-all",
                         formData.scoring === option
@@ -191,6 +208,7 @@ export default function Onboarding() {
                     <button
                       key={option}
                       onClick={() => setFormData({...formData, units: option.toLowerCase()})}
+                      data-testid={`button-units-${option.toLowerCase()}`}
                       className={cn(
                         "py-2 px-6 rounded-md text-sm transition-all",
                         formData.units === option.toLowerCase()
@@ -211,6 +229,7 @@ export default function Onboarding() {
                 variant="ghost" 
                 onClick={() => setStep(1)}
                 className="text-white/60 hover:text-white"
+                data-testid="button-back"
               >
                 Back
               </Button>
@@ -218,8 +237,10 @@ export default function Onboarding() {
                 size="lg" 
                 onClick={handleFinish}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 font-serif"
+                data-testid="button-finish"
+                disabled={savePreferencesMutation.isPending}
               >
-                Enter TrophyVault
+                {savePreferencesMutation.isPending ? "Saving..." : "Enter TrophyVault"}
               </Button>
             </div>
           </motion.div>

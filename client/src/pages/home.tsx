@@ -1,30 +1,53 @@
 import Layout from "@/components/Layout";
-import { trophies, heroImage } from "@/lib/mock-data";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Trophy, MapPin, Calendar, Activity } from "lucide-react";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useTheme } from "@/lib/theme-context";
+import type { Trophy as TrophyType } from "@shared/schema";
 
-// Theme images
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
 
 export default function Home() {
   const { theme } = useTheme();
+
+  const { data: trophies = [], isLoading: trophiesLoading } = useQuery<TrophyType[]>({
+    queryKey: ["/api/trophies"],
+  });
+
+  const { data: stats, isLoading: statsLoading } = useQuery<{
+    totalTrophies: number;
+    speciesCollected: number;
+    recentSpecies: string | null;
+  }>({
+    queryKey: ["/api/stats"],
+  });
+
   const featuredTrophies = trophies.filter(t => t.featured);
 
-  // Dynamic Hero Image based on Theme
   const currentHero = theme === "manor" ? themeManor 
                      : theme === "minimal" ? themeMinimal 
                      : themeLodge;
 
+  const isLoading = trophiesLoading || statsLoading;
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="min-h-full pb-10">
-        {/* Hero Section */}
         <div className="relative h-[60vh] w-full overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent z-10"></div>
           
@@ -69,32 +92,30 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Stats Overview */}
         <div className="max-w-7xl mx-auto px-6 md:px-12 -mt-8 md:-mt-16 relative z-30 grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatCard 
             icon={Trophy} 
             label="Total Trophies" 
-            value="24" 
-            subtext="+3 this season" 
+            value={String(stats?.totalTrophies ?? 0).padStart(2, "0")} 
+            subtext={`${stats?.totalTrophies ?? 0} in collection`} 
             delay={0.1}
           />
           <StatCard 
             icon={MapPin} 
             label="Species Collected" 
-            value="06" 
-            subtext="Last: Greater Kudu" 
+            value={String(stats?.speciesCollected ?? 0).padStart(2, "0")} 
+            subtext={stats?.recentSpecies ? `Last: ${stats.recentSpecies}` : "No species yet"} 
             delay={0.2}
           />
           <StatCard 
             icon={Activity} 
             label="Average Score" 
-            value="92.4" 
-            subtext="Top 10% of users" 
+            value="--" 
+            subtext="Start adding trophies" 
             delay={0.3}
           />
         </div>
 
-        {/* Featured Section */}
         <div className="max-w-7xl mx-auto px-6 md:px-12 mt-16">
           <div className="flex justify-between items-end mb-8">
             <div>
@@ -108,11 +129,19 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {featuredTrophies.map((trophy, index) => (
-              <FeaturedCard key={trophy.id} trophy={trophy} index={index} />
-            ))}
-          </div>
+          {featuredTrophies.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {featuredTrophies.map((trophy, index) => (
+                <FeaturedCard key={trophy.id} trophy={trophy} index={index} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 text-muted-foreground">
+              <Trophy className="h-12 w-12 mx-auto mb-4 opacity-30" />
+              <p className="font-serif text-lg">No featured trophies yet</p>
+              <p className="text-sm mt-1">Mark trophies as featured to showcase them here</p>
+            </div>
+          )}
         </div>
       </div>
     </Layout>
@@ -131,7 +160,7 @@ function StatCard({ icon: Icon, label, value, subtext, delay }: any) {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-muted-foreground text-sm font-medium uppercase tracking-wider">{label}</p>
-              <h3 className="text-3xl font-serif font-bold mt-2 text-foreground">{value}</h3>
+              <h3 className="text-3xl font-serif font-bold mt-2 text-foreground" data-testid={`text-stat-${label.toLowerCase().replace(/\s/g, '-')}`}>{value}</h3>
               <p className="text-xs text-primary mt-1">{subtext}</p>
             </div>
             <div className="p-3 bg-primary/10 rounded-lg">
@@ -144,20 +173,23 @@ function StatCard({ icon: Icon, label, value, subtext, delay }: any) {
   );
 }
 
-function FeaturedCard({ trophy, index }: { trophy: any, index: number }) {
+function FeaturedCard({ trophy, index }: { trophy: TrophyType, index: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: 0.2 + (index * 0.1) }}
       className="group relative h-[400px] overflow-hidden rounded-xl border border-border/50 bg-card"
+      data-testid={`card-featured-trophy-${trophy.id}`}
     >
       <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10 opacity-80 group-hover:opacity-90 transition-opacity" />
-      <img 
-        src={trophy.imageUrl} 
-        alt={trophy.name} 
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-      />
+      {trophy.imageUrl && (
+        <img 
+          src={trophy.imageUrl} 
+          alt={trophy.name} 
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+      )}
       
       <div className="relative z-20 h-full flex flex-col justify-end p-6 md:p-8">
         <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">

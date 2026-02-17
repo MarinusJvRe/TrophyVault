@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { trophies } from "@/lib/mock-data";
+import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { 
   ArrowLeft, Share2, Ruler, Target, MapPin, 
@@ -10,19 +10,40 @@ import { Separator } from "@/components/ui/separator";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import type { Trophy } from "@shared/schema";
 
 export default function TrophyDetail() {
   const [match, params] = useRoute("/trophies/:id");
   const { toast } = useToast();
   
+  const { data: trophy, isLoading, error } = useQuery<Trophy>({
+    queryKey: ["/api/trophies", params?.id],
+    enabled: !!match && !!params?.id,
+  });
+
   if (!match) return <div>Not found</div>;
-  
-  const trophy = trophies.find(t => t.id === params.id);
-  
-  if (!trophy) return <div>Trophy not found</div>;
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!trophy) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Trophy not found</p>
+        </div>
+      </Layout>
+    );
+  }
 
   const handleShare = () => {
-    // Mock WhatsApp Share
     const text = `Check out my ${trophy.species} trophy on TrophyVault! Score: ${trophy.score}.`;
     const url = `https://trophyvault.app/t/${trophy.id}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text + " " + url)}`;
@@ -38,14 +59,15 @@ export default function TrophyDetail() {
   return (
     <Layout>
       <div className="flex flex-col h-full md:flex-row overflow-hidden">
-        {/* Left: Image/3D Viewer Area */}
         <div className="w-full md:w-3/5 h-[50vh] md:h-full relative bg-black/40 flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0 z-0">
-             <img 
-               src={trophy.imageUrl} 
-               alt={trophy.name}
-               className="w-full h-full object-cover opacity-40 blur-3xl scale-110"
-             />
+             {trophy.imageUrl && (
+               <img 
+                 src={trophy.imageUrl} 
+                 alt={trophy.name}
+                 className="w-full h-full object-cover opacity-40 blur-3xl scale-110"
+               />
+             )}
           </div>
           
           <motion.div 
@@ -54,15 +76,19 @@ export default function TrophyDetail() {
             transition={{ duration: 0.5 }}
             className="relative z-10 w-full h-full p-8 flex items-center justify-center"
           >
-            {/* Simulation of a 3D viewer container */}
             <div className="relative w-full max-w-md aspect-[3/4] md:aspect-square rounded-xl overflow-hidden shadow-2xl border border-white/10 group cursor-grab active:cursor-grabbing">
-              <img 
-                 src={trophy.imageUrl} 
-                 alt={trophy.name}
-                 className="w-full h-full object-cover"
-              />
+              {trophy.imageUrl ? (
+                <img 
+                   src={trophy.imageUrl} 
+                   alt={trophy.name}
+                   className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-secondary/10">
+                  <Camera className="h-16 w-16 text-muted-foreground/30" />
+                </div>
+              )}
               
-              {/* Fake 3D Controls */}
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md rounded-full px-4 py-2 flex gap-4 text-white/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <span className="text-xs font-mono">360° VIEW</span>
               </div>
@@ -77,13 +103,12 @@ export default function TrophyDetail() {
           </motion.div>
 
           <Link href="/trophies">
-            <Button variant="ghost" size="icon" className="absolute top-6 left-6 z-20 text-white hover:bg-white/10 rounded-full">
+            <Button variant="ghost" size="icon" className="absolute top-6 left-6 z-20 text-white hover:bg-white/10 rounded-full" data-testid="button-back">
               <ArrowLeft className="h-6 w-6" />
             </Button>
           </Link>
         </div>
 
-        {/* Right: Details Panel */}
         <div className="w-full md:w-2/5 h-full overflow-y-auto bg-background/95 border-l border-border/40 p-8">
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -92,17 +117,17 @@ export default function TrophyDetail() {
           >
             <div className="flex justify-between items-start mb-2">
               <div className="text-sm font-medium text-primary tracking-widest uppercase">{trophy.species}</div>
-              <Button onClick={handleShare} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-green-500/10 hover:text-green-500 transition-colors">
+              <Button onClick={handleShare} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-green-500/10 hover:text-green-500 transition-colors" data-testid="button-share">
                 <Share2 className="h-4 w-4" />
               </Button>
             </div>
             
-            <h1 className="text-4xl font-serif font-bold text-foreground mb-4">{trophy.name}</h1>
+            <h1 className="text-4xl font-serif font-bold text-foreground mb-4" data-testid="text-trophy-name">{trophy.name}</h1>
             
             <div className="flex gap-4 mb-8">
                <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-card border border-border/50 text-sm">
                  <TrophyIcon className="h-4 w-4 text-primary" />
-                 <span className="font-semibold">{trophy.score}</span>
+                 <span className="font-semibold" data-testid="text-trophy-score">{trophy.score}</span>
                </div>
                <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-card border border-border/50 text-sm">
                  <Target className="h-4 w-4 text-muted-foreground" />
@@ -110,7 +135,7 @@ export default function TrophyDetail() {
                </div>
             </div>
             
-            <Button onClick={handleShare} className="w-full mb-6 bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 font-medium">
+            <Button onClick={handleShare} className="w-full mb-6 bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 font-medium" data-testid="button-share-whatsapp">
               <MessageCircle className="h-4 w-4" /> Share on WhatsApp
             </Button>
 
@@ -160,19 +185,21 @@ export default function TrophyDetail() {
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">Field Notes</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground italic border-l-2 border-primary/30 pl-4 py-1">
-                  "{trophy.notes}"
-                </p>
-              </div>
+              {trophy.notes && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">Field Notes</h3>
+                  <p className="text-sm leading-relaxed text-muted-foreground italic border-l-2 border-primary/30 pl-4 py-1">
+                    "{trophy.notes}"
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="mt-10 pt-6 border-t border-border/50 flex gap-4">
-               <Button className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 font-serif">
+               <Button className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 font-serif" data-testid="button-certificate">
                  Generate Official Certificate
                </Button>
-               <Button variant="outline" className="border-border/50 text-foreground hover:bg-card">
+               <Button variant="outline" className="border-border/50 text-foreground hover:bg-card" data-testid="button-edit">
                  Edit
                </Button>
             </div>
