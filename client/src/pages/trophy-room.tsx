@@ -82,19 +82,11 @@ export default function TrophyRoom() {
         </header>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredTrophies.map((trophy, i) => (
-            <Link key={trophy.id} href={`/trophies/${trophy.id}`}>
-              <div className="cursor-pointer h-full">
-                <TrophyCard trophy={trophy} index={i} />
-              </div>
-            </Link>
-          ))}
-          
           {/* Add New Placeholder */}
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.1 }}
             className="group min-h-[300px] flex flex-col items-center justify-center border-2 border-dashed border-border/40 rounded-xl p-6 text-center hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer"
           >
             <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -106,6 +98,14 @@ export default function TrophyRoom() {
               Upload Now
             </Button>
           </motion.div>
+
+          {filteredTrophies.map((trophy, i) => (
+            <Link key={trophy.id} href={`/trophies/${trophy.id}`}>
+              <div className="cursor-pointer h-full">
+                <TrophyCard trophy={trophy} index={i} />
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
     </Layout>
