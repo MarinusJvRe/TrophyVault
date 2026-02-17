@@ -3,16 +3,19 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/lib/theme-context";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import TrophyRoom from "@/pages/trophy-room";
 import TrophyDetail from "@/pages/trophy-detail";
 import Placeholder from "@/pages/placeholder";
+import Onboarding from "@/pages/onboarding";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/onboarding" component={Onboarding} />
       <Route path="/trophies" component={TrophyRoom} />
       <Route path="/trophies/:id" component={TrophyDetail} />
       <Route path="/expeditions">
@@ -29,10 +32,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

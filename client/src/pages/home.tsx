@@ -5,18 +5,35 @@ import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { useTheme } from "@/lib/theme-context";
+
+// Theme images
+import themeLodge from "../assets/theme-lodge.png";
+import themeManor from "../assets/theme-manor.png";
+import themeMinimal from "../assets/theme-minimal.png";
 
 export default function Home() {
+  const { theme } = useTheme();
   const featuredTrophies = trophies.filter(t => t.featured);
+
+  // Dynamic Hero Image based on Theme
+  const currentHero = theme === "manor" ? themeManor 
+                     : theme === "minimal" ? themeMinimal 
+                     : themeLodge;
 
   return (
     <Layout>
       <div className="min-h-full pb-10">
         {/* Hero Section */}
         <div className="relative h-[60vh] w-full overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent z-10"></div>
-          <img 
-            src={heroImage} 
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent z-10"></div>
+          
+          <motion.img 
+            key={theme}
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1 }}
+            src={currentHero} 
             alt="Lodge" 
             className="absolute inset-0 w-full h-full object-cover"
           />
@@ -31,11 +48,11 @@ export default function Home() {
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
                 <span className="text-xs font-medium text-primary tracking-wider uppercase">AI Analysis Ready</span>
               </div>
-              <h1 className="text-4xl md:text-6xl font-serif font-bold text-white mb-4 leading-tight">
+              <h1 className="text-4xl md:text-6xl font-serif font-bold text-white mb-4 leading-tight drop-shadow-lg">
                 Preserve the Legacy.<br/>
-                <span className="text-white/80 italic font-light">Honor the Hunt.</span>
+                <span className="text-white/90 italic font-light">Honor the Hunt.</span>
               </h1>
-              <p className="text-lg text-white/70 max-w-xl mb-8 font-light">
+              <p className="text-lg text-white/90 max-w-xl mb-8 font-light drop-shadow-md">
                 Your digital trophy room, enhanced with AI identification and 3D modeling. 
                 Track your achievements with precision and elegance.
               </p>
@@ -109,7 +126,7 @@ function StatCard({ icon: Icon, label, value, subtext, delay }: any) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: delay, duration: 0.5 }}
     >
-      <Card className="bg-card/90 backdrop-blur-xl border-white/5 shadow-2xl">
+      <Card className="bg-card/90 backdrop-blur-xl border-border/10 shadow-2xl">
         <CardContent className="p-6">
           <div className="flex items-start justify-between">
             <div>
