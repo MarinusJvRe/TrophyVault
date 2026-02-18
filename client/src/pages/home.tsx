@@ -203,21 +203,21 @@ function RatingCard({ rating, source, ratingCount, delay }: { rating: number | n
               <p className="text-muted-foreground text-sm font-medium uppercase tracking-wider">Room Rating</p>
               {rating !== null ? (
                 <>
-                  <div className="mt-2" data-testid="text-stat-room-rating">
+                  <div className="mt-2 h-[2.25rem] flex items-center" data-testid="text-stat-room-rating">
                     <StarRating rating={rating} />
                   </div>
-                  <p className="text-xs text-primary mt-1.5">
+                  <p className="text-xs text-primary mt-1">
                     {source === "community"
-                      ? `${rating.toFixed(1)} from ${ratingCount} ${ratingCount === 1 ? "vote" : "votes"}`
-                      : `${rating.toFixed(1)} based on uploads`}
+                      ? `${rating.toFixed(1)} · public rating`
+                      : `${rating.toFixed(1)} · private room rating`}
                   </p>
                 </>
               ) : (
                 <>
-                  <div className="mt-2" data-testid="text-stat-room-rating">
+                  <div className="mt-2 h-[2.25rem] flex items-center" data-testid="text-stat-room-rating">
                     <StarRating rating={0} />
                   </div>
-                  <p className="text-xs text-primary mt-1.5">Add trophies to earn a rating</p>
+                  <p className="text-xs text-primary mt-1">Add trophies to earn a rating</p>
                 </>
               )}
             </div>
