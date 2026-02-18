@@ -36,7 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/lib/theme-context";
 
 import wallLodge from "@/assets/wall-lodge.png";
-import wallManor from "@/assets/wall-manor.png";
+import wallManor from "@/assets/wall-manor-texture.png";
 import wallMinimal from "@/assets/wall-minimal.png";
 
 const WALL_TEXTURES: Record<string, { src: string; opacity: string }> = {
