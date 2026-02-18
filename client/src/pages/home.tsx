@@ -69,11 +69,11 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
             >
-              <h1 className="text-4xl md:text-6xl font-serif font-bold text-white mb-4 leading-tight drop-shadow-lg" data-testid="text-hero-heading">
+              <h1 className={`text-4xl md:text-6xl font-serif font-bold mb-4 leading-tight ${theme === "minimal" ? "text-foreground" : "text-white drop-shadow-lg"}`} data-testid="text-hero-heading">
                 Preserve the Legacy.<br/>
-                <span className="text-white/90 italic font-light">Honor the Hunt.</span>
+                <span className={`italic font-light ${theme === "minimal" ? "text-foreground/80" : "text-white/90"}`}>Honor the Hunt.</span>
               </h1>
-              <p className="text-lg text-white/90 max-w-xl mb-2 font-light drop-shadow-md" data-testid="text-hero-subtitle">
+              <p className={`text-lg max-w-xl mb-2 font-light ${theme === "minimal" ? "text-muted-foreground" : "text-white/90 drop-shadow-md"}`} data-testid="text-hero-subtitle">
                 {user?.firstName ? `${user.firstName}'s hunts at a glance.` : "Your hunts at a glance."}
               </p>
             </motion.div>
@@ -185,14 +185,14 @@ function FeaturedCard({ trophy, index }: { trophy: TrophyType, index: number }) 
             <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest bg-primary text-primary-foreground">
               {trophy.species}
             </span>
-            <span className="text-xs text-white/70 flex items-center gap-1">
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Calendar className="h-3 w-3" /> {new Date(trophy.date).getFullYear()}
             </span>
           </div>
           
-          <h3 className="text-2xl font-serif font-bold text-white mb-2">{trophy.name}</h3>
+          <h3 className="text-2xl font-serif font-bold text-foreground mb-2">{trophy.name}</h3>
           
-          <div className="grid grid-cols-2 gap-4 mb-4 text-sm text-white/80">
+          <div className="grid grid-cols-2 gap-4 mb-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-primary" />
               {trophy.location}
