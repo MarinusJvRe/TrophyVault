@@ -33,6 +33,17 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Trophy } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "@/lib/theme-context";
+
+import wallLodge from "@/assets/wall-lodge.png";
+import wallManor from "@/assets/wall-manor.png";
+import wallMinimal from "@/assets/wall-minimal.png";
+
+const WALL_TEXTURES: Record<string, { src: string; opacity: string }> = {
+  lodge: { src: wallLodge, opacity: "opacity-[0.08]" },
+  manor: { src: wallManor, opacity: "opacity-[0.10]" },
+  minimal: { src: wallMinimal, opacity: "opacity-[0.06]" },
+};
 
 export default function TrophyRoom() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -40,6 +51,8 @@ export default function TrophyRoom() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { theme } = useTheme();
+  const wallTexture = WALL_TEXTURES[theme] || WALL_TEXTURES.lodge;
 
   const { data: trophies = [], isLoading } = useQuery<Trophy[]>({
     queryKey: ["/api/trophies"],
@@ -98,7 +111,13 @@ export default function TrophyRoom() {
 
   return (
     <Layout>
-      <div className="p-6 md:p-12 max-w-7xl mx-auto min-h-full">
+      <div className="relative min-h-full">
+        <div
+          className={cn("absolute inset-0 bg-repeat bg-[length:512px_512px] pointer-events-none", wallTexture.opacity)}
+          style={{ backgroundImage: `url(${wallTexture.src})` }}
+          data-testid="wall-cladding-background"
+        />
+        <div className="relative p-6 md:p-12 max-w-7xl mx-auto min-h-full">
         <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <h1 className="text-3xl md:text-4xl font-serif font-bold text-primary mb-2">The Vault</h1>
@@ -235,6 +254,7 @@ export default function TrophyRoom() {
             </Link>
           ))}
         </div>
+      </div>
       </div>
     </Layout>
   );
