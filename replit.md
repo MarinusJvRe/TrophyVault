@@ -4,7 +4,9 @@
 TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
-- **2026-02-18**: Renamed themes: "Modern Lodge" → "Timber Ridge", "Classic Manor" → "Safari Manor" with African safari color palette and new preview images
+- **2026-02-18**: Redesigned Safari Manor to dark warm tones (thatch, khaki, leather, dark wood); fixed text readability across all themes
+- **2026-02-18**: Profile page: added photo upload, Premium/Free badge, moved sharing toggle below name, locations below pursuit
+- **2026-02-18**: Renamed themes: "Modern Lodge" → "Timber Ridge", "Classic Manor" → "Safari Manor"
 - **2026-02-18**: Added Profile/Settings page with theme selection, hunting preferences, favourite locations, room sharing toggle
 - **2026-02-18**: Added mobile bottom tab navigation for small screens
 - **2026-02-18**: Reordered sidebar navigation (Dashboard first), removed "Start New Expedition" button

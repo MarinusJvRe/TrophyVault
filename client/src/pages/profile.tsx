@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { User, Palette, MapPin, Target, Ruler, Eye, Check, Mountain, Home, Feather, LogOut } from "lucide-react";
+import { User, Palette, MapPin, Target, Ruler, Eye, Check, Mountain, Home, Feather, LogOut, Camera, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { UserPreferences } from "@shared/schema";
 
@@ -19,7 +19,7 @@ import themeMinimal from "../assets/theme-minimal.png";
 
 const THEMES = [
   { id: "lodge", name: "Timber Ridge", description: "Rugged timber, warm stone, mountain air.", image: themeLodge, icon: Mountain },
-  { id: "manor", name: "Safari Manor", description: "Victorian elegance meets African wilderness.", image: themeManor, icon: Home },
+  { id: "manor", name: "Safari Manor", description: "Thatch, khaki canvas, and luxury leather.", image: themeManor, icon: Home },
   { id: "minimal", name: "Alpine Gallery", description: "Concrete, glass, and light.", image: themeMinimal, icon: Feather },
 ];
 
@@ -44,6 +44,7 @@ export default function Profile() {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: preferences, isLoading } = useQuery<UserPreferences>({
     queryKey: ["/api/preferences"],
@@ -76,6 +77,27 @@ export default function Profile() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to save preferences.", variant: "destructive" });
+    },
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/profile/upload-image", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
+      toast({ title: "Photo updated", description: "Your profile photo has been saved." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to upload photo.", variant: "destructive" });
     },
   });
 
@@ -127,6 +149,20 @@ export default function Profile() {
     autoSave({ roomVisibility: val });
   };
 
+  const handlePhotoClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      uploadMutation.mutate(file);
+    }
+  };
+
+  const profileImage = preferences?.profileImageUrl || user?.profileImageUrl;
+  const isPremium = preferences?.isPremium || false;
+
   if (isLoading) {
     return (
       <Layout>
@@ -151,19 +187,69 @@ export default function Profile() {
         <Card className="bg-card border-border/40">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              {user?.profileImageUrl ? (
-                <img src={user.profileImageUrl} alt="Profile" className="h-16 w-16 rounded-full border-2 border-primary/30 object-cover" data-testid="img-profile-avatar" />
-              ) : (
-                <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary/30" data-testid="img-profile-avatar">
-                  <User className="h-8 w-8 text-primary" />
+              <div className="relative group cursor-pointer" onClick={handlePhotoClick} data-testid="button-upload-photo">
+                {profileImage ? (
+                  <img src={profileImage} alt="Profile" className="h-20 w-20 rounded-full border-2 border-primary/30 object-cover" data-testid="img-profile-avatar" />
+                ) : (
+                  <div className="h-20 w-20 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary/30" data-testid="img-profile-avatar">
+                    <User className="h-10 w-10 text-primary" />
+                  </div>
+                )}
+                <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Camera className="h-5 w-5 text-white" />
                 </div>
-              )}
-              <div>
-                <h2 className="text-xl font-serif font-bold text-foreground" data-testid="text-profile-name">
-                  {user?.firstName || ""} {user?.lastName || ""}
-                </h2>
+                {uploadMutation.isPending && (
+                  <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+                data-testid="input-profile-photo"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-serif font-bold text-foreground" data-testid="text-profile-name">
+                    {user?.firstName || ""} {user?.lastName || ""}
+                  </h2>
+                  <span className={cn(
+                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider",
+                    isPremium
+                      ? "bg-amber-500/20 text-amber-500 border border-amber-500/30"
+                      : "bg-muted text-muted-foreground border border-border/40"
+                  )} data-testid="badge-membership">
+                    {isPremium && <Crown className="h-2.5 w-2.5" />}
+                    {isPremium ? "Premium" : "Free"}
+                  </span>
+                </div>
                 <p className="text-sm text-muted-foreground" data-testid="text-profile-email">{user?.email || ""}</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border/40">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Eye className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-medium text-foreground text-sm">Public Trophy Room</div>
+                  <div className="text-xs text-muted-foreground">
+                    Allow others to view and rate your room.
+                  </div>
+                </div>
+              </div>
+              <Switch
+                checked={roomVisibility === "public"}
+                onCheckedChange={handleVisibilityChange}
+                data-testid="switch-room-visibility"
+              />
             </div>
           </CardContent>
         </Card>
@@ -240,6 +326,38 @@ export default function Profile() {
             <Separator className="bg-border/30" />
 
             <div className="space-y-3">
+              <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                <MapPin className="h-4 w-4 inline mr-2" />
+                Favourite Hunting Locations
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {HUNTING_LOCATIONS.map((loc) => (
+                  <button
+                    key={loc}
+                    onClick={() => toggleLocation(loc)}
+                    data-testid={`button-location-${loc.toLowerCase().replace(/[\s-]/g, '-')}`}
+                    className={cn(
+                      "flex items-center gap-3 py-3 px-4 rounded-lg text-sm border text-left transition-all",
+                      huntingLocations.includes(loc)
+                        ? "bg-primary/10 border-primary/50 text-foreground"
+                        : "bg-card border-border/40 text-muted-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    <div className={cn(
+                      "h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
+                      huntingLocations.includes(loc) ? "bg-primary border-primary" : "border-border/60"
+                    )}>
+                      {huntingLocations.includes(loc) && <Check className="h-3 w-3 text-primary-foreground" />}
+                    </div>
+                    {loc}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Separator className="bg-border/30" />
+
+            <div className="space-y-3">
               <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Scoring System</label>
               <div className="grid grid-cols-3 gap-3">
                 {SCORING_SYSTEMS.map((option) => (
@@ -284,62 +402,6 @@ export default function Profile() {
                   </button>
                 ))}
               </div>
-            </div>
-
-            <Separator className="bg-border/30" />
-
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                <MapPin className="h-4 w-4 inline mr-2" />
-                Favourite Hunting Locations
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {HUNTING_LOCATIONS.map((loc) => (
-                  <button
-                    key={loc}
-                    onClick={() => toggleLocation(loc)}
-                    data-testid={`button-location-${loc.toLowerCase().replace(/[\s-]/g, '-')}`}
-                    className={cn(
-                      "flex items-center gap-3 py-3 px-4 rounded-lg text-sm border text-left transition-all",
-                      huntingLocations.includes(loc)
-                        ? "bg-primary/10 border-primary/50 text-foreground"
-                        : "bg-card border-border/40 text-muted-foreground hover:bg-muted/50"
-                    )}
-                  >
-                    <div className={cn(
-                      "h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
-                      huntingLocations.includes(loc) ? "bg-primary border-primary" : "border-border/60"
-                    )}>
-                      {huntingLocations.includes(loc) && <Check className="h-3 w-3 text-primary-foreground" />}
-                    </div>
-                    {loc}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border/40">
-          <CardHeader>
-            <CardTitle className="font-serif flex items-center gap-2 text-lg">
-              <Eye className="h-5 w-5 text-primary" />
-              Trophy Room Sharing
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/20 border border-border/40">
-              <div>
-                <div className="font-medium text-foreground">Public Trophy Room</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Allow other hunters to view and rate your trophy room in the Community section.
-                </div>
-              </div>
-              <Switch
-                checked={roomVisibility === "public"}
-                onCheckedChange={handleVisibilityChange}
-                data-testid="switch-room-visibility"
-              />
             </div>
           </CardContent>
         </Card>

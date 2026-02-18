@@ -45,6 +45,8 @@ export const userPreferences = pgTable("user_preferences", {
   units: text("units").default("imperial"),
   roomVisibility: text("room_visibility").default("private"),
   huntingLocations: text("hunting_locations").array().default(sql`'{}'::text[]`),
+  profileImageUrl: text("profile_image_url"),
+  isPremium: boolean("is_premium").default(false),
 });
 
 export const roomRatings = pgTable("room_ratings", {

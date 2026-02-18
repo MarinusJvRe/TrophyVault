@@ -3,6 +3,30 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema } from "@shared/schema";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const uploadDir = path.join(process.cwd(), "uploads", "profiles");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const profileUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || ".jpg";
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Only JPEG, PNG, WebP, or GIF images are allowed"));
+  },
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -11,6 +35,10 @@ export async function registerRoutes(
   // Setup auth BEFORE other routes
   await setupAuth(app);
   registerAuthRoutes(app);
+
+  // Serve uploaded files
+  const express = await import("express");
+  app.use("/uploads", express.default.static(path.join(process.cwd(), "uploads")));
 
   // Helper to get user ID from request
   const getUserId = (req: any): string => req.user?.claims?.sub;
@@ -88,6 +116,14 @@ export async function registerRoutes(
     if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten() });
     const prefs = await storage.upsertPreferences(getUserId(req), parsed.data);
     res.json(prefs);
+  });
+
+  // ========== PROFILE IMAGE UPLOAD ==========
+  app.post("/api/profile/upload-image", isAuthenticated, profileUpload.single("image"), async (req, res) => {
+    if (!req.file) return res.status(400).json({ message: "No image file provided" });
+    const imageUrl = `/uploads/profiles/${req.file.filename}`;
+    const prefs = await storage.upsertPreferences(getUserId(req), { profileImageUrl: imageUrl } as any);
+    res.json({ imageUrl, preferences: prefs });
   });
 
   // ========== COMMUNITY / ROOM RATINGS ==========

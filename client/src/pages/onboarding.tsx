@@ -23,7 +23,7 @@ const THEMES = [
   {
     id: "manor",
     name: "Safari Manor",
-    description: "Victorian elegance meets African wilderness. The gentleman's retreat.",
+    description: "Thatch, khaki canvas, and luxury leather. The gentleman's retreat.",
     image: themeManor,
     icon: Home
   },

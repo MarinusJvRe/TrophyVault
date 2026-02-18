@@ -29,19 +29,33 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.style.setProperty("--foreground", "220 40% 10%");
       root.style.setProperty("--card", "0 0% 100%");
       root.style.setProperty("--card-foreground", "220 40% 10%");
-      root.style.setProperty("--primary", "220 10% 20%"); // Dark Slate
+      root.style.setProperty("--primary", "220 10% 20%");
       root.style.setProperty("--primary-foreground", "210 20% 98%");
-      root.style.setProperty("--border", "220 10% 90%");
+      root.style.setProperty("--secondary", "210 15% 92%");
+      root.style.setProperty("--secondary-foreground", "220 40% 10%");
       root.style.setProperty("--muted", "220 10% 94%");
+      root.style.setProperty("--muted-foreground", "220 10% 40%");
+      root.style.setProperty("--accent", "210 15% 92%");
+      root.style.setProperty("--accent-foreground", "220 40% 10%");
+      root.style.setProperty("--border", "220 10% 88%");
+      root.style.setProperty("--input", "220 10% 88%");
+      root.style.setProperty("--ring", "220 10% 20%");
     } else if (newTheme === "manor") {
-      root.style.setProperty("--background", "38 35% 93%");
-      root.style.setProperty("--foreground", "25 30% 12%");
-      root.style.setProperty("--card", "35 30% 89%");
-      root.style.setProperty("--card-foreground", "25 30% 12%");
-      root.style.setProperty("--primary", "35 60% 35%");
-      root.style.setProperty("--primary-foreground", "38 35% 95%");
-      root.style.setProperty("--border", "35 20% 78%");
-      root.style.setProperty("--muted", "35 20% 82%");
+      root.style.setProperty("--background", "25 20% 7%");
+      root.style.setProperty("--foreground", "35 25% 90%");
+      root.style.setProperty("--card", "25 18% 12%");
+      root.style.setProperty("--card-foreground", "35 25% 90%");
+      root.style.setProperty("--primary", "35 55% 50%");
+      root.style.setProperty("--primary-foreground", "25 20% 7%");
+      root.style.setProperty("--secondary", "25 15% 18%");
+      root.style.setProperty("--secondary-foreground", "35 20% 85%");
+      root.style.setProperty("--muted", "25 12% 18%");
+      root.style.setProperty("--muted-foreground", "30 15% 55%");
+      root.style.setProperty("--accent", "35 55% 50%");
+      root.style.setProperty("--accent-foreground", "25 20% 7%");
+      root.style.setProperty("--border", "25 12% 20%");
+      root.style.setProperty("--input", "25 12% 20%");
+      root.style.setProperty("--ring", "35 55% 50%");
     } else {
       // Default Timber Ridge (Dark) - Reset to CSS defaults
       root.style.removeProperty("--background");
@@ -50,8 +64,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.style.removeProperty("--card-foreground");
       root.style.removeProperty("--primary");
       root.style.removeProperty("--primary-foreground");
-      root.style.removeProperty("--border");
+      root.style.removeProperty("--secondary");
+      root.style.removeProperty("--secondary-foreground");
       root.style.removeProperty("--muted");
+      root.style.removeProperty("--muted-foreground");
+      root.style.removeProperty("--accent");
+      root.style.removeProperty("--accent-foreground");
+      root.style.removeProperty("--border");
+      root.style.removeProperty("--input");
+      root.style.removeProperty("--ring");
     }
   };
 
