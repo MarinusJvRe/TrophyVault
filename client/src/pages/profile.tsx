@@ -26,8 +26,7 @@ const THEMES = [
 const HUNTING_LOCATIONS = [
   "Southern Africa - Bushveld",
   "Southern Africa - Plains",
-  "Southern Africa - Coastal",
-  "East Africa - Savanna",
+  "Africa - Other",
   "North America - High Country",
   "North America - Midwest",
   "North America - Deep Woods",
@@ -74,29 +73,58 @@ export default function Profile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
-      toast({ title: "Settings saved", description: "Your preferences have been updated." });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to save preferences.", variant: "destructive" });
     },
   });
 
-  const handleSave = () => {
-    setTheme(selectedTheme as any);
-    saveMutation.mutate({
+  const autoSave = (overrides: Record<string, any>) => {
+    const data = {
       theme: selectedTheme,
       pursuit,
       scoringSystem,
       units,
       huntingLocations,
       roomVisibility,
-    });
+      ...overrides,
+    };
+    saveMutation.mutate(data);
+  };
+
+  const handleThemeSelect = (id: "lodge" | "manor" | "minimal") => {
+    setSelectedTheme(id);
+    setTheme(id);
+    autoSave({ theme: id });
+  };
+
+  const handlePursuitSelect = (option: string) => {
+    setPursuit(option);
+    autoSave({ pursuit: option });
+  };
+
+  const handleScoringSelect = (option: string) => {
+    setScoringSystem(option);
+    autoSave({ scoringSystem: option });
+  };
+
+  const handleUnitsSelect = (option: string) => {
+    setUnits(option);
+    autoSave({ units: option });
   };
 
   const toggleLocation = (loc: string) => {
-    setHuntingLocations(prev =>
-      prev.includes(loc) ? prev.filter(l => l !== loc) : [...prev, loc]
-    );
+    const updated = huntingLocations.includes(loc)
+      ? huntingLocations.filter(l => l !== loc)
+      : [...huntingLocations, loc];
+    setHuntingLocations(updated);
+    autoSave({ huntingLocations: updated });
+  };
+
+  const handleVisibilityChange = (checked: boolean) => {
+    const val = checked ? "public" : "private";
+    setRoomVisibility(val);
+    autoSave({ roomVisibility: val });
   };
 
   if (isLoading) {
@@ -152,7 +180,7 @@ export default function Profile() {
               {THEMES.map((t) => (
                 <div
                   key={t.id}
-                  onClick={() => setSelectedTheme(t.id as "lodge" | "manor" | "minimal")}
+                  onClick={() => handleThemeSelect(t.id as "lodge" | "manor" | "minimal")}
                   data-testid={`button-theme-${t.id}`}
                   className={cn(
                     "cursor-pointer group relative rounded-xl overflow-hidden border-2 transition-all duration-300 h-[180px]",
@@ -194,7 +222,7 @@ export default function Profile() {
                 {PURSUITS.map((option) => (
                   <button
                     key={option}
-                    onClick={() => setPursuit(option)}
+                    onClick={() => handlePursuitSelect(option)}
                     data-testid={`button-pursuit-${option.toLowerCase().replace(/\s/g, '-')}`}
                     className={cn(
                       "py-3 px-4 rounded-lg text-sm border transition-all",
@@ -217,7 +245,7 @@ export default function Profile() {
                 {SCORING_SYSTEMS.map((option) => (
                   <button
                     key={option}
-                    onClick={() => setScoringSystem(option)}
+                    onClick={() => handleScoringSelect(option)}
                     data-testid={`button-scoring-${option.toLowerCase().replace(/[&\s]/g, '-')}`}
                     className={cn(
                       "py-3 px-4 rounded-lg text-sm border transition-all",
@@ -243,7 +271,7 @@ export default function Profile() {
                 {["Imperial", "Metric"].map((option) => (
                   <button
                     key={option}
-                    onClick={() => setUnits(option.toLowerCase())}
+                    onClick={() => handleUnitsSelect(option.toLowerCase())}
                     data-testid={`button-units-${option.toLowerCase()}`}
                     className={cn(
                       "py-2 px-6 rounded-md text-sm transition-all",
@@ -257,40 +285,37 @@ export default function Profile() {
                 ))}
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card className="bg-card border-border/40">
-          <CardHeader>
-            <CardTitle className="font-serif flex items-center gap-2 text-lg">
-              <MapPin className="h-5 w-5 text-primary" />
-              Favourite Hunting Locations
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">Select all regions where you typically hunt.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {HUNTING_LOCATIONS.map((loc) => (
-                <button
-                  key={loc}
-                  onClick={() => toggleLocation(loc)}
-                  data-testid={`button-location-${loc.toLowerCase().replace(/[\s-]/g, '-')}`}
-                  className={cn(
-                    "flex items-center gap-3 py-3 px-4 rounded-lg text-sm border text-left transition-all",
-                    huntingLocations.includes(loc)
-                      ? "bg-primary/10 border-primary/50 text-foreground"
-                      : "bg-card border-border/40 text-muted-foreground hover:bg-muted/50"
-                  )}
-                >
-                  <div className={cn(
-                    "h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
-                    huntingLocations.includes(loc) ? "bg-primary border-primary" : "border-border/60"
-                  )}>
-                    {huntingLocations.includes(loc) && <Check className="h-3 w-3 text-primary-foreground" />}
-                  </div>
-                  {loc}
-                </button>
-              ))}
+            <Separator className="bg-border/30" />
+
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                <MapPin className="h-4 w-4 inline mr-2" />
+                Favourite Hunting Locations
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {HUNTING_LOCATIONS.map((loc) => (
+                  <button
+                    key={loc}
+                    onClick={() => toggleLocation(loc)}
+                    data-testid={`button-location-${loc.toLowerCase().replace(/[\s-]/g, '-')}`}
+                    className={cn(
+                      "flex items-center gap-3 py-3 px-4 rounded-lg text-sm border text-left transition-all",
+                      huntingLocations.includes(loc)
+                        ? "bg-primary/10 border-primary/50 text-foreground"
+                        : "bg-card border-border/40 text-muted-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    <div className={cn(
+                      "h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
+                      huntingLocations.includes(loc) ? "bg-primary border-primary" : "border-border/60"
+                    )}>
+                      {huntingLocations.includes(loc) && <Check className="h-3 w-3 text-primary-foreground" />}
+                    </div>
+                    {loc}
+                  </button>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -312,25 +337,16 @@ export default function Profile() {
               </div>
               <Switch
                 checked={roomVisibility === "public"}
-                onCheckedChange={(checked) => setRoomVisibility(checked ? "public" : "private")}
+                onCheckedChange={handleVisibilityChange}
                 data-testid="switch-room-visibility"
               />
             </div>
           </CardContent>
         </Card>
 
-        <div className="flex flex-col sm:flex-row gap-4 pt-2">
-          <Button
-            size="lg"
-            onClick={handleSave}
-            disabled={saveMutation.isPending}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground font-serif flex-1"
-            data-testid="button-save-profile"
-          >
-            {saveMutation.isPending ? "Saving..." : "Save All Settings"}
-          </Button>
-          <a href="/api/logout" className="sm:w-auto">
-            <Button size="lg" variant="outline" className="w-full gap-2 border-border/40 text-muted-foreground hover:text-destructive hover:border-destructive/50" data-testid="button-profile-logout">
+        <div className="flex justify-end pt-2">
+          <a href="/api/logout">
+            <Button size="lg" variant="outline" className="gap-2 border-border/40 text-muted-foreground hover:text-destructive hover:border-destructive/50" data-testid="button-profile-logout">
               <LogOut className="h-4 w-4" /> Sign Out
             </Button>
           </a>

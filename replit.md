@@ -51,7 +51,7 @@ CSS variables update dynamically via ThemeProvider context. HSL format without h
 - Primary Pursuit: Big Game, Plains Game, Waterfowl, Alpine
 - Scoring System: SCI, Boone & Crockett, Rowland Ward
 - Units: Imperial, Metric
-- Hunting Locations: Multi-select (Southern Africa Bushveld/Plains/Coastal, East Africa Savanna, North America High Country/Midwest/Deep Woods/Plains, Europe Alpine/Nordic, Other)
+- Hunting Locations: Multi-select (Southern Africa Bushveld/Plains, Africa Other, North America High Country/Midwest/Deep Woods/Plains, Europe Alpine/Nordic, Other)
 - Room Visibility: Public/Private
 
 ## Design Notes

@@ -240,8 +240,7 @@ export default function Onboarding() {
                   {[
                     "Southern Africa - Bushveld",
                     "Southern Africa - Plains",
-                    "Southern Africa - Coastal",
-                    "East Africa - Savanna",
+                    "Africa - Other",
                     "North America - High Country",
                     "North America - Midwest",
                     "North America - Deep Woods",
