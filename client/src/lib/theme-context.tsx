@@ -34,16 +34,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.style.setProperty("--border", "220 10% 90%");
       root.style.setProperty("--muted", "220 10% 94%");
     } else if (newTheme === "manor") {
-      root.style.setProperty("--background", "30 20% 95%"); // Warm cream
-      root.style.setProperty("--foreground", "30 10% 10%");
-      root.style.setProperty("--card", "30 20% 92%");
-      root.style.setProperty("--card-foreground", "30 10% 10%");
-      root.style.setProperty("--primary", "15 40% 30%"); // Rich Mahogany/Leather
-      root.style.setProperty("--primary-foreground", "30 20% 95%");
-      root.style.setProperty("--border", "30 15% 85%");
-      root.style.setProperty("--muted", "30 15% 88%");
+      root.style.setProperty("--background", "38 35% 93%");
+      root.style.setProperty("--foreground", "25 30% 12%");
+      root.style.setProperty("--card", "35 30% 89%");
+      root.style.setProperty("--card-foreground", "25 30% 12%");
+      root.style.setProperty("--primary", "35 60% 35%");
+      root.style.setProperty("--primary-foreground", "38 35% 95%");
+      root.style.setProperty("--border", "35 20% 78%");
+      root.style.setProperty("--muted", "35 20% 82%");
     } else {
-      // Default Lodge (Dark) - Reset to CSS defaults
+      // Default Timber Ridge (Dark) - Reset to CSS defaults
       root.style.removeProperty("--background");
       root.style.removeProperty("--foreground");
       root.style.removeProperty("--card");

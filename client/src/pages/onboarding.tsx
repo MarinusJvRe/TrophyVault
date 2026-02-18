@@ -15,15 +15,15 @@ import themeMinimal from "../assets/theme-minimal.png";
 const THEMES = [
   {
     id: "lodge",
-    name: "Modern Lodge",
-    description: "Deep forests, stone, and shadow. A sanctuary for the serious hunter.",
+    name: "Timber Ridge",
+    description: "Rugged timber, warm stone, mountain air. A sanctuary for the serious hunter.",
     image: themeLodge,
     icon: Mountain
   },
   {
     id: "manor",
-    name: "Classic Manor",
-    description: "Oak paneling, leather, and heritage. The gentleman's retreat.",
+    name: "Safari Manor",
+    description: "Victorian elegance meets African wilderness. The gentleman's retreat.",
     image: themeManor,
     icon: Home
   },

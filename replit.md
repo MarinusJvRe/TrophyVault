@@ -4,6 +4,7 @@
 TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
+- **2026-02-18**: Renamed themes: "Modern Lodge" → "Timber Ridge", "Classic Manor" → "Safari Manor" with African safari color palette and new preview images
 - **2026-02-18**: Added Profile/Settings page with theme selection, hunting preferences, favourite locations, room sharing toggle
 - **2026-02-18**: Added mobile bottom tab navigation for small screens
 - **2026-02-18**: Reordered sidebar navigation (Dashboard first), removed "Start New Expedition" button
@@ -43,7 +44,7 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 - `room_ratings` (roomOwnerId, raterId, score)
 
 ## Theme System
-Three themes: `lodge` (Modern Lodge), `manor` (Classic Manor), `minimal` (Alpine Gallery)
+Three themes: `lodge` (Timber Ridge), `manor` (Safari Manor), `minimal` (Alpine Gallery)
 CSS variables update dynamically via ThemeProvider context. HSL format without hsl() wrapper for Tailwind v4 compatibility.
 
 ## User Preferences

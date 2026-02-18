@@ -18,8 +18,8 @@ import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
 
 const THEMES = [
-  { id: "lodge", name: "Modern Lodge", description: "Deep forests, stone, and shadow.", image: themeLodge, icon: Mountain },
-  { id: "manor", name: "Classic Manor", description: "Oak paneling, leather, and heritage.", image: themeManor, icon: Home },
+  { id: "lodge", name: "Timber Ridge", description: "Rugged timber, warm stone, mountain air.", image: themeLodge, icon: Mountain },
+  { id: "manor", name: "Safari Manor", description: "Victorian elegance meets African wilderness.", image: themeManor, icon: Home },
   { id: "minimal", name: "Alpine Gallery", description: "Concrete, glass, and light.", image: themeMinimal, icon: Feather },
 ];
 
