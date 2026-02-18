@@ -70,9 +70,12 @@ export default function Home() {
               transition={{ duration: 0.8 }}
             >
               <h1 className="text-4xl md:text-6xl font-serif font-bold text-white mb-4 leading-tight drop-shadow-lg" data-testid="text-hero-heading">
-                {user?.firstName ? `${user.firstName}'s Hunts` : "Your Hunts"}<br/>
-                <span className="text-white/90 italic font-light">at a Glance.</span>
+                Preserve the Legacy.<br/>
+                <span className="text-white/90 italic font-light">Honor the Hunt.</span>
               </h1>
+              <p className="text-lg text-white/90 max-w-xl mb-2 font-light drop-shadow-md" data-testid="text-hero-subtitle">
+                {user?.firstName ? `${user.firstName}'s hunts at a glance.` : "Your hunts at a glance."}
+              </p>
             </motion.div>
           </div>
         </div>
