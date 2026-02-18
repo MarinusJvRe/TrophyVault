@@ -159,8 +159,10 @@ export async function registerRoutes(
     const userId = getUserId(req);
     const allTrophies = await storage.getTrophies(userId);
     const uniqueSpecies = new Set(allTrophies.map(t => t.species));
+    const qualifyingTrophies = allTrophies.filter(t => t.score && t.score.trim() !== "");
     res.json({
-      totalTrophies: allTrophies.length,
+      totalHunts: allTrophies.length,
+      totalTrophies: qualifyingTrophies.length,
       speciesCollected: uniqueSpecies.size,
       recentSpecies: allTrophies[0]?.species || null,
     });

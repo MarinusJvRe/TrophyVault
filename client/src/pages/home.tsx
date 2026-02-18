@@ -22,6 +22,7 @@ export default function Home() {
   });
 
   const { data: stats, isLoading: statsLoading } = useQuery<{
+    totalHunts: number;
     totalTrophies: number;
     speciesCollected: number;
     recentSpecies: string | null;
@@ -70,7 +71,7 @@ export default function Home() {
               transition={{ duration: 0.8 }}
             >
               <h1 className={`text-4xl md:text-6xl font-serif font-bold mb-4 leading-tight ${theme === "minimal" ? "text-foreground" : "text-white drop-shadow-lg"}`} data-testid="text-hero-heading">
-                Preserve the Legacy.<br/>
+                Preserve your Legacy.<br/>
                 <span className={`italic font-light ${theme === "minimal" ? "text-foreground/80" : "text-white/90"}`}>Honor the Hunt.</span>
               </h1>
               <p className={`text-lg max-w-xl mb-2 font-light ${theme === "minimal" ? "text-muted-foreground" : "text-white/90 drop-shadow-md"}`} data-testid="text-hero-subtitle">
@@ -82,24 +83,24 @@ export default function Home() {
 
         <div className="max-w-7xl mx-auto px-6 md:px-12 -mt-8 md:-mt-16 relative z-30 grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatCard 
+            icon={Activity} 
+            label="Total Hunts" 
+            value={String(stats?.totalHunts ?? 0).padStart(2, "0")} 
+            subtext={`${stats?.totalHunts ?? 0} animals recorded`} 
+            delay={0.1}
+          />
+          <StatCard 
             icon={Trophy} 
             label="Total Trophies" 
             value={String(stats?.totalTrophies ?? 0).padStart(2, "0")} 
-            subtext={`${stats?.totalTrophies ?? 0} in collection`} 
-            delay={0.1}
+            subtext="Qualifying scored animals" 
+            delay={0.2}
           />
           <StatCard 
             icon={MapPin} 
             label="Species Collected" 
             value={String(stats?.speciesCollected ?? 0).padStart(2, "0")} 
             subtext={stats?.recentSpecies ? `Last: ${stats.recentSpecies}` : "No species yet"} 
-            delay={0.2}
-          />
-          <StatCard 
-            icon={Activity} 
-            label="Average Score" 
-            value="--" 
-            subtext="Start adding trophies" 
             delay={0.3}
           />
         </div>
