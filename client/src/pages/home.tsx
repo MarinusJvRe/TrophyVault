@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useTheme } from "@/lib/theme-context";
+import { useAuth } from "@/hooks/use-auth";
 import type { Trophy as TrophyType } from "@shared/schema";
 
 import themeLodge from "../assets/theme-lodge.png";
@@ -14,6 +15,7 @@ import themeMinimal from "../assets/theme-minimal.png";
 
 export default function Home() {
   const { theme } = useTheme();
+  const { user } = useAuth();
 
   const { data: trophies = [], isLoading: trophiesLoading } = useQuery<TrophyType[]>({
     queryKey: ["/api/trophies"],
@@ -67,26 +69,10 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
             >
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 border border-primary/30 backdrop-blur-md mb-4">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                <span className="text-xs font-medium text-primary tracking-wider uppercase">AI Analysis Ready</span>
-              </div>
-              <h1 className="text-4xl md:text-6xl font-serif font-bold text-white mb-4 leading-tight drop-shadow-lg">
-                Preserve the Legacy.<br/>
-                <span className="text-white/90 italic font-light">Honor the Hunt.</span>
+              <h1 className="text-4xl md:text-6xl font-serif font-bold text-white mb-4 leading-tight drop-shadow-lg" data-testid="text-hero-heading">
+                {user?.firstName ? `${user.firstName}'s Hunts` : "Your Hunts"}<br/>
+                <span className="text-white/90 italic font-light">at a Glance.</span>
               </h1>
-              <p className="text-lg text-white/90 max-w-xl mb-8 font-light drop-shadow-md">
-                Your digital trophy room, enhanced with AI identification and 3D modeling. 
-                Track your achievements with precision and elegance.
-              </p>
-              
-              <div className="flex flex-wrap gap-4">
-                <Link href="/trophies">
-                  <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-serif tracking-wide" data-testid="button-view-trophy-room">
-                    View Trophy Room
-                  </Button>
-                </Link>
-              </div>
             </motion.div>
           </div>
         </div>
