@@ -160,11 +160,30 @@ export async function registerRoutes(
     const allTrophies = await storage.getTrophies(userId);
     const uniqueSpecies = new Set(allTrophies.map(t => t.species));
     const qualifyingTrophies = allTrophies.filter(t => t.score && t.score.trim() !== "");
+    const roomRating = await storage.getRoomRating(userId);
+
+    let rating: number | null = null;
+    let ratingSource: "community" | "auto" = "auto";
+    if (roomRating.totalRatings > 0) {
+      rating = Math.round(roomRating.avgScore * 100) / 100;
+      ratingSource = "community";
+    } else if (allTrophies.length > 0) {
+      const hasImage = allTrophies.filter(t => t.imageUrl).length;
+      const hasScore = qualifyingTrophies.length;
+      const hasNotes = allTrophies.filter(t => t.notes && t.notes.trim() !== "").length;
+      const total = allTrophies.length;
+      const completeness = ((hasImage / total) * 0.4 + (hasScore / total) * 0.35 + (hasNotes / total) * 0.25) * 5;
+      rating = Math.round(Math.min(5, Math.max(0.5, completeness)) * 100) / 100;
+    }
+
     res.json({
       totalHunts: allTrophies.length,
       totalTrophies: qualifyingTrophies.length,
       speciesCollected: uniqueSpecies.size,
       recentSpecies: allTrophies[0]?.species || null,
+      roomRating: rating,
+      roomRatingSource: ratingSource,
+      roomRatingCount: roomRating.totalRatings,
     });
   });
 

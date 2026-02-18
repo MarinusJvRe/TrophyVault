@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Trophy, MapPin, Calendar, Activity } from "lucide-react";
+import { ArrowRight, Trophy, MapPin, Calendar, Activity, Star } from "lucide-react";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,9 @@ export default function Home() {
     totalTrophies: number;
     speciesCollected: number;
     recentSpecies: string | null;
+    roomRating: number | null;
+    roomRatingSource: "community" | "auto";
+    roomRatingCount: number;
   }>({
     queryKey: ["/api/stats"],
   });
@@ -81,7 +84,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 md:px-12 -mt-8 md:-mt-16 relative z-30 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 -mt-8 md:-mt-16 relative z-30 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           <StatCard 
             icon={Activity} 
             label="Total Hunts" 
@@ -102,6 +105,12 @@ export default function Home() {
             value={String(stats?.speciesCollected ?? 0).padStart(2, "0")} 
             subtext={stats?.recentSpecies ? `Last: ${stats.recentSpecies}` : "No species yet"} 
             delay={0.3}
+          />
+          <RatingCard
+            rating={stats?.roomRating ?? null}
+            source={stats?.roomRatingSource ?? "auto"}
+            ratingCount={stats?.roomRatingCount ?? 0}
+            delay={0.4}
           />
         </div>
 
@@ -154,6 +163,66 @@ function StatCard({ icon: Icon, label, value, subtext, delay }: any) {
             </div>
             <div className="p-3 bg-primary/10 rounded-lg">
               <Icon className="h-6 w-6 text-primary" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <div className="flex gap-0.5" data-testid="star-rating-display">
+      {[1, 2, 3, 4, 5].map((star) => {
+        const fill = Math.min(1, Math.max(0, rating - (star - 1)));
+        return (
+          <div key={star} className="relative h-5 w-5">
+            <Star className="absolute inset-0 h-5 w-5 text-primary/20" />
+            <div className="absolute inset-0 overflow-hidden" style={{ width: `${fill * 100}%` }}>
+              <Star className="h-5 w-5 text-primary fill-primary" />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RatingCard({ rating, source, ratingCount, delay }: { rating: number | null; source: string; ratingCount: number; delay: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.5 }}
+    >
+      <Card className="bg-card/90 backdrop-blur-xl border-border/10 shadow-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-muted-foreground text-sm font-medium uppercase tracking-wider">Room Rating</p>
+              {rating !== null ? (
+                <>
+                  <div className="mt-2" data-testid="text-stat-room-rating">
+                    <StarRating rating={rating} />
+                  </div>
+                  <p className="text-xs text-primary mt-1.5">
+                    {source === "community"
+                      ? `${rating.toFixed(1)} from ${ratingCount} ${ratingCount === 1 ? "vote" : "votes"}`
+                      : `${rating.toFixed(1)} based on uploads`}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="mt-2" data-testid="text-stat-room-rating">
+                    <StarRating rating={0} />
+                  </div>
+                  <p className="text-xs text-primary mt-1.5">Add trophies to earn a rating</p>
+                </>
+              )}
+            </div>
+            <div className="p-3 bg-primary/10 rounded-lg">
+              <Star className="h-6 w-6 text-primary" />
             </div>
           </div>
         </CardContent>
