@@ -39,11 +39,12 @@ export const trophies = pgTable("trophies", {
 export const userPreferences = pgTable("user_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  theme: text("theme").default("lodge"), // lodge, manor, minimal
-  pursuit: text("pursuit"), // Big Game, Plains Game, Waterfowl, Alpine
+  theme: text("theme").default("lodge"),
+  pursuit: text("pursuit"),
   scoringSystem: text("scoring_system").default("SCI"),
-  units: text("units").default("imperial"), // imperial, metric
-  roomVisibility: text("room_visibility").default("private"), // private, public
+  units: text("units").default("imperial"),
+  roomVisibility: text("room_visibility").default("private"),
+  huntingLocations: text("hunting_locations").array().default(sql`'{}'::text[]`),
 });
 
 export const roomRatings = pgTable("room_ratings", {

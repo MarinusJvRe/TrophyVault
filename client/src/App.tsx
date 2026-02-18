@@ -13,6 +13,7 @@ import Placeholder from "@/pages/placeholder";
 import Onboarding from "@/pages/onboarding";
 import Safe from "@/pages/safe";
 import Community from "@/pages/community";
+import Profile from "@/pages/profile";
 import { Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import themeLodge from "./assets/theme-lodge.png";
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/trophies/:id" component={TrophyDetail} />
       <Route path="/safe" component={Safe} />
       <Route path="/community" component={Community} />
+      <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
   );

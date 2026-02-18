@@ -81,12 +81,11 @@ export default function Home() {
               </p>
               
               <div className="flex flex-wrap gap-4">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-serif tracking-wide">
-                  <Link href="/trophies">View Trophy Room</Link>
-                </Button>
-                <Button size="lg" variant="outline" className="bg-white/5 border-white/20 text-white hover:bg-white/10 backdrop-blur-sm">
-                  Start New Expedition
-                </Button>
+                <Link href="/trophies">
+                  <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-serif tracking-wide" data-testid="button-view-trophy-room">
+                    View Trophy Room
+                  </Button>
+                </Link>
               </div>
             </motion.div>
           </div>

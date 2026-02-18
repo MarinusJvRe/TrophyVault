@@ -44,11 +44,12 @@ export default function Onboarding() {
   const [formData, setFormData] = useState({
     pursuit: "",
     scoring: "sci",
-    units: "imperial"
+    units: "imperial",
+    huntingLocations: [] as string[],
   });
 
   const savePreferencesMutation = useMutation({
-    mutationFn: async (data: { theme: string; pursuit: string; scoringSystem: string; units: string }) => {
+    mutationFn: async (data: any) => {
       await apiRequest("PUT", "/api/preferences", data);
     },
     onSuccess: () => {
@@ -57,6 +58,15 @@ export default function Onboarding() {
     },
   });
 
+  const toggleLocation = (loc: string) => {
+    setFormData(prev => ({
+      ...prev,
+      huntingLocations: prev.huntingLocations.includes(loc)
+        ? prev.huntingLocations.filter(l => l !== loc)
+        : [...prev.huntingLocations, loc],
+    }));
+  };
+
   const handleFinish = () => {
     setTheme(selectedTheme as any);
     savePreferencesMutation.mutate({
@@ -64,6 +74,7 @@ export default function Onboarding() {
       pursuit: formData.pursuit,
       scoringSystem: formData.scoring,
       units: formData.units,
+      huntingLocations: formData.huntingLocations,
     });
     setLocation("/");
   };
@@ -217,6 +228,46 @@ export default function Onboarding() {
                       )}
                     >
                       {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-white/80 uppercase tracking-wider">Where do you hunt?</label>
+                <p className="text-xs text-white/40">Select all that apply</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-2">
+                  {[
+                    "Southern Africa - Bushveld",
+                    "Southern Africa - Plains",
+                    "Southern Africa - Coastal",
+                    "East Africa - Savanna",
+                    "North America - High Country",
+                    "North America - Midwest",
+                    "North America - Deep Woods",
+                    "North America - Plains",
+                    "Europe - Alpine",
+                    "Europe - Nordic",
+                    "Other",
+                  ].map((loc) => (
+                    <button
+                      key={loc}
+                      onClick={() => toggleLocation(loc)}
+                      data-testid={`button-location-${loc.toLowerCase().replace(/[\s-]/g, '-')}`}
+                      className={cn(
+                        "flex items-center gap-2 py-2 px-3 rounded-lg text-xs border text-left transition-all",
+                        formData.huntingLocations.includes(loc)
+                          ? "bg-primary/20 border-primary/50 text-white"
+                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
+                      )}
+                    >
+                      <div className={cn(
+                        "h-4 w-4 rounded border shrink-0 flex items-center justify-center transition-colors",
+                        formData.huntingLocations.includes(loc) ? "bg-primary border-primary" : "border-white/30"
+                      )}>
+                        {formData.huntingLocations.includes(loc) && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                      </div>
+                      {loc}
                     </button>
                   ))}
                 </div>
