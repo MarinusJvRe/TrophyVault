@@ -14,9 +14,9 @@ import Onboarding from "@/pages/onboarding";
 import Safe from "@/pages/safe";
 import Community from "@/pages/community";
 import Profile from "@/pages/profile";
-import { Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import themeLodge from "./assets/theme-lodge.png";
+import trophyVaultLogo from "@assets/1771685444234_edit_63733598053289_1771685576340.png";
 
 function Router() {
   return (
@@ -44,11 +44,8 @@ function LandingPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-black/40" />
         <div className="relative z-10 p-12 max-w-lg">
-          <div className="flex items-center gap-3 mb-8">
-            <Trophy className="h-10 w-10 text-primary" />
-            <h1 className="font-serif text-4xl font-bold tracking-wider text-white">
-              TROPHY<span className="text-primary">VAULT</span>
-            </h1>
+          <div className="mb-8">
+            <img src={trophyVaultLogo} alt="TrophyVault" className="h-24 w-auto" data-testid="img-logo-landing-desktop" />
           </div>
           <p className="text-xl text-white/80 font-light leading-relaxed">
             Your digital trophy room, enhanced with AI identification and 3D modeling.
@@ -58,11 +55,8 @@ function LandingPage() {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-background">
-        <div className="md:hidden flex items-center gap-3 mb-12">
-          <Trophy className="h-8 w-8 text-primary" />
-          <h1 className="font-serif text-3xl font-bold tracking-wider text-foreground">
-            TROPHY<span className="text-primary">VAULT</span>
-          </h1>
+        <div className="md:hidden mb-12">
+          <img src={trophyVaultLogo} alt="TrophyVault" className="h-20 w-auto mx-auto" data-testid="img-logo-landing-mobile" />
         </div>
 
         <div className="max-w-md w-full text-center space-y-8">

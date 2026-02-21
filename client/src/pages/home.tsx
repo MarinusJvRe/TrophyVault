@@ -12,6 +12,7 @@ import type { Trophy as TrophyType } from "@shared/schema";
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
+import trophyVaultLogo from "@assets/1771685444234_edit_63733598053289_1771685576340.png";
 
 export default function Home() {
   const { theme } = useTheme();
@@ -68,6 +69,9 @@ export default function Home() {
           />
           
           <div className="relative z-20 h-full flex flex-col justify-end p-8 md:p-12 max-w-5xl mx-auto">
+            <div className="absolute top-6 right-6 md:top-8 md:right-8">
+              <img src={trophyVaultLogo} alt="TrophyVault" className="h-12 md:h-16 w-auto opacity-80" data-testid="img-logo-dashboard-hero" />
+            </div>
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
