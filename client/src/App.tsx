@@ -131,7 +131,7 @@ function AuthPage() {
 
       <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 bg-[#1a1a1a] overflow-y-auto">
         <div className="lg:hidden mb-8">
-          <img src={trophyVaultLogo} alt="Trophy Vault" className="h-20 w-auto mx-auto" data-testid="img-logo-landing-mobile" />
+          <img src={trophyVaultLogo} alt="Trophy Vault" className="h-32 w-auto mx-auto" data-testid="img-logo-landing-mobile" />
         </div>
 
         <div className="max-w-sm w-full space-y-6">
