@@ -36,6 +36,7 @@ export function getSession() {
       httpOnly: true,
       secure: true,
       sameSite: "none" as const,
+      partitioned: true,
       maxAge: sessionTtl,
     },
   });

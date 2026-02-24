@@ -6,7 +6,8 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 ## Recent Changes
 - **2026-02-24**: New user flow: Sign up → Onboarding → Trophy Room; Existing user: Sign in → Dashboard
 - **2026-02-24**: Dashboard logo moved to top center with fade-in animation
-- **2026-02-24**: Session cookie fixed: SameSite=None + Secure for Replit webview iframe compatibility
+- **2026-02-24**: Session cookie fixed: SameSite=None + Secure + Partitioned (CHIPS) for Replit webview iframe compatibility
+- **2026-02-24**: Onboarding screens redesigned for mobile responsiveness (compact cards, scrollable layout, dvh)
 - **2026-02-24**: New transparent-background logo (copper/bronze antlers + "TROPHY VAULT" text) replaces square block everywhere
 - **2026-02-24**: Added splash screen with logo + spinner on app cold load (1.8s)
 - **2026-02-24**: New auth system: email+password sign-up/sign-in, Google OAuth button, Apple Sign-In button
