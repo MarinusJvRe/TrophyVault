@@ -83,7 +83,8 @@ function AuthPage() {
           return;
         }
 
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        const userData = await res.json();
+        queryClient.setQueryData(["/api/auth/user"], userData);
         toast({ title: "Account created", description: "Welcome to Trophy Vault!" });
       } else {
         const res = await fetch("/api/auth/login", {
@@ -100,7 +101,8 @@ function AuthPage() {
           return;
         }
 
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        const userData = await res.json();
+        queryClient.setQueryData(["/api/auth/user"], userData);
       }
     } catch {
       setError("Something went wrong. Please try again.");
