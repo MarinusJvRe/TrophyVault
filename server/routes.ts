@@ -4,29 +4,45 @@ import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerEmailAuthRoutes } from "./auth";
 import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema } from "@shared/schema";
+import { analyzeTrophyImage } from "./trophy-ai";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-const uploadDir = path.join(process.cwd(), "uploads", "profiles");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+const profileUploadDir = path.join(process.cwd(), "uploads", "profiles");
+const trophyUploadDir = path.join(process.cwd(), "uploads", "trophies");
+if (!fs.existsSync(profileUploadDir)) fs.mkdirSync(profileUploadDir, { recursive: true });
+if (!fs.existsSync(trophyUploadDir)) fs.mkdirSync(trophyUploadDir, { recursive: true });
+
+const imageUploadConfig = {
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req: any, file: any, cb: any) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Only JPEG, PNG, WebP, or GIF images are allowed"));
+  },
+};
 
 const profileUpload = multer({
   storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
+    destination: (_req, _file, cb) => cb(null, profileUploadDir),
     filename: (_req, file, cb) => {
       const ext = path.extname(file.originalname) || ".jpg";
       cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
     },
   }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Only JPEG, PNG, WebP, or GIF images are allowed"));
-  },
+  ...imageUploadConfig,
+});
+
+const trophyUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, trophyUploadDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || ".jpg";
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  ...imageUploadConfig,
 });
 
 export async function registerRoutes(
@@ -125,6 +141,28 @@ export async function registerRoutes(
     const imageUrl = `/uploads/profiles/${req.file.filename}`;
     const prefs = await storage.upsertPreferences(getUserId(req), { profileImageUrl: imageUrl } as any);
     res.json({ imageUrl, preferences: prefs });
+  });
+
+  // ========== TROPHY IMAGE UPLOAD ==========
+  app.post("/api/trophies/upload-image", isAuthenticated, trophyUpload.single("image"), async (req, res) => {
+    if (!req.file) return res.status(400).json({ message: "No image file provided" });
+    const imageUrl = `/uploads/trophies/${req.file.filename}`;
+    res.json({ imageUrl });
+  });
+
+  // ========== AI TROPHY ANALYSIS ==========
+  app.post("/api/trophies/analyze", isAuthenticated, trophyUpload.single("image"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No image file provided" });
+      const imageUrl = `/uploads/trophies/${req.file.filename}`;
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const base64 = fileBuffer.toString("base64");
+      const analysis = await analyzeTrophyImage(base64, req.file.mimetype);
+      res.json({ imageUrl, analysis });
+    } catch (error: any) {
+      console.error("AI analysis error:", error);
+      res.status(500).json({ message: "AI analysis failed", error: error.message });
+    }
   });
 
   // ========== COMMUNITY / ROOM RATINGS ==========

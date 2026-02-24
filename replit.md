@@ -4,6 +4,7 @@
 TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
+- **2026-02-24**: AI-powered trophy upload: photo upload → OpenAI vision analysis (species ID, quality score, mount recommendation, horn details) → pre-filled form
 - **2026-02-24**: New user flow: Sign up → Onboarding → Trophy Room; Existing user: Sign in → Dashboard
 - **2026-02-24**: Dashboard logo moved to top center with fade-in animation
 - **2026-02-24**: Session cookie fixed: SameSite=None + Secure + Partitioned (CHIPS) for Replit webview iframe compatibility
@@ -36,6 +37,8 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 
 ## API Routes
 - `GET/POST /api/trophies`, `GET/PATCH/DELETE /api/trophies/:id`
+- `POST /api/trophies/upload-image` (file upload, returns imageUrl)
+- `POST /api/trophies/analyze` (file upload → OpenAI vision → species + quality + mount analysis)
 - `GET/POST /api/weapons`, `GET/PATCH/DELETE /api/weapons/:id`
 - `GET/PUT /api/preferences`
 - `GET /api/stats`
