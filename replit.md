@@ -4,7 +4,10 @@
 TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
-- **2026-02-24**: AI-powered trophy upload: photo upload → OpenAI vision analysis (species ID, quality score, mount recommendation, horn details) → pre-filled form
+- **2026-02-24**: AI prompt enhanced: gender identification, horn length in user's units (metric/imperial), trophy qualification estimate per scoring system (SCI/Rowland Ward/B&C)
+- **2026-02-24**: Trophy form: Weapon dropdown from Safe (+ "Other" fallback), score auto-filled with mid-range horn estimate, Trophy Notes + Hunt Notes (separate fields), method/location now optional
+- **2026-02-24**: Schema: added `huntNotes`, `gender` columns to trophies; `method`/`location` now nullable
+- **2026-02-24**: AI-powered trophy upload: photo upload → OpenAI vision analysis (species ID, gender, quality score, mount recommendation, horn details, trophy qualification) → pre-filled form
 - **2026-02-24**: New user flow: Sign up → Onboarding → Trophy Room; Existing user: Sign in → Dashboard
 - **2026-02-24**: Dashboard logo moved to top center with fade-in animation
 - **2026-02-24**: Session cookie fixed: SameSite=None + Secure + Partitioned (CHIPS) for Replit webview iframe compatibility
@@ -52,7 +55,7 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 ## Database Tables
 - `users` (id, email, firstName, lastName, profileImageUrl, passwordHash, authProvider, authProviderId, createdAt, updatedAt)
 - `sessions` (sid, sess, expire)
-- `trophies` (species, name, date, location, score, method, weaponId, notes, imageUrl, featured)
+- `trophies` (species, name, date, location?, score, method?, weaponId, gender?, notes, huntNotes, imageUrl, featured)
 - `weapons` (name, type, caliber, make, model, optic, notes, imageUrl)
 - `user_preferences` (theme, pursuit, scoringSystem, units, roomVisibility, huntingLocations[])
 - `room_ratings` (roomOwnerId, raterId, score)

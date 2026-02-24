@@ -157,8 +157,11 @@ export async function registerRoutes(
       const imageUrl = `/uploads/trophies/${req.file.filename}`;
       const fileBuffer = fs.readFileSync(req.file.path);
       const base64 = fileBuffer.toString("base64");
-      const analysis = await analyzeTrophyImage(base64, req.file.mimetype);
-      res.json({ imageUrl, analysis });
+      const prefs = await storage.getPreferences(getUserId(req));
+      const units = prefs?.units || "imperial";
+      const scoringSystem = prefs?.scoringSystem || "SCI";
+      const analysis = await analyzeTrophyImage(base64, req.file.mimetype, units, scoringSystem);
+      res.json({ imageUrl, analysis, units, scoringSystem });
     } catch (error: any) {
       console.error("AI analysis error:", error);
       res.status(500).json({ message: "AI analysis failed", error: error.message });

@@ -116,7 +116,12 @@ export default function TrophyDetail() {
             transition={{ delay: 0.2 }}
           >
             <div className="flex justify-between items-start mb-2">
-              <div className="text-sm font-medium text-primary tracking-widest uppercase">{trophy.species}</div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-primary tracking-widest uppercase">{trophy.species}</span>
+                {trophy.gender && (
+                  <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded capitalize">{trophy.gender}</span>
+                )}
+              </div>
               <Button onClick={handleShare} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-green-500/10 hover:text-green-500 transition-colors" data-testid="button-share">
                 <Share2 className="h-4 w-4" />
               </Button>
@@ -187,9 +192,18 @@ export default function TrophyDetail() {
 
               {trophy.notes && (
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">Field Notes</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">Trophy Notes</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground italic border-l-2 border-primary/30 pl-4 py-1">
                     "{trophy.notes}"
+                  </p>
+                </div>
+              )}
+
+              {trophy.huntNotes && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">Hunt Notes</h3>
+                  <p className="text-sm leading-relaxed text-muted-foreground italic border-l-2 border-primary/30 pl-4 py-1">
+                    "{trophy.huntNotes}"
                   </p>
                 </div>
               )}

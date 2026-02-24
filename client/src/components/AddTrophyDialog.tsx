@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { getAuthToken } from "@/lib/auth-token";
 import {
@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,10 +21,11 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Upload, Sparkles, Check, AlertTriangle, ChevronRight, X, Eye, Crosshair, Loader2, Crop } from "lucide-react";
+import { Camera, Upload, Sparkles, Check, AlertTriangle, ChevronRight, X, Eye, Crosshair, Loader2, Crop, Trophy, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactCrop, { type Crop as CropType, centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
+import type { Weapon } from "@shared/schema";
 
 interface TrophyAnalysis {
   animal_detected: boolean;
@@ -33,6 +35,11 @@ interface TrophyAnalysis {
     scientific_name: string;
     category: string;
     confidence: number;
+  };
+  gender: {
+    estimated: "male" | "female" | "unknown";
+    confidence: number;
+    indicators: string;
   };
   photo_quality: {
     score: number;
@@ -56,8 +63,19 @@ interface TrophyAnalysis {
   horn_details: {
     has_horns: boolean;
     horn_type: string | null;
-    estimated_length_description: string | null;
+    estimated_length_inches: number | null;
+    estimated_length_cm: number | null;
+    length_range_low: number | null;
+    length_range_high: number | null;
     notable_features: string | null;
+  };
+  trophy_qualification: {
+    scoring_system: string;
+    minimum_qualifying_score: string | null;
+    estimated_score: string | null;
+    likely_qualifies: boolean | null;
+    confidence: number;
+    notes: string | null;
   };
   additional_animals: number;
   exif_hints: {
@@ -101,6 +119,21 @@ function getCroppedBlob(image: HTMLImageElement, crop: CropType): Promise<Blob> 
   });
 }
 
+function getEstimatedScore(analysis: TrophyAnalysis | null, units: string): string {
+  if (!analysis?.horn_details?.has_horns) return "";
+  const low = analysis.horn_details.length_range_low;
+  const high = analysis.horn_details.length_range_high;
+  if (low != null && high != null) {
+    const mid = Math.round(((low + high) / 2) * 10) / 10;
+    const abbr = units === "metric" ? "cm" : "\"";
+    return `${mid}${abbr}`;
+  }
+  if (analysis.trophy_qualification?.estimated_score) {
+    return analysis.trophy_qualification.estimated_score;
+  }
+  return "";
+}
+
 export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogProps) {
   const [step, setStep] = useState<Step>("upload");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -110,12 +143,18 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const [crop, setCrop] = useState<CropType>();
   const [analysis, setAnalysis] = useState<TrophyAnalysis | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
-  const [method, setMethod] = useState<string>("");
+  const [weaponId, setWeaponId] = useState<string>("");
+  const [analysisUnits, setAnalysisUnits] = useState<string>("imperial");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cropImageRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: weapons = [] } = useQuery<Weapon[]>({
+    queryKey: ["/api/weapons"],
+    enabled: open,
+  });
 
   const resetState = useCallback(() => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -128,7 +167,8 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     setCrop(undefined);
     setAnalysis(null);
     setUploadedImageUrl(null);
-    setMethod("");
+    setWeaponId("");
+    setAnalysisUnits("imperial");
   }, [previewUrl, croppedPreviewUrl]);
 
   const handleOpenChange = useCallback((val: boolean) => {
@@ -151,11 +191,12 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
         const err = await res.json().catch(() => ({ message: "Analysis failed" }));
         throw new Error(err.message || "Analysis failed");
       }
-      return res.json() as Promise<{ imageUrl: string; analysis: TrophyAnalysis }>;
+      return res.json() as Promise<{ imageUrl: string; analysis: TrophyAnalysis; units: string; scoringSystem: string }>;
     },
     onSuccess: (data) => {
       setAnalysis(data.analysis);
       setUploadedImageUrl(data.imageUrl);
+      setAnalysisUnits(data.units || "imperial");
       setStep("results");
     },
     onError: (error: Error) => {
@@ -276,14 +317,18 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const handleCreateTrophy = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const selectedWeapon = weapons.find(w => w.id === weaponId);
     createTrophyMutation.mutate({
       species: formData.get("species") as string,
       name: formData.get("name") as string,
       date: formData.get("date") as string,
-      location: formData.get("location") as string,
-      score: formData.get("score") as string || null,
-      method: method,
-      notes: formData.get("notes") as string || null,
+      location: (formData.get("location") as string) || null,
+      score: (formData.get("score") as string) || null,
+      method: selectedWeapon ? selectedWeapon.type : (weaponId === "__other__" ? "Other" : null),
+      weaponId: weaponId && weaponId !== "__other__" ? weaponId : null,
+      gender: analysis?.gender?.estimated || (formData.get("gender") as string) || null,
+      notes: (formData.get("notes") as string) || null,
+      huntNotes: (formData.get("huntNotes") as string) || null,
       imageUrl: uploadedImageUrl,
       featured: false,
     });
@@ -329,6 +374,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
               key="results"
               analysis={analysis}
               previewUrl={getPreviewToShow()}
+              units={analysisUnits}
               onContinue={() => setStep("form")}
               onRetake={resetState}
             />
@@ -338,8 +384,10 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
               key="form"
               analysis={analysis}
               previewUrl={getPreviewToShow()}
-              method={method}
-              setMethod={setMethod}
+              weaponId={weaponId}
+              setWeaponId={setWeaponId}
+              weapons={weapons}
+              units={analysisUnits}
               onSubmit={handleCreateTrophy}
               isPending={createTrophyMutation.isPending}
             />
@@ -599,16 +647,20 @@ function AnalyzingStep({ previewUrl }: { previewUrl: string | null }) {
 function ResultsStep({
   analysis,
   previewUrl,
+  units,
   onContinue,
   onRetake,
 }: {
   analysis: TrophyAnalysis;
   previewUrl: string | null;
+  units: string;
   onContinue: () => void;
   onRetake: () => void;
 }) {
   const confidence = Math.round(analysis.species.confidence * 100);
   const qualityScore = analysis.photo_quality.score;
+  const unitAbbr = units === "metric" ? "cm" : "\"";
+  const tq = analysis.trophy_qualification;
 
   return (
     <motion.div
@@ -675,10 +727,15 @@ function ResultsStep({
             </span>
           </div>
           <p className="text-xs text-muted-foreground italic mb-2">{analysis.species.scientific_name}</p>
-          <div className="flex items-center gap-1 text-xs">
-            <span className="text-muted-foreground">Category:</span>
-            <span className="capitalize text-foreground">{analysis.species.category}</span>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-muted-foreground">Category: <span className="capitalize text-foreground">{analysis.species.category}</span></span>
+            {analysis.gender && (
+              <span className="text-muted-foreground">Gender: <span className="capitalize text-foreground">{analysis.gender.estimated}</span></span>
+            )}
           </div>
+          {analysis.gender?.indicators && (
+            <p className="text-xs text-muted-foreground mt-1 italic">{analysis.gender.indicators}</p>
+          )}
         </div>
       </div>
 
@@ -711,7 +768,7 @@ function ResultsStep({
 
       {analysis.horn_details.has_horns && (
         <div className="bg-card border border-border/40 rounded-lg p-3 mb-4">
-          <div className="text-xs text-muted-foreground mb-1">Horn Details</div>
+          <div className="text-xs text-muted-foreground mb-1">Horn / Antler Details</div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
             {analysis.horn_details.horn_type && (
               <>
@@ -719,10 +776,12 @@ function ResultsStep({
                 <span className="text-foreground capitalize">{analysis.horn_details.horn_type}</span>
               </>
             )}
-            {analysis.horn_details.estimated_length_description && (
+            {analysis.horn_details.length_range_low != null && analysis.horn_details.length_range_high != null && (
               <>
-                <span className="text-muted-foreground">Length:</span>
-                <span className="text-foreground">{analysis.horn_details.estimated_length_description}</span>
+                <span className="text-muted-foreground">Est. Length:</span>
+                <span className="text-foreground">
+                  {analysis.horn_details.length_range_low}{unitAbbr} – {analysis.horn_details.length_range_high}{unitAbbr}
+                </span>
               </>
             )}
             {analysis.horn_details.notable_features && (
@@ -732,6 +791,47 @@ function ResultsStep({
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {tq && (
+        <div className={cn(
+          "border rounded-lg p-3 mb-4",
+          tq.likely_qualifies === true ? "bg-green-500/5 border-green-500/30" :
+          tq.likely_qualifies === false ? "bg-yellow-500/5 border-yellow-500/30" :
+          "bg-card border-border/40"
+        )}>
+          <div className="flex items-center gap-2 mb-2">
+            <Trophy className="h-4 w-4 text-primary" />
+            <span className="text-xs font-medium text-foreground">Trophy Qualification — {tq.scoring_system}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            {tq.minimum_qualifying_score && (
+              <>
+                <span className="text-muted-foreground">Minimum Score:</span>
+                <span className="text-foreground">{tq.minimum_qualifying_score}</span>
+              </>
+            )}
+            {tq.estimated_score && (
+              <>
+                <span className="text-muted-foreground">Estimated Score:</span>
+                <span className="text-foreground font-medium">{tq.estimated_score}</span>
+              </>
+            )}
+            <span className="text-muted-foreground">Likely Qualifies:</span>
+            <span className={cn(
+              "font-medium",
+              tq.likely_qualifies === true ? "text-green-500" :
+              tq.likely_qualifies === false ? "text-yellow-500" :
+              "text-muted-foreground"
+            )}>
+              {tq.likely_qualifies === true ? "Yes" : tq.likely_qualifies === false ? "Unlikely" : "Unknown"}
+              {tq.confidence > 0 && ` (${Math.round(tq.confidence * 100)}% confidence)`}
+            </span>
+          </div>
+          {tq.notes && (
+            <p className="text-xs text-muted-foreground mt-2 italic">{tq.notes}</p>
+          )}
         </div>
       )}
 
@@ -774,18 +874,24 @@ function VisibilityBadge({ label, visible }: { label: string; visible: boolean }
 function FormStep({
   analysis,
   previewUrl,
-  method,
-  setMethod,
+  weaponId,
+  setWeaponId,
+  weapons,
+  units,
   onSubmit,
   isPending,
 }: {
   analysis: TrophyAnalysis | null;
   previewUrl: string | null;
-  method: string;
-  setMethod: (v: string) => void;
+  weaponId: string;
+  setWeaponId: (v: string) => void;
+  weapons: Weapon[];
+  units: string;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isPending: boolean;
 }) {
+  const estimatedScore = getEstimatedScore(analysis, units);
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -803,9 +909,16 @@ function FormStep({
             <img src={previewUrl} alt="Trophy" className="w-full h-full object-cover" />
           </div>
           {analysis && (
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-foreground truncate">{analysis.species.common_name}</p>
-              <p className="text-xs text-muted-foreground italic">{analysis.species.scientific_name}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground italic">{analysis.species.scientific_name}</p>
+                {analysis.gender?.estimated && analysis.gender.estimated !== "unknown" && (
+                  <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded capitalize">
+                    {analysis.gender.estimated}
+                  </span>
+                )}
+              </div>
             </div>
           )}
           {analysis && (
@@ -853,11 +966,10 @@ function FormStep({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="location" className="text-xs">Location *</Label>
+            <Label htmlFor="location" className="text-xs">Location</Label>
             <Input
               id="location"
               name="location"
-              required
               defaultValue={analysis?.exif_hints.location_visible || ""}
               placeholder="e.g., Limpopo, South Africa"
               data-testid="input-trophy-location"
@@ -867,46 +979,64 @@ function FormStep({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="score" className="text-xs">Score</Label>
+            <Label htmlFor="score" className="text-xs">Score / Size</Label>
             <Input
               id="score"
               name="score"
-              placeholder="e.g., 52 3/8 SCI"
+              placeholder={units === "metric" ? "e.g., 132 cm" : "e.g., 52 3/8\""}
+              defaultValue={estimatedScore}
               data-testid="input-trophy-score"
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Method *</Label>
-            <Select value={method} onValueChange={setMethod} required>
-              <SelectTrigger data-testid="select-trophy-method">
-                <SelectValue placeholder="Select method" />
+            <Label className="text-xs">Weapon</Label>
+            <Select value={weaponId} onValueChange={setWeaponId}>
+              <SelectTrigger data-testid="select-trophy-weapon">
+                <SelectValue placeholder="Select weapon" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Rifle">Rifle</SelectItem>
-                <SelectItem value="Bow">Bow</SelectItem>
-                <SelectItem value="Muzzleloader">Muzzleloader</SelectItem>
-                <SelectItem value="Shotgun">Shotgun</SelectItem>
-                <SelectItem value="Handgun">Handgun</SelectItem>
+                {weapons.map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name} ({w.type}{w.caliber ? ` — ${w.caliber}` : ""})
+                  </SelectItem>
+                ))}
+                <SelectItem value="__other__">Other / Not in Safe</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
+        {analysis?.gender?.estimated && analysis.gender.estimated !== "unknown" && (
+          <input type="hidden" name="gender" value={analysis.gender.estimated} />
+        )}
+
         <div className="space-y-1.5">
-          <Label htmlFor="notes" className="text-xs">Notes</Label>
-          <Input
+          <Label htmlFor="notes" className="text-xs">Trophy Notes</Label>
+          <Textarea
             id="notes"
             name="notes"
-            placeholder="Hunt story, conditions, memorable details..."
+            rows={2}
+            placeholder="Details about the trophy itself — horn quality, unique markings, condition..."
             defaultValue={analysis?.horn_details.notable_features || ""}
             data-testid="input-trophy-notes"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="huntNotes" className="text-xs">Hunt Notes</Label>
+          <Textarea
+            id="huntNotes"
+            name="huntNotes"
+            rows={2}
+            placeholder="The hunt story — conditions, terrain, memorable moments..."
+            data-testid="input-hunt-notes"
           />
         </div>
 
         <Button
           type="submit"
           className="w-full gap-2"
-          disabled={isPending || !method}
+          disabled={isPending}
           data-testid="button-submit-trophy"
         >
           {isPending ? (

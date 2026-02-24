@@ -10,18 +10,29 @@ const SYSTEM_PROMPT = `You are TrophyVault's image analysis assistant. Analyze h
 Your task:
 1. Identify if there is a recognizable game animal
 2. Identify the species (common + scientific name)
-3. Assess photo quality for 3D model generation
-4. Locate the animal in the image (bounding box)
-5. Recommend the best mount type based on visibility
-6. Extract any visible horn/antler characteristics
-7. Note any issues (occlusion, lighting, blur)
+3. Determine the gender of the animal (male/female/unknown)
+4. Assess photo quality for 3D model generation
+5. Locate the animal in the image (bounding box)
+6. Recommend the best mount type based on visibility
+7. Extract any visible horn/antler characteristics with numeric length estimates
+8. Estimate whether the trophy would qualify under a given scoring system
+9. Note any issues (occlusion, lighting, blur)
 
 Return ONLY valid JSON matching the schema below. No markdown, no code fences, just raw JSON.`;
 
-const USER_PROMPT = `Analyze this hunting trophy photo.
+function buildUserPrompt(units: string, scoringSystem: string): string {
+  const unitLabel = units === "metric" ? "centimeters (cm)" : "inches (in)";
+  const unitAbbr = units === "metric" ? "cm" : "in";
+
+  return `Analyze this hunting trophy photo.
 
 Focus on the MOST PROMINENT game animal in the image.
 Ignore any people, weapons, vehicles, or dogs.
+
+IMPORTANT CONTEXT:
+- Report all measurements in ${unitLabel}
+- Evaluate trophy qualification against the ${scoringSystem} scoring system
+- Identify the gender of the animal
 
 Respond with JSON matching this exact schema:
 {
@@ -32,6 +43,11 @@ Respond with JSON matching this exact schema:
     "scientific_name": string,
     "category": "antelope"|"deer"|"buffalo"|"big_cat"|"pig"|"bird"|"fish"|"other",
     "confidence": number (0-1)
+  },
+  "gender": {
+    "estimated": "male"|"female"|"unknown",
+    "confidence": number (0-1),
+    "indicators": string (brief explanation of how gender was determined, e.g. "prominent horns indicate male")
   },
   "photo_quality": {
     "score": number (1-10),
@@ -55,8 +71,19 @@ Respond with JSON matching this exact schema:
   "horn_details": {
     "has_horns": boolean,
     "horn_type": "spiral"|"lyre"|"straight"|"curved"|"antler"|"boss"|null,
-    "estimated_length_description": string | null,
+    "estimated_length_inches": number | null (estimated horn/antler length in inches, your best numeric estimate even if approximate),
+    "estimated_length_cm": number | null (estimated horn/antler length in centimeters),
+    "length_range_low_${unitAbbr}": number | null (lower bound of estimated length in ${unitLabel}),
+    "length_range_high_${unitAbbr}": number | null (upper bound of estimated length in ${unitLabel}),
     "notable_features": string | null
+  },
+  "trophy_qualification": {
+    "scoring_system": "${scoringSystem}",
+    "minimum_qualifying_score": string | null (the minimum score for this species under ${scoringSystem}, e.g. "52 inches" or "132 cm"),
+    "estimated_score": string | null (your estimated score based on visible horn/antler measurements, in ${unitLabel}),
+    "likely_qualifies": boolean | null (whether the trophy likely meets the minimum qualifying score),
+    "confidence": number (0-1, how confident you are in this qualification assessment),
+    "notes": string | null (any caveats or additional context about the qualification estimate)
   },
   "additional_animals": number,
   "exif_hints": {
@@ -64,6 +91,7 @@ Respond with JSON matching this exact schema:
     "time_of_day": "morning"|"midday"|"afternoon"|"evening"|"night"|null
   }
 }`;
+}
 
 export interface TrophyAnalysis {
   animal_detected: boolean;
@@ -73,6 +101,11 @@ export interface TrophyAnalysis {
     scientific_name: string;
     category: string;
     confidence: number;
+  };
+  gender: {
+    estimated: "male" | "female" | "unknown";
+    confidence: number;
+    indicators: string;
   };
   photo_quality: {
     score: number;
@@ -96,8 +129,19 @@ export interface TrophyAnalysis {
   horn_details: {
     has_horns: boolean;
     horn_type: string | null;
-    estimated_length_description: string | null;
+    estimated_length_inches: number | null;
+    estimated_length_cm: number | null;
+    length_range_low: number | null;
+    length_range_high: number | null;
     notable_features: string | null;
+  };
+  trophy_qualification: {
+    scoring_system: string;
+    minimum_qualifying_score: string | null;
+    estimated_score: string | null;
+    likely_qualifies: boolean | null;
+    confidence: number;
+    notes: string | null;
   };
   additional_animals: number;
   exif_hints: {
@@ -106,7 +150,14 @@ export interface TrophyAnalysis {
   };
 }
 
-export async function analyzeTrophyImage(base64Image: string, mimeType: string): Promise<TrophyAnalysis> {
+export async function analyzeTrophyImage(
+  base64Image: string,
+  mimeType: string,
+  units: string = "imperial",
+  scoringSystem: string = "SCI"
+): Promise<TrophyAnalysis> {
+  const userPrompt = buildUserPrompt(units, scoringSystem);
+
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
@@ -114,7 +165,7 @@ export async function analyzeTrophyImage(base64Image: string, mimeType: string):
       {
         role: "user",
         content: [
-          { type: "text", text: USER_PROMPT },
+          { type: "text", text: userPrompt },
           {
             type: "image_url",
             image_url: {
@@ -125,11 +176,27 @@ export async function analyzeTrophyImage(base64Image: string, mimeType: string):
         ],
       },
     ],
-    max_tokens: 1500,
+    max_tokens: 2000,
     temperature: 0.2,
   });
 
   const content = response.choices[0]?.message?.content || "";
   const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(cleaned);
+  const parsed = JSON.parse(cleaned);
+
+  if (parsed.horn_details) {
+    const hd = parsed.horn_details;
+    const lowKey = Object.keys(hd).find(k => k.startsWith("length_range_low"));
+    const highKey = Object.keys(hd).find(k => k.startsWith("length_range_high"));
+    if (lowKey && lowKey !== "length_range_low") {
+      hd.length_range_low = hd[lowKey];
+      delete hd[lowKey];
+    }
+    if (highKey && highKey !== "length_range_high") {
+      hd.length_range_high = hd[highKey];
+      delete hd[highKey];
+    }
+  }
+
+  return parsed;
 }
