@@ -23,7 +23,8 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 ## Architecture
 - **Frontend**: React + Vite, Wouter routing, TanStack Query, Tailwind CSS, Framer Motion, shadcn/ui
 - **Backend**: Express.js, Drizzle ORM, PostgreSQL (Neon-backed)
-- **Auth**: Multi-provider — Email/Password (bcrypt), Replit OIDC (Passport.js), Google OAuth (planned), Apple Sign-In (planned)
+- **Auth**: Multi-provider — Email/Password (bcrypt) + auth token fallback, Replit OIDC (Passport.js), Google OAuth (planned), Apple Sign-In (planned)
+- **AI**: OpenAI GPT-4o vision for trophy analysis (via Replit AI Integrations)
 
 ## Key Pages
 - `/` - Dashboard (hero + stats + featured trophies)
@@ -70,11 +71,13 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 
 ## Auth System
 - **Email/Password**: bcrypt hash (12 rounds), session-based auth, stored in users table
+- **Auth Token Fallback**: In-memory token map (server/auth.ts) returned on login/register, sent via `X-Auth-Token` header; solves Replit webview iframe cookie issues
 - **Replit OIDC**: Existing integration via Passport.js (still functional as fallback)
 - **Google OAuth**: UI button ready, backend route placeholder (needs GOOGLE_CLIENT_ID/SECRET)
 - **Apple Sign-In**: UI button ready, backend route placeholder (needs Apple credentials)
 - Session stored in PostgreSQL via connect-pg-simple
-- `isAuthenticated` middleware checks both email sessions and Replit OIDC tokens
+- `isAuthenticated` middleware checks: 1) email session, 2) X-Auth-Token header, 3) Replit OIDC tokens
+- Client stores auth token in sessionStorage (`client/src/lib/auth-token.ts`)
 
 ## Theme System
 Three themes: `lodge` (Timber Ridge), `manor` (Safari Manor), `minimal` (Alpine Gallery)

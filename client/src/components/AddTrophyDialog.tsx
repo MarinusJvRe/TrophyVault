@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { getAuthToken } from "@/lib/auth-token";
 import {
   Dialog,
   DialogContent,
@@ -19,8 +20,10 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Upload, Sparkles, Check, AlertTriangle, ChevronRight, X, Eye, Crosshair, Loader2 } from "lucide-react";
+import { Camera, Upload, Sparkles, Check, AlertTriangle, ChevronRight, X, Eye, Crosshair, Loader2, Crop } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ReactCrop, { type Crop as CropType, centerCrop, makeAspectCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 
 interface TrophyAnalysis {
   animal_detected: boolean;
@@ -63,33 +66,70 @@ interface TrophyAnalysis {
   };
 }
 
-type Step = "upload" | "analyzing" | "results" | "form";
+type Step = "upload" | "crop" | "analyzing" | "results" | "form";
 
 interface AddTrophyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+function getAuthHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  return token ? { "X-Auth-Token": token } : {};
+}
+
+function getCroppedBlob(image: HTMLImageElement, crop: CropType): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  const scaleX = image.naturalWidth / image.width;
+  const scaleY = image.naturalHeight / image.height;
+  canvas.width = crop.width * scaleX;
+  canvas.height = crop.height * scaleY;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(
+    image,
+    crop.x * scaleX,
+    crop.y * scaleY,
+    crop.width * scaleX,
+    crop.height * scaleY,
+    0,
+    0,
+    canvas.width,
+    canvas.height,
+  );
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob!), "image/jpeg", 0.92);
+  });
+}
+
 export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogProps) {
   const [step, setStep] = useState<Step>("upload");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [croppedPreviewUrl, setCroppedPreviewUrl] = useState<string | null>(null);
+  const [croppedFile, setCroppedFile] = useState<File | null>(null);
+  const [crop, setCrop] = useState<CropType>();
   const [analysis, setAnalysis] = useState<TrophyAnalysis | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [method, setMethod] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cropImageRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const resetState = useCallback(() => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (croppedPreviewUrl) URL.revokeObjectURL(croppedPreviewUrl);
     setStep("upload");
     setSelectedFile(null);
     setPreviewUrl(null);
+    setCroppedPreviewUrl(null);
+    setCroppedFile(null);
+    setCrop(undefined);
     setAnalysis(null);
     setUploadedImageUrl(null);
     setMethod("");
-  }, []);
+  }, [previewUrl, croppedPreviewUrl]);
 
   const handleOpenChange = useCallback((val: boolean) => {
     if (!val) resetState();
@@ -104,10 +144,12 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
         method: "POST",
         body: formData,
         credentials: "include",
+        headers: getAuthHeaders(),
       });
       if (!res.ok) {
+        if (res.status === 401) throw new Error("Session expired. Please log out and log back in.");
         const err = await res.json().catch(() => ({ message: "Analysis failed" }));
-        throw new Error(err.message);
+        throw new Error(err.message || "Analysis failed");
       }
       return res.json() as Promise<{ imageUrl: string; analysis: TrophyAnalysis }>;
     },
@@ -130,8 +172,13 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
         method: "POST",
         body: formData,
         credentials: "include",
+        headers: getAuthHeaders(),
       });
-      if (!res.ok) throw new Error("Upload failed");
+      if (!res.ok) {
+        if (res.status === 401) throw new Error("Session expired. Please log out and log back in.");
+        const err = await res.json().catch(() => ({ message: "Upload failed" }));
+        throw new Error(err.message || "Upload failed");
+      }
       return res.json() as Promise<{ imageUrl: string }>;
     },
     onSuccess: (data) => {
@@ -162,6 +209,9 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     setSelectedFile(file);
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
+    setCroppedPreviewUrl(null);
+    setCroppedFile(null);
+    setCrop(undefined);
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,15 +225,52 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     if (file && file.type.startsWith("image/")) handleFileSelect(file);
   };
 
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget;
+    const initialCrop = centerCrop(
+      makeAspectCrop({ unit: "%", width: 90 }, 4 / 3, width, height),
+      width,
+      height,
+    );
+    setCrop(initialCrop);
+  };
+
+  const handleCropDone = async () => {
+    if (!crop || !cropImageRef.current || crop.width < 10 || crop.height < 10) {
+      toast({ title: "Invalid crop", description: "Please select a larger area to crop", variant: "destructive" });
+      return;
+    }
+    try {
+      const blob = await getCroppedBlob(cropImageRef.current, crop);
+      if (!blob || blob.size === 0) {
+        toast({ title: "Crop failed", description: "Could not crop the image", variant: "destructive" });
+        return;
+      }
+      const file = new File([blob], selectedFile?.name || "cropped.jpg", { type: "image/jpeg" });
+      setCroppedFile(file);
+      if (croppedPreviewUrl) URL.revokeObjectURL(croppedPreviewUrl);
+      const url = URL.createObjectURL(blob);
+      setCroppedPreviewUrl(url);
+      setStep("upload");
+    } catch {
+      toast({ title: "Crop failed", description: "Could not crop the image", variant: "destructive" });
+    }
+  };
+
+  const getFileToUpload = () => croppedFile || selectedFile;
+  const getPreviewToShow = () => croppedPreviewUrl || previewUrl;
+
   const startAnalysis = () => {
-    if (!selectedFile) return;
+    const file = getFileToUpload();
+    if (!file) return;
     setStep("analyzing");
-    analyzeMutation.mutate(selectedFile);
+    analyzeMutation.mutate(file);
   };
 
   const skipAnalysis = () => {
-    if (!selectedFile) return;
-    uploadOnlyMutation.mutate(selectedFile);
+    const file = getFileToUpload();
+    if (!file) return;
+    uploadOnlyMutation.mutate(file);
   };
 
   const handleCreateTrophy = (e: React.FormEvent<HTMLFormElement>) => {
@@ -209,34 +296,48 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
           {step === "upload" && (
             <UploadStep
               key="upload"
-              previewUrl={previewUrl}
+              previewUrl={getPreviewToShow()}
               selectedFile={selectedFile}
+              hasCrop={!!croppedFile}
               onFileInput={handleFileInput}
               onDrop={handleDrop}
               fileInputRef={fileInputRef}
               onAnalyze={startAnalysis}
               onSkip={skipAnalysis}
-              onRemoveFile={() => { setSelectedFile(null); setPreviewUrl(null); }}
+              onCrop={() => setStep("crop")}
+              onRemoveFile={() => { setSelectedFile(null); setPreviewUrl(null); setCroppedFile(null); setCroppedPreviewUrl(null); }}
               isUploading={uploadOnlyMutation.isPending}
             />
           )}
+          {step === "crop" && previewUrl && (
+            <CropStep
+              key="crop"
+              previewUrl={previewUrl}
+              crop={crop}
+              setCrop={setCrop}
+              onImageLoad={onImageLoad}
+              cropImageRef={cropImageRef}
+              onDone={handleCropDone}
+              onCancel={() => setStep("upload")}
+            />
+          )}
           {step === "analyzing" && (
-            <AnalyzingStep key="analyzing" previewUrl={previewUrl} />
+            <AnalyzingStep key="analyzing" previewUrl={getPreviewToShow()} />
           )}
           {step === "results" && analysis && (
             <ResultsStep
               key="results"
               analysis={analysis}
-              previewUrl={previewUrl}
+              previewUrl={getPreviewToShow()}
               onContinue={() => setStep("form")}
-              onRetake={() => { resetState(); }}
+              onRetake={resetState}
             />
           )}
           {step === "form" && (
             <FormStep
               key="form"
               analysis={analysis}
-              previewUrl={previewUrl}
+              previewUrl={getPreviewToShow()}
               method={method}
               setMethod={setMethod}
               onSubmit={handleCreateTrophy}
@@ -252,21 +353,25 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
 function UploadStep({
   previewUrl,
   selectedFile,
+  hasCrop,
   onFileInput,
   onDrop,
   fileInputRef,
   onAnalyze,
   onSkip,
+  onCrop,
   onRemoveFile,
   isUploading,
 }: {
   previewUrl: string | null;
   selectedFile: File | null;
+  hasCrop: boolean;
   onFileInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onDrop: (e: React.DragEvent) => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onAnalyze: () => void;
   onSkip: () => void;
+  onCrop: () => void;
   onRemoveFile: () => void;
   isUploading: boolean;
 }) {
@@ -332,6 +437,23 @@ function UploadStep({
             >
               <X className="h-4 w-4" />
             </button>
+            {hasCrop && (
+              <div className="absolute top-2 left-2 bg-green-500/80 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                <Check className="h-3 w-3" /> Cropped
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              onClick={onCrop}
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              data-testid="button-crop-photo"
+            >
+              <Crop className="h-4 w-4" /> Crop
+            </Button>
           </div>
 
           <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
@@ -371,6 +493,66 @@ function UploadStep({
   );
 }
 
+function CropStep({
+  previewUrl,
+  crop,
+  setCrop,
+  onImageLoad,
+  cropImageRef,
+  onDone,
+  onCancel,
+}: {
+  previewUrl: string;
+  crop: CropType | undefined;
+  setCrop: (c: CropType) => void;
+  onImageLoad: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+  cropImageRef: React.RefObject<HTMLImageElement | null>;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      className="p-6"
+    >
+      <DialogHeader className="mb-4">
+        <DialogTitle className="font-serif text-xl flex items-center gap-2">
+          <Crop className="h-5 w-5 text-primary" />
+          Crop Image
+        </DialogTitle>
+      </DialogHeader>
+
+      <p className="text-sm text-muted-foreground mb-3">
+        Drag to adjust the crop area. Focus on the animal for best AI results.
+      </p>
+
+      <div className="rounded-xl overflow-hidden border border-border/40 mb-4 max-h-[400px] flex items-center justify-center bg-black/5">
+        <ReactCrop crop={crop} onChange={(c) => setCrop(c)} minWidth={50} minHeight={50}>
+          <img
+            ref={cropImageRef}
+            src={previewUrl}
+            alt="Crop preview"
+            onLoad={onImageLoad}
+            className="max-h-[380px] w-auto"
+            data-testid="img-crop-preview"
+          />
+        </ReactCrop>
+      </div>
+
+      <div className="flex gap-2">
+        <Button onClick={onDone} className="flex-1 gap-2" data-testid="button-apply-crop">
+          <Check className="h-4 w-4" /> Apply Crop
+        </Button>
+        <Button onClick={onCancel} variant="outline" data-testid="button-cancel-crop">
+          Cancel
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
 function AnalyzingStep({ previewUrl }: { previewUrl: string | null }) {
   return (
     <motion.div
@@ -387,11 +569,13 @@ function AnalyzingStep({ previewUrl }: { previewUrl: string | null }) {
       </DialogHeader>
 
       <div className="relative rounded-xl overflow-hidden mb-6 border border-border/40">
-        <img
-          src={previewUrl!}
-          alt="Analyzing..."
-          className="w-full max-h-[250px] object-contain bg-black/5"
-        />
+        {previewUrl && (
+          <img
+            src={previewUrl}
+            alt="Analyzing..."
+            className="w-full max-h-[250px] object-contain bg-black/5"
+          />
+        )}
         <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px] flex items-center justify-center">
           <div className="text-center">
             <div className="relative mx-auto mb-3">
@@ -435,14 +619,46 @@ function ResultsStep({
     >
       <DialogHeader className="mb-4">
         <DialogTitle className="font-serif text-xl flex items-center gap-2">
-          <Check className="h-5 w-5 text-green-500" />
+          {analysis.animal_detected ? (
+            <Check className="h-5 w-5 text-green-500" />
+          ) : (
+            <AlertTriangle className="h-5 w-5 text-yellow-500" />
+          )}
           Analysis Complete
         </DialogTitle>
       </DialogHeader>
 
+      {!analysis.animal_detected && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mb-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <p className="font-medium text-yellow-500">No Animal Detected</p>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                {analysis.rejection_reason || "Try uploading a clearer photo with the animal more visible. You can still continue with manual entry."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {analysis.additional_animals > 0 && (
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-4">
+          <div className="flex items-start gap-2">
+            <Eye className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <p className="font-medium text-blue-500">Multiple Animals Detected</p>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                {analysis.additional_animals + 1} animals detected. Showing results for the most prominent one: {analysis.species.common_name}. Consider cropping to focus on a single animal.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-4 mb-4">
         <div className="w-24 h-24 rounded-lg overflow-hidden border border-border/40 shrink-0">
-          <img src={previewUrl!} alt="Trophy" className="w-full h-full object-cover" />
+          {previewUrl && <img src={previewUrl} alt="Trophy" className="w-full h-full object-cover" />}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -466,18 +682,6 @@ function ResultsStep({
         </div>
       </div>
 
-      {!analysis.animal_detected && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 mb-4">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-            <div className="text-sm">
-              <p className="font-medium text-destructive">No Animal Detected</p>
-              <p className="text-muted-foreground text-xs mt-0.5">{analysis.rejection_reason || "Try uploading a clearer photo of the trophy."}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-card border border-border/40 rounded-lg p-3">
           <div className="text-xs text-muted-foreground mb-1">Photo Quality</div>
@@ -490,8 +694,11 @@ function ResultsStep({
             </div>
             <span className="text-sm font-bold text-foreground">{qualityScore}/10</span>
           </div>
+          {analysis.photo_quality.issues.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">{analysis.photo_quality.issues.join(", ")}</p>
+          )}
           {analysis.photo_quality.suggestion && (
-            <p className="text-xs text-muted-foreground mt-1">{analysis.photo_quality.suggestion}</p>
+            <p className="text-xs text-primary mt-1">{analysis.photo_quality.suggestion}</p>
           )}
         </div>
 

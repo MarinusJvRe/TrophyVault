@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Chrome, Apple } from "lucide-react";
+import { setAuthToken } from "@/lib/auth-token";
 import themeLodge from "./assets/theme-lodge.png";
 import trophyVaultLogo from "@assets/trophy_vault_logo_transparent.png";
 
@@ -84,6 +85,7 @@ function AuthPage() {
         }
 
         const userData = await res.json();
+        if (userData.authToken) setAuthToken(userData.authToken);
         sessionStorage.setItem("isNewUser", "true");
         queryClient.setQueryData(["/api/auth/user"], userData);
         toast({ title: "Account created", description: "Welcome to Trophy Vault!" });
@@ -103,6 +105,7 @@ function AuthPage() {
         }
 
         const userData = await res.json();
+        if (userData.authToken) setAuthToken(userData.authToken);
         queryClient.setQueryData(["/api/auth/user"], userData);
       }
     } catch {

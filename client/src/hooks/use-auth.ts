@@ -1,9 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
+import { getAuthToken, clearAuthToken } from "@/lib/auth-token";
 
 async function fetchUser(): Promise<User | null> {
+  const headers: Record<string, string> = {};
+  const token = getAuthToken();
+  if (token) headers["X-Auth-Token"] = token;
+
   const response = await fetch("/api/auth/user", {
     credentials: "include",
+    headers,
   });
 
   if (response.status === 401) {
@@ -18,6 +24,7 @@ async function fetchUser(): Promise<User | null> {
 }
 
 async function logout(): Promise<void> {
+  clearAuthToken();
   try {
     const res = await fetch("/api/auth/email-logout", {
       method: "POST",

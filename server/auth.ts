@@ -1,5 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import { z } from "zod";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -16,6 +17,32 @@ const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
+
+const TOKEN_TTL = 7 * 24 * 60 * 60 * 1000;
+const authTokens = new Map<string, { userId: string; expiresAt: number }>();
+
+function generateAuthToken(userId: string): string {
+  const token = crypto.randomBytes(32).toString("hex");
+  authTokens.set(token, { userId, expiresAt: Date.now() + TOKEN_TTL });
+  return token;
+}
+
+export function validateAuthToken(token: string): string | null {
+  const entry = authTokens.get(token);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    authTokens.delete(token);
+    return null;
+  }
+  return entry.userId;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  authTokens.forEach((entry, token) => {
+    if (now > entry.expiresAt) authTokens.delete(token);
+  });
+}, 60 * 60 * 1000);
 
 function saveSession(req: any): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -56,12 +83,15 @@ export function registerEmailAuthRoutes(app: Express) {
 
       await saveSession(req);
 
+      const authToken = generateAuthToken(user.id);
+
       res.status(201).json({
         id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         profileImageUrl: user.profileImageUrl,
+        authToken,
       });
     } catch (error) {
       console.error("Registration error:", error);
@@ -93,12 +123,15 @@ export function registerEmailAuthRoutes(app: Express) {
 
       await saveSession(req);
 
+      const authToken = generateAuthToken(user.id);
+
       res.json({
         id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         profileImageUrl: user.profileImageUrl,
+        authToken,
       });
     } catch (error) {
       console.error("Login error:", error);
