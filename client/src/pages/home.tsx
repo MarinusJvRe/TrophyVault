@@ -75,7 +75,7 @@ export default function Home() {
               transition={{ duration: 0.8, delay: 0.2 }}
               className="pt-4"
             >
-              <img src={trophyVaultLogo} alt="TrophyVault" className="h-16 md:h-20 w-auto opacity-90 drop-shadow-lg" data-testid="img-logo-dashboard-hero" />
+              <img src={trophyVaultLogo} alt="TrophyVault" className="h-32 md:h-44 w-auto opacity-90 drop-shadow-lg" data-testid="img-logo-dashboard-hero" />
             </motion.div>
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
