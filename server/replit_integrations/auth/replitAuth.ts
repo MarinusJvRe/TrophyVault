@@ -131,9 +131,24 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  const session = req.session as any;
+  if (session?.userId && session?.authProvider === "email") {
+    const { db } = await import("../../db");
+    const { users } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    const [user] = await db.select().from(users).where(eq(users.id, session.userId));
+    if (user) {
+      (req as any).user = {
+        claims: { sub: user.id },
+        id: user.id,
+      };
+      return next();
+    }
+  }
+
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  if (!req.isAuthenticated() || !user?.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 

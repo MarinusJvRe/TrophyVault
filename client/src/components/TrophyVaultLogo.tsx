@@ -1,4 +1,4 @@
-import trophyVaultLogo from "@assets/1771685444234_edit_63733598053289_1771685576340.png";
+import trophyVaultLogo from "@assets/trophy_vault_logo_transparent.png";
 
 interface TrophyVaultLogoProps {
   className?: string;
@@ -8,7 +8,7 @@ export default function TrophyVaultLogo({ className }: TrophyVaultLogoProps) {
   return (
     <img
       src={trophyVaultLogo}
-      alt="TrophyVault"
+      alt="Trophy Vault"
       className={`object-contain ${className ?? ""}`}
     />
   );

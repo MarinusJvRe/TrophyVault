@@ -12,7 +12,7 @@ import type { Trophy as TrophyType } from "@shared/schema";
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
-import trophyVaultLogo from "@assets/1771685444234_edit_63733598053289_1771685576340.png";
+import trophyVaultLogo from "@assets/trophy_vault_logo_transparent.png";
 
 export default function Home() {
   const { theme } = useTheme();

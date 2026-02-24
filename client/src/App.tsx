@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -14,9 +15,14 @@ import Onboarding from "@/pages/onboarding";
 import Safe from "@/pages/safe";
 import Community from "@/pages/community";
 import Profile from "@/pages/profile";
+import SplashScreen from "@/components/SplashScreen";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { Eye, EyeOff, Mail, Chrome, Apple } from "lucide-react";
 import themeLodge from "./assets/theme-lodge.png";
-import trophyVaultLogo from "@assets/1771685444234_edit_63733598053289_1771685576340.png";
+import trophyVaultLogo from "@assets/trophy_vault_logo_transparent.png";
 
 function Router() {
   return (
@@ -33,19 +39,88 @@ function Router() {
   );
 }
 
-function LandingPage() {
+function AuthPage() {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      if (mode === "signup") {
+        if (password !== confirmPassword) {
+          setError("Passwords do not match");
+          setIsSubmitting(false);
+          return;
+        }
+        if (password.length < 8) {
+          setError("Password must be at least 8 characters");
+          setIsSubmitting(false);
+          return;
+        }
+
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email, password, firstName, lastName }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data.message || "Registration failed");
+          setIsSubmitting(false);
+          return;
+        }
+
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        toast({ title: "Account created", description: "Welcome to Trophy Vault!" });
+      } else {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data.message || "Login failed");
+          setIsSubmitting(false);
+          return;
+        }
+
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="flex h-screen w-full">
-      <div className="hidden md:flex w-1/2 relative items-center justify-center bg-black">
+      <div className="hidden lg:flex w-1/2 relative items-center justify-center bg-black">
         <img
           src={themeLodge}
-          alt="TrophyVault"
-          className="absolute inset-0 w-full h-full object-cover opacity-60"
+          alt="Trophy Vault"
+          className="absolute inset-0 w-full h-full object-cover opacity-50"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-black/40" />
         <div className="relative z-10 p-12 max-w-lg">
           <div className="mb-8">
-            <img src={trophyVaultLogo} alt="TrophyVault" className="h-24 w-auto" data-testid="img-logo-landing-desktop" />
+            <img src={trophyVaultLogo} alt="Trophy Vault" className="h-28 w-auto" data-testid="img-logo-landing-desktop" />
           </div>
           <p className="text-xl text-white/80 font-light leading-relaxed">
             Your digital trophy room, enhanced with AI identification and 3D modeling.
@@ -54,28 +129,182 @@ function LandingPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-background">
-        <div className="md:hidden mb-12">
-          <img src={trophyVaultLogo} alt="TrophyVault" className="h-20 w-auto mx-auto" data-testid="img-logo-landing-mobile" />
+      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 bg-[#1a1a1a] overflow-y-auto">
+        <div className="lg:hidden mb-8">
+          <img src={trophyVaultLogo} alt="Trophy Vault" className="h-20 w-auto mx-auto" data-testid="img-logo-landing-mobile" />
         </div>
 
-        <div className="max-w-md w-full text-center space-y-8">
-          <div>
-            <h2 className="text-3xl font-serif font-bold text-foreground mb-4">
-              Preserve the Legacy
+        <div className="max-w-sm w-full space-y-6">
+          <div className="text-center">
+            <h2 className="text-2xl font-serif font-bold text-white mb-2" data-testid="text-auth-heading">
+              {mode === "signin" ? "Welcome Back" : "Create Account"}
             </h2>
-            <p className="text-muted-foreground text-lg">
-              Sign in to access your trophy room and manage your collection.
+            <p className="text-white/60 text-sm">
+              {mode === "signin" ? "Sign in to access your trophy room" : "Start preserving your hunting legacy"}
             </p>
           </div>
 
-          <a href="/api/login" data-testid="link-login">
-            <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-serif tracking-wide text-lg py-6">
-              Sign In with Replit
+          <div className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full bg-white text-gray-800 border-white/20 hover:bg-white/90 font-medium py-5"
+              onClick={() => window.location.href = "/api/auth/google"}
+              data-testid="button-google-signin"
+            >
+              <Chrome className="h-5 w-5 mr-2" />
+              Continue with Google
             </Button>
-          </a>
 
-          <p className="text-sm text-muted-foreground">
+            <Button
+              variant="outline"
+              className="w-full bg-black text-white border-white/20 hover:bg-black/80 font-medium py-5"
+              onClick={() => window.location.href = "/api/auth/apple"}
+              data-testid="button-apple-signin"
+            >
+              <Apple className="h-5 w-5 mr-2" />
+              Continue with Apple
+            </Button>
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/10" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-[#1a1a1a] px-3 text-white/40 uppercase tracking-wider">or</span>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === "signup" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="firstName" className="text-white/70 text-xs">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[#b87333]"
+                    placeholder="John"
+                    data-testid="input-first-name"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="lastName" className="text-white/70 text-xs">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[#b87333]"
+                    placeholder="Doe"
+                    data-testid="input-last-name"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-white/70 text-xs">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[#b87333] pl-10"
+                  placeholder="you@example.com"
+                  data-testid="input-email"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-white/70 text-xs">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[#b87333] pr-10"
+                  placeholder={mode === "signup" ? "Min. 8 characters" : "Enter your password"}
+                  data-testid="input-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
+                  data-testid="button-toggle-password"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            {mode === "signup" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="confirmPassword" className="text-white/70 text-xs">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[#b87333]"
+                  placeholder="Confirm your password"
+                  data-testid="input-confirm-password"
+                />
+              </div>
+            )}
+
+            {error && (
+              <p className="text-red-400 text-sm text-center" data-testid="text-auth-error">{error}</p>
+            )}
+
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-[#b87333] hover:bg-[#a0622d] text-white font-serif tracking-wide text-base py-5"
+              data-testid="button-submit-auth"
+            >
+              {isSubmitting ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : mode === "signin" ? "Sign In" : "Create Account"}
+            </Button>
+          </form>
+
+          <p className="text-center text-sm text-white/50">
+            {mode === "signin" ? (
+              <>
+                Don't have an account?{" "}
+                <button
+                  onClick={() => { setMode("signup"); setError(""); }}
+                  className="text-[#b87333] hover:text-[#d4935f] font-medium"
+                  data-testid="button-switch-to-signup"
+                >
+                  Sign Up
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{" "}
+                <button
+                  onClick={() => { setMode("signin"); setError(""); }}
+                  className="text-[#b87333] hover:text-[#d4935f] font-medium"
+                  data-testid="button-switch-to-signin"
+                >
+                  Sign In
+                </button>
+              </>
+            )}
+          </p>
+
+          <p className="text-xs text-white/30 text-center">
             By signing in, you agree to our terms of service and privacy policy.
           </p>
         </div>
@@ -89,14 +318,14 @@ function AuthGate() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center h-screen bg-[#1a1a1a]">
+        <div className="w-8 h-8 border-2 border-[#b87333] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   if (!user) {
-    return <LandingPage />;
+    return <AuthPage />;
   }
 
   return <Router />;
@@ -108,7 +337,9 @@ function App() {
       <ThemeProvider>
         <TooltipProvider>
           <Toaster />
-          <AuthGate />
+          <SplashScreen>
+            <AuthGate />
+          </SplashScreen>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

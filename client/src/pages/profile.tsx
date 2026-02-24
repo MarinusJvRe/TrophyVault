@@ -407,11 +407,19 @@ export default function Profile() {
         </Card>
 
         <div className="flex justify-end pt-2">
-          <a href="/api/logout">
-            <Button size="lg" variant="outline" className="gap-2 border-border/40 text-muted-foreground hover:text-destructive hover:border-destructive/50" data-testid="button-profile-logout">
-              <LogOut className="h-4 w-4" /> Sign Out
-            </Button>
-          </a>
+          <Button
+            size="lg"
+            variant="outline"
+            className="gap-2 border-border/40 text-muted-foreground hover:text-destructive hover:border-destructive/50"
+            data-testid="button-profile-logout"
+            onClick={() => {
+              fetch("/api/auth/email-logout", { method: "POST", credentials: "include" })
+                .then(r => { if (r.ok) window.location.href = "/"; else window.location.href = "/api/logout"; })
+                .catch(() => window.location.href = "/api/logout");
+            }}
+          >
+            <LogOut className="h-4 w-4" /> Sign Out
+          </Button>
         </div>
       </div>
     </Layout>

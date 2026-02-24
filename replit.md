@@ -4,21 +4,21 @@
 TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
-- **2026-02-21**: Integrated user-designed logo into landing page and dashboard hero; created simplified SVG antler icon component
-- **2026-02-18**: Redesigned Safari Manor to dark warm tones (thatch, khaki, leather, dark wood); fixed text readability across all themes
-- **2026-02-18**: Profile page: added photo upload, Premium/Free badge, moved sharing toggle below name, locations below pursuit
-- **2026-02-18**: Renamed themes: "Modern Lodge" → "Timber Ridge", "Classic Manor" → "Safari Manor"
-- **2026-02-18**: Added Profile/Settings page with theme selection, hunting preferences, favourite locations, room sharing toggle
-- **2026-02-18**: Added mobile bottom tab navigation for small screens
-- **2026-02-18**: Reordered sidebar navigation (Dashboard first), removed "Start New Expedition" button
-- **2026-02-18**: Added huntingLocations array field to user_preferences schema
+- **2026-02-24**: New transparent-background logo (copper/bronze antlers + "TROPHY VAULT" text) replaces square block everywhere
+- **2026-02-24**: Added splash screen with logo + spinner on app cold load (1.8s)
+- **2026-02-24**: New auth system: email+password sign-up/sign-in, Google OAuth button, Apple Sign-In button
+- **2026-02-24**: Auth page with toggle between Sign In and Sign Up modes, dark theme matching brand
+- **2026-02-24**: Updated users table with passwordHash, authProvider, authProviderId fields
+- **2026-02-21**: Integrated user-designed logo into landing page and dashboard hero
+- **2026-02-18**: Redesigned Safari Manor to dark warm tones; fixed text readability across all themes
+- **2026-02-18**: Profile page: photo upload, Premium/Free badge, sharing toggle, locations
 - **2026-02-18**: Backend fully wired with PostgreSQL, Drizzle ORM, Replit Auth (OIDC)
 - **2026-02-17**: Converted frontend from mock data to real API calls
 
 ## Architecture
 - **Frontend**: React + Vite, Wouter routing, TanStack Query, Tailwind CSS, Framer Motion, shadcn/ui
 - **Backend**: Express.js, Drizzle ORM, PostgreSQL (Neon-backed)
-- **Auth**: Replit Auth via OpenID Connect (Passport.js)
+- **Auth**: Multi-provider — Email/Password (bcrypt), Replit OIDC (Passport.js), Google OAuth (planned), Apple Sign-In (planned)
 
 ## Key Pages
 - `/` - Dashboard (hero + stats + featured trophies)
@@ -28,6 +28,7 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 - `/community` - Community (leaderboards, rate rooms)
 - `/profile` - Profile & Settings (theme, about, locations, sharing)
 - `/onboarding` - First-time setup (theme + preferences + locations)
+- Auth page (unauthenticated) - Sign In / Sign Up with email, Google, Apple
 
 ## API Routes
 - `GET/POST /api/trophies`, `GET/PATCH/DELETE /api/trophies/:id`
@@ -37,14 +38,36 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 - `GET /api/community/rooms`, `GET /api/community/room/:userId`, `POST /api/community/rate`
 - `GET /api/my-room-rating`
 - Auth: `/api/login`, `/api/logout`, `/api/callback`, `/api/auth/user`
+- Email Auth: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/email-logout`
+- OAuth: `GET /api/auth/google`, `GET /api/auth/apple` (pending credential setup)
 
 ## Database Tables
-- `users` (Replit Auth managed)
-- `sessions` (Replit Auth managed)
+- `users` (id, email, firstName, lastName, profileImageUrl, passwordHash, authProvider, authProviderId, createdAt, updatedAt)
+- `sessions` (sid, sess, expire)
 - `trophies` (species, name, date, location, score, method, weaponId, notes, imageUrl, featured)
 - `weapons` (name, type, caliber, make, model, optic, notes, imageUrl)
 - `user_preferences` (theme, pursuit, scoringSystem, units, roomVisibility, huntingLocations[])
 - `room_ratings` (roomOwnerId, raterId, score)
+
+## Logo
+- Transparent background logo: `attached_assets/trophy_vault_logo_transparent.png`
+- Imported via `@assets/trophy_vault_logo_transparent.png` alias
+- Copper/bronze antlers (deer + kudu) with horizontal line and "TROPHY VAULT" text
+- Used in: splash screen, auth page, sidebar, dashboard hero
+
+## Splash Screen
+- `SplashScreen.tsx` component wraps app in App.tsx
+- Shows logo centered + copper spinner for 1.8s
+- Framer Motion fade-out transition
+- Dark background (#1a1a1a)
+
+## Auth System
+- **Email/Password**: bcrypt hash (12 rounds), session-based auth, stored in users table
+- **Replit OIDC**: Existing integration via Passport.js (still functional as fallback)
+- **Google OAuth**: UI button ready, backend route placeholder (needs GOOGLE_CLIENT_ID/SECRET)
+- **Apple Sign-In**: UI button ready, backend route placeholder (needs Apple credentials)
+- Session stored in PostgreSQL via connect-pg-simple
+- `isAuthenticated` middleware checks both email sessions and Replit OIDC tokens
 
 ## Theme System
 Three themes: `lodge` (Timber Ridge), `manor` (Safari Manor), `minimal` (Alpine Gallery)
@@ -54,11 +77,12 @@ CSS variables update dynamically via ThemeProvider context. HSL format without h
 - Primary Pursuit: Big Game, Plains Game, Waterfowl, Alpine
 - Scoring System: SCI, Boone & Crockett, Rowland Ward
 - Units: Imperial, Metric
-- Hunting Locations: Multi-select (Southern Africa Bushveld/Plains, Africa Other, North America High Country/Midwest/Deep Woods/Plains, Europe Alpine/Nordic, Other)
+- Hunting Locations: Multi-select
 - Room Visibility: Public/Private
 
 ## Design Notes
 - Typography: Cinzel (serif headings), DM Sans (body)
 - Dark forest tones for lodge theme
+- Brand color: copper/bronze (#b87333)
 - Trophy images must be imported as JS variables in Vite, not accessed via URL paths
 - `data-testid` attributes on all interactive elements

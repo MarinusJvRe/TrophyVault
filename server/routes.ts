@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { registerEmailAuthRoutes } from "./auth";
 import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
@@ -32,9 +33,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup auth BEFORE other routes
   await setupAuth(app);
   registerAuthRoutes(app);
+  registerEmailAuthRoutes(app);
 
   // Serve uploaded files
   const express = await import("express");

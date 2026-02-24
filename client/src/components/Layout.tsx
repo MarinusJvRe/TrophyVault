@@ -1,8 +1,9 @@
-import { Trophy, Calendar, User, Settings, LogOut, Shield, Users } from "lucide-react";
+import { Calendar, User, LogOut, Shield, Users, Trophy } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/hooks/use-auth";
+import trophyVaultLogo from "@assets/trophy_vault_logo_transparent.png";
 
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
@@ -27,11 +28,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden transition-colors duration-700">
       <aside className="w-64 border-r border-border/40 bg-card/80 backdrop-blur-xl hidden md:flex flex-col relative z-20">
-        <div className="p-6">
-          <h1 className="font-serif text-2xl font-bold tracking-wider text-primary flex items-center gap-2">
-            <Trophy className="h-6 w-6" />
-            TROPHY<span className="text-foreground">VAULT</span>
-          </h1>
+        <div className="p-4">
+          <img src={trophyVaultLogo} alt="Trophy Vault" className="h-12 w-auto" data-testid="img-logo-sidebar" />
         </div>
 
         <nav className="flex-1 px-4 space-y-2">
@@ -81,11 +79,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
              </div>
            </Link>
            
-           <a href="/api/logout">
-             <button className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors" data-testid="button-logout">
-               <LogOut className="h-3 w-3" /> Sign Out
-             </button>
-           </a>
+           <button
+             onClick={() => {
+               fetch("/api/auth/email-logout", { method: "POST", credentials: "include" })
+                 .then(r => { if (r.ok) window.location.href = "/"; else window.location.href = "/api/logout"; })
+                 .catch(() => window.location.href = "/api/logout");
+             }}
+             className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+             data-testid="button-logout"
+           >
+             <LogOut className="h-3 w-3" /> Sign Out
+           </button>
         </div>
       </aside>
 
