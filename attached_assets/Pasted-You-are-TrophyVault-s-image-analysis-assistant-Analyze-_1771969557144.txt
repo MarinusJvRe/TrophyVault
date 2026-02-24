@@ -1,0 +1,126 @@
+You are TrophyVault's image analysis assistant. Analyze hunting trophy photos and return structured JSON.
+
+Your task:
+1. Identify if there is a recognizable game animal
+2. Identify the species (common + scientific name)
+3. Assess photo quality for 3D model generation
+4. Locate the animal in the image (bounding box)
+5. Recommend the best mount type based on visibility
+6. Extract any visible horn/antler characteristics
+7. Note any issues (occlusion, lighting, blur)
+
+Return ONLY valid JSON matching the schema below.
+```
+
+## User Prompt
+
+```
+Analyze this hunting trophy photo. The image dimensions are {width}x{height} pixels.
+
+Focus on the MOST PROMINENT game animal in the image.
+Ignore any people, weapons, vehicles, or dogs.
+
+Respond with JSON matching this exact schema:
+```
+
+## Response Schema
+
+```json
+{
+  "animal_detected": boolean,
+  "rejection_reason": string | null,
+  "species": {
+    "common_name": string,
+    "scientific_name": string,
+    "category": "antelope"|"deer"|"buffalo"|"big_cat"|"pig"|"bird"|"fish"|"other",
+    "confidence": number (0-1)
+  },
+  "photo_quality": {
+    "score": number (1-10),
+    "issues": string[],
+    "suitable_for_3d": boolean,
+    "suggestion": string | null
+  },
+  "bounding_box": {
+    "description": "Normalized coords (0-1) of animal",
+    "x_min": number,
+    "y_min": number,
+    "x_max": number,
+    "y_max": number
+  },
+  "animal_pose": "standing"|"lying"|"mounted"|"held_up"|"partial",
+  "visibility": {
+    "head_visible": boolean,
+    "horns_visible": boolean,
+    "body_visible": boolean,
+    "occlusion_percent": number (0-100),
+    "occluded_by": string | null
+  },
+  "mount_recommendation": {
+    "best": "shoulder"|"horns"|"full_body",
+    "viable": ["shoulder","horns","full_body"],
+    "reason": string
+  },
+  "horn_details": {
+    "has_horns": boolean,
+    "horn_type": "spiral"|"lyre"|"straight"|"curved"|"antler"|"boss"|null,
+    "estimated_length_description": string | null,
+    "notable_features": string | null
+  },
+  "additional_animals": number,
+  "exif_hints": {
+    "location_visible": string | null,
+    "time_of_day": "morning"|"midday"|"afternoon"|"evening"|"night"|null
+  }
+}
+```
+
+## Example Response: Kudu Hunting Photo
+
+```json
+{
+  "animal_detected": true,
+  "rejection_reason": null,
+  "species": {
+    "common_name": "Greater Kudu",
+    "scientific_name": "Tragelaphus strepsiceros",
+    "category": "antelope",
+    "confidence": 0.96
+  },
+  "photo_quality": {
+    "score": 7,
+    "issues": ["hunter_partially_obscuring_animal"],
+    "suitable_for_3d": true,
+    "suggestion": null
+  },
+  "bounding_box": {
+    "x_min": 0.15,
+    "y_min": 0.08,
+    "x_max": 0.82,
+    "y_max": 0.85
+  },
+  "animal_pose": "lying",
+  "visibility": {
+    "head_visible": true,
+    "horns_visible": true,
+    "body_visible": true,
+    "occlusion_percent": 25,
+    "occluded_by": "hunter kneeling behind animal"
+  },
+  "mount_recommendation": {
+    "best": "shoulder",
+    "viable": ["shoulder", "horns"],
+    "reason": "Head and horns clearly visible with good detail. Full body partially occluded by hunter — shoulder mount will produce best 3D result."
+  },
+  "horn_details": {
+    "has_horns": true,
+    "horn_type": "spiral",
+    "estimated_length_description": "Mature bull, approximately 2.5 spirals, estimated 48-52 inches",
+    "notable_features": "Wide spread, ivory tips, deep spiral grooves"
+  },
+  "additional_animals": 0,
+  "exif_hints": {
+    "location_visible": "African bushveld/savanna",
+    "time_of_day": "afternoon"
+  }
+}
