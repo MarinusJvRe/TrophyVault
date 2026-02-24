@@ -17,6 +17,15 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+function saveSession(req: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    req.session.save((err: any) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
 export function registerEmailAuthRoutes(app: Express) {
   app.post("/api/auth/register", async (req, res) => {
     try {
@@ -44,6 +53,8 @@ export function registerEmailAuthRoutes(app: Express) {
 
       (req.session as any).userId = user.id;
       (req.session as any).authProvider = "email";
+
+      await saveSession(req);
 
       res.status(201).json({
         id: user.id,
@@ -80,6 +91,8 @@ export function registerEmailAuthRoutes(app: Express) {
       (req.session as any).userId = user.id;
       (req.session as any).authProvider = "email";
 
+      await saveSession(req);
+
       res.json({
         id: user.id,
         email: user.email,
@@ -101,18 +114,3 @@ export function registerEmailAuthRoutes(app: Express) {
     res.status(501).json({ message: "Apple Sign In not configured. Set APPLE_CLIENT_ID and APPLE_TEAM_ID." });
   });
 }
-
-export const isEmailAuthenticated: RequestHandler = async (req, res, next) => {
-  const session = req.session as any;
-  if (session?.userId && session?.authProvider === "email") {
-    const [user] = await db.select().from(users).where(eq(users.id, session.userId));
-    if (user) {
-      (req as any).user = {
-        claims: { sub: user.id },
-        id: user.id,
-      };
-      return next();
-    }
-  }
-  return next();
-};
