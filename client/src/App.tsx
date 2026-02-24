@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme-context";
@@ -84,6 +84,7 @@ function AuthPage() {
         }
 
         const userData = await res.json();
+        sessionStorage.setItem("isNewUser", "true");
         queryClient.setQueryData(["/api/auth/user"], userData);
         toast({ title: "Account created", description: "Welcome to Trophy Vault!" });
       } else {
@@ -317,8 +318,13 @@ function AuthPage() {
 
 function AuthGate() {
   const { user, isLoading } = useAuth();
+  const isNewUser = sessionStorage.getItem("isNewUser") === "true";
+  const { data: preferences, isLoading: prefsLoading } = useQuery({
+    queryKey: ["/api/preferences"],
+    enabled: !!user && isNewUser,
+  });
 
-  if (isLoading) {
+  if (isLoading || (user && isNewUser && prefsLoading)) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#1a1a1a]">
         <div className="w-8 h-8 border-2 border-[#b87333] border-t-transparent rounded-full animate-spin"></div>
@@ -328,6 +334,10 @@ function AuthGate() {
 
   if (!user) {
     return <AuthPage />;
+  }
+
+  if (isNewUser && (!preferences || !(preferences as any).pursuit)) {
+    return <Onboarding />;
   }
 
   return <Router />;

@@ -68,20 +68,26 @@ export default function Home() {
             className="absolute inset-0 w-full h-full object-cover"
           />
           
-          <div className="relative z-20 h-full flex flex-col justify-end p-8 md:p-12 max-w-5xl mx-auto">
-            <div className="absolute top-6 right-6 md:top-8 md:right-8">
-              <img src={trophyVaultLogo} alt="TrophyVault" className="h-12 md:h-16 w-auto opacity-80" data-testid="img-logo-dashboard-hero" />
-            </div>
+          <div className="relative z-20 h-full flex flex-col items-center justify-between p-8 md:p-12 max-w-5xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="pt-4"
+            >
+              <img src={trophyVaultLogo} alt="TrophyVault" className="h-16 md:h-20 w-auto opacity-90 drop-shadow-lg" data-testid="img-logo-dashboard-hero" />
+            </motion.div>
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
+              className="text-center mb-4"
             >
               <h1 className={`text-4xl md:text-6xl font-serif font-bold mb-4 leading-tight ${theme === "minimal" ? "text-foreground" : "text-white drop-shadow-lg"}`} data-testid="text-hero-heading">
                 Preserve your Legacy.<br/>
                 <span className={`italic font-light ${theme === "minimal" ? "text-foreground/80" : "text-white/90"}`}>Honor the Hunt.</span>
               </h1>
-              <p className={`text-lg max-w-xl mb-2 font-light ${theme === "minimal" ? "text-muted-foreground" : "text-white/90 drop-shadow-md"}`} data-testid="text-hero-subtitle">
+              <p className={`text-lg max-w-xl mb-2 font-light mx-auto ${theme === "minimal" ? "text-muted-foreground" : "text-white/90 drop-shadow-md"}`} data-testid="text-hero-subtitle">
                 {user?.firstName ? `${user.firstName}'s hunts at a glance.` : "Your hunts at a glance."}
               </p>
             </motion.div>

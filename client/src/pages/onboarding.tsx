@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useTheme } from "@/lib/theme-context";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowRight, Home, Feather, Mountain } from "lucide-react";
@@ -54,7 +54,9 @@ export default function Onboarding() {
     },
     onSuccess: () => {
       setTheme(selectedTheme as any);
-      setLocation("/");
+      sessionStorage.removeItem("isNewUser");
+      queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
+      setLocation("/trophies");
     },
   });
 
@@ -76,7 +78,6 @@ export default function Onboarding() {
       units: formData.units,
       huntingLocations: formData.huntingLocations,
     });
-    setLocation("/");
   };
 
   return (
