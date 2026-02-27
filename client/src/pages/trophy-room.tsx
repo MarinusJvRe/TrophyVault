@@ -131,10 +131,7 @@ export default function TrophyRoom() {
               <span className="text-2xl text-primary font-light">+</span>
             </div>
             <h3 className="font-serif font-bold text-foreground mb-1">Add New Trophy</h3>
-            <p className="text-sm text-muted-foreground mb-4">Upload photos for AI Analysis</p>
-            <Button size="sm" variant="secondary" className="bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground">
-              Upload Now
-            </Button>
+            <p className="text-sm text-muted-foreground">Upload photos for AI Analysis</p>
           </motion.div>
 
           {filteredTrophies.map((trophy, i) => (
