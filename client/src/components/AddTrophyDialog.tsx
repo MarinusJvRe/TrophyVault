@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Upload, Sparkles, Check, AlertTriangle, ChevronRight, X, Eye, Crosshair, Loader2, Crop, Trophy, Shield } from "lucide-react";
+import { Camera, Upload, Sparkles, Check, AlertTriangle, ChevronRight, X, Eye, Crosshair, Loader2, Crop, Trophy, Shield, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactCrop, { type Crop as CropType, centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
@@ -146,7 +146,8 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const [weaponId, setWeaponId] = useState<string>("");
   const [analysisUnits, setAnalysisUnits] = useState<string>("imperial");
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const cropImageRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -346,7 +347,8 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
               hasCrop={!!croppedFile}
               onFileInput={handleFileInput}
               onDrop={handleDrop}
-              fileInputRef={fileInputRef}
+              cameraInputRef={cameraInputRef}
+              galleryInputRef={galleryInputRef}
               onAnalyze={startAnalysis}
               onSkip={skipAnalysis}
               onCrop={() => setStep("crop")}
@@ -404,7 +406,8 @@ function UploadStep({
   hasCrop,
   onFileInput,
   onDrop,
-  fileInputRef,
+  cameraInputRef,
+  galleryInputRef,
   onAnalyze,
   onSkip,
   onCrop,
@@ -416,7 +419,8 @@ function UploadStep({
   hasCrop: boolean;
   onFileInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onDrop: (e: React.DragEvent) => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  cameraInputRef: React.RefObject<HTMLInputElement | null>;
+  galleryInputRef: React.RefObject<HTMLInputElement | null>;
   onAnalyze: () => void;
   onSkip: () => void;
   onCrop: () => void;
@@ -438,21 +442,28 @@ function UploadStep({
       </DialogHeader>
 
       <input
-        ref={fileInputRef}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
         onChange={onFileInput}
         className="hidden"
-        data-testid="input-trophy-file"
+        data-testid="input-trophy-camera"
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={onFileInput}
+        className="hidden"
+        data-testid="input-trophy-gallery"
       />
 
       {!selectedFile ? (
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-border/60 rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group"
+          className="border-2 border-dashed border-border/60 rounded-xl p-8 text-center hover:border-primary/50 hover:bg-primary/5 transition-all group"
           data-testid="dropzone-trophy-image"
         >
           <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
@@ -462,9 +473,24 @@ function UploadStep({
           <p className="text-sm text-muted-foreground mb-4">
             Take a photo or select from your gallery
           </p>
-          <div className="flex gap-2 justify-center">
-            <Button size="sm" variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20" data-testid="button-browse-files">
-              <Camera className="h-4 w-4 mr-1" /> Browse Files
+          <div className="flex gap-3 justify-center">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="bg-primary/10 text-primary hover:bg-primary/20"
+              onClick={() => cameraInputRef.current?.click()}
+              data-testid="button-take-photo"
+            >
+              <Camera className="h-4 w-4 mr-1.5" /> Take Photo
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="bg-primary/10 text-primary hover:bg-primary/20"
+              onClick={() => galleryInputRef.current?.click()}
+              data-testid="button-choose-gallery"
+            >
+              <ImageIcon className="h-4 w-4 mr-1.5" /> Gallery
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-3">JPEG, PNG, or WebP up to 10MB</p>
