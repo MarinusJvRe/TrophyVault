@@ -60,6 +60,7 @@ export default function TrophyDetail() {
       await apiRequest("DELETE", `/api/trophies/${params?.id}`);
     },
     onSuccess: () => {
+      setDeleteDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/trophies"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       toast({ title: "Trophy deleted", description: "Your trophy has been removed from the vault." });
