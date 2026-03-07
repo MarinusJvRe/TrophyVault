@@ -208,20 +208,13 @@ export async function analyzeTrophyImage(
 
 export async function generateTrophyRender(renderPrompt: string): Promise<Buffer | null> {
   try {
-    const response = await openai.images.generate({
-      model: "dall-e-3",
-      prompt: renderPrompt,
-      n: 1,
-      size: "1024x1024",
-      quality: "standard",
-    });
-
-    const imageUrl = response.data[0]?.url;
-    if (!imageUrl) return null;
-
-    const imgResponse = await fetch(imageUrl);
-    const arrayBuffer = await imgResponse.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    const { generateImageBuffer } = await import("./replit_integrations/image/client");
+    const buffer = await generateImageBuffer(renderPrompt, "1024x1024");
+    if (!buffer || buffer.length === 0) {
+      console.error("Render generation returned empty image data");
+      return null;
+    }
+    return buffer;
   } catch (error) {
     console.error("Render generation failed:", error);
     return null;

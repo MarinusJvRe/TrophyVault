@@ -33,7 +33,7 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 - **Frontend**: React + Vite, Wouter routing, TanStack Query, Tailwind CSS, Framer Motion, shadcn/ui
 - **Backend**: Express.js, Drizzle ORM, PostgreSQL (Neon-backed)
 - **Auth**: Multi-provider — Email/Password (bcrypt) + auth token fallback, Replit OIDC (Passport.js), Google OAuth (planned), Apple Sign-In (planned)
-- **AI**: OpenAI GPT-4o vision for trophy analysis (via Replit AI Integrations)
+- **AI**: OpenAI GPT-4o vision for trophy analysis + gpt-image-1 for 3D trophy render generation (via Replit AI Integrations); Gemini integration also available
 
 ## Key Pages
 - `/` - Dashboard (hero + stats + featured trophies)
