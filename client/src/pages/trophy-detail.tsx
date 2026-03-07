@@ -7,6 +7,9 @@ import {
   ArrowLeft, Share2, Target, MapPin, 
   Calendar, BadgeCheck, Camera, MessageCircle, Crosshair, Sword, Trash2, Pencil, AlertTriangle, Check, Loader2, X
 } from "lucide-react";
+import { LocationMap } from "@/components/LocationMap";
+import { LocationSearch } from "@/components/LocationSearch";
+import { generateTrophyCertificate } from "@/components/TrophyCertificate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +36,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import type { Trophy, Weapon } from "@shared/schema";
+import { findClosestSpecies } from "@shared/scoring-thresholds";
 
 export default function TrophyDetail() {
   const [match, params] = useRoute("/trophies/:id");
@@ -42,6 +46,9 @@ export default function TrophyDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editWeaponId, setEditWeaponId] = useState<string>("");
+  const [editLocation, setEditLocation] = useState<string>("");
+  const [editLat, setEditLat] = useState<number | null>(null);
+  const [editLng, setEditLng] = useState<number | null>(null);
   
   const { data: trophy, isLoading } = useQuery<Trophy>({
     queryKey: ["/api/trophies", params?.id],
@@ -89,6 +96,9 @@ export default function TrophyDetail() {
 
   const handleStartEdit = () => {
     setEditWeaponId(trophy?.weaponId || "");
+    setEditLocation(trophy?.location || "");
+    setEditLat(trophy?.latitude || null);
+    setEditLng(trophy?.longitude || null);
     setEditing(true);
   };
 
@@ -104,7 +114,9 @@ export default function TrophyDetail() {
       species: formData.get("species") as string,
       name: formData.get("name") as string,
       date: formData.get("date") as string,
-      location: (formData.get("location") as string) || null,
+      location: editLocation || null,
+      latitude: editLat,
+      longitude: editLng,
       score: (formData.get("score") as string) || null,
       method: (formData.get("method") as string) || (selectedWeapon ? selectedWeapon.type : null),
       weaponId: editWeaponId && editWeaponId !== "__other__" ? editWeaponId : null,
@@ -222,6 +234,14 @@ export default function TrophyDetail() {
                 weapons={weapons}
                 editWeaponId={editWeaponId}
                 setEditWeaponId={setEditWeaponId}
+                editLocation={editLocation}
+                editLat={editLat}
+                editLng={editLng}
+                onLocationChange={(loc, lat, lng) => {
+                  setEditLocation(loc);
+                  setEditLat(lat);
+                  setEditLng(lng);
+                }}
                 onSubmit={handleSaveEdit}
                 onCancel={handleCancelEdit}
                 isPending={updateMutation.isPending}
@@ -231,6 +251,7 @@ export default function TrophyDetail() {
                 trophy={trophy}
                 weapon={weapon}
                 onShare={handleShare}
+                onCertificate={() => generateTrophyCertificate(trophy, weapon)}
               />
             )}
           </div>
@@ -269,11 +290,15 @@ function ViewMode({
   trophy,
   weapon,
   onShare,
+  onCertificate,
 }: {
   trophy: Trophy;
   weapon: Weapon | null | undefined;
   onShare: () => void;
+  onCertificate: () => void;
 }) {
+  const speciesThresholds = findClosestSpecies(trophy.species);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -340,6 +365,15 @@ function ViewMode({
             </div>
           )}
         </div>
+        {trophy.latitude != null && trophy.longitude != null && (
+          <LocationMap
+            latitude={trophy.latitude}
+            longitude={trophy.longitude}
+            locationName={trophy.location || undefined}
+            height="160px"
+            className="mt-3"
+          />
+        )}
       </div>
 
       <div>
@@ -360,6 +394,26 @@ function ViewMode({
           </div>
         </div>
       </div>
+
+      {speciesThresholds && (
+        <div>
+          <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">Scoring Thresholds — {speciesThresholds.species}</h3>
+          <div className="grid grid-cols-3 gap-3" data-testid="scoring-thresholds-detail">
+            <div className="p-3 rounded-lg bg-card border border-border/50 text-center">
+              <div className="text-xs text-muted-foreground mb-1">SCI</div>
+              <div className="text-sm font-semibold text-foreground" data-testid="text-detail-threshold-sci">{speciesThresholds.sci || "—"}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-card border border-border/50 text-center">
+              <div className="text-xs text-muted-foreground mb-1">Rowland Ward</div>
+              <div className="text-sm font-semibold text-foreground" data-testid="text-detail-threshold-rw">{speciesThresholds.rowlandWard || "—"}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-card border border-border/50 text-center">
+              <div className="text-xs text-muted-foreground mb-1">B&C</div>
+              <div className="text-sm font-semibold text-foreground" data-testid="text-detail-threshold-bc">{speciesThresholds.booneAndCrockett || "—"}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {trophy.notes && (
         <div>
@@ -383,8 +437,8 @@ function ViewMode({
         <Button onClick={onShare} className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 font-medium" data-testid="button-share-whatsapp">
           <MessageCircle className="h-4 w-4" /> Share on WhatsApp
         </Button>
-        <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-serif" data-testid="button-certificate">
-          Generate Official Certificate
+        <Button onClick={onCertificate} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-serif" data-testid="button-certificate">
+          Generate Certificate
         </Button>
       </div>
     </motion.div>
@@ -396,6 +450,10 @@ function EditForm({
   weapons,
   editWeaponId,
   setEditWeaponId,
+  editLocation,
+  editLat,
+  editLng,
+  onLocationChange,
   onSubmit,
   onCancel,
   isPending,
@@ -404,6 +462,10 @@ function EditForm({
   weapons: Weapon[];
   editWeaponId: string;
   setEditWeaponId: (v: string) => void;
+  editLocation: string;
+  editLat: number | null;
+  editLng: number | null;
+  onLocationChange: (loc: string, lat: number | null, lng: number | null) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
   isPending: boolean;
@@ -453,13 +515,13 @@ function EditForm({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="edit-location" className="text-xs">Location</Label>
-            <Input
-              id="edit-location"
-              name="location"
-              defaultValue={trophy.location || ""}
-              placeholder="e.g., Limpopo, South Africa"
-              data-testid="input-edit-location"
+            <Label className="text-xs">Location</Label>
+            <LocationSearch
+              value={editLocation}
+              latitude={editLat}
+              longitude={editLng}
+              onChange={onLocationChange}
+              placeholder="Search for a location..."
             />
           </div>
         </div>

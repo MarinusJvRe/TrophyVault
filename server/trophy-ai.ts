@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { getThreshold, findClosestSpecies } from "@shared/scoring-thresholds";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -80,7 +81,7 @@ Respond with JSON matching this exact schema:
   },
   "trophy_qualification": {
     "scoring_system": "${scoringSystem}",
-    "minimum_qualifying_score": string | null (the minimum score for this species under ${scoringSystem}, e.g. "52 inches" or "132 cm"),
+    "minimum_qualifying_score": string | null (use TrophyVault's official scoring threshold database for this species under ${scoringSystem} — do NOT guess or invent minimum scores; if the species is not in the database, return null),
     "estimated_score": string | null (your estimated score based on visible horn/antler measurements, in ${unitLabel}),
     "likely_qualifies": boolean | null (whether the trophy likely meets the minimum qualifying score),
     "confidence": number (0-1, how confident you are in this qualification assessment),
@@ -90,7 +91,6 @@ Respond with JSON matching this exact schema:
   "render_prompt": string (a detailed DALL-E prompt to generate a photorealistic 3D taxidermy shoulder mount render of this specific animal species. Include species name, horn/antler details, coloring, and specify: "photorealistic 3D render, taxidermy shoulder mount, dark wooden plaque background, museum quality, dramatic studio lighting, no background, isolated on transparent background"),
   "additional_animals": number,
   "exif_hints": {
-    "location_visible": string | null,
     "time_of_day": "morning"|"midday"|"afternoon"|"evening"|"night"|null
   }
 }`;
@@ -200,6 +200,13 @@ export async function analyzeTrophyImage(
     if (highKey && highKey !== "length_range_high") {
       hd.length_range_high = hd[highKey];
       delete hd[highKey];
+    }
+  }
+
+  if (parsed.species?.common_name && parsed.trophy_qualification) {
+    const officialThreshold = getThreshold(parsed.species.common_name, scoringSystem);
+    if (officialThreshold && officialThreshold !== "n/a") {
+      parsed.trophy_qualification.minimum_qualifying_score = officialThreshold;
     }
   }
 

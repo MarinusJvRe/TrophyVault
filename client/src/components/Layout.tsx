@@ -1,4 +1,4 @@
-import { Calendar, User, LogOut, Shield, Users, Trophy } from "lucide-react";
+import { Calendar, User, LogOut, Shield, Users, Trophy, MapPin } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
@@ -12,6 +12,7 @@ import themeMinimal from "../assets/theme-minimal.png";
 const navItems = [
   { icon: Calendar, label: "Dashboard", href: "/" },
   { icon: Trophy, label: "Trophy Room", href: "/trophies" },
+  { icon: MapPin, label: "Map", href: "/trophies/map" },
   { icon: Shield, label: "The Safe", href: "/safe" },
   { icon: Users, label: "Community", href: "/community" },
 ];

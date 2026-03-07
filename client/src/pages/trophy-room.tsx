@@ -180,14 +180,6 @@ function WallMountCard({ trophy, index }: { trophy: Trophy, index: number }) {
         </div>
       )}
 
-      {trophy.renderImageUrl && (
-        <div className="absolute top-2 left-2 z-10">
-          <div className="bg-primary/20 backdrop-blur-sm text-primary text-[9px] font-semibold px-1.5 py-0.5 rounded">
-            3D
-          </div>
-        </div>
-      )}
-
       <div className="absolute bottom-0 left-0 right-0 z-10 p-2.5">
         <p className="text-white text-xs font-semibold uppercase tracking-wide truncate">{trophy.species}</p>
         <p className="text-white/70 text-[10px] truncate mt-0.5">{trophy.name}</p>

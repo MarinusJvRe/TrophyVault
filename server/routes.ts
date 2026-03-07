@@ -11,8 +11,10 @@ import fs from "fs";
 
 const profileUploadDir = path.join(process.cwd(), "uploads", "profiles");
 const trophyUploadDir = path.join(process.cwd(), "uploads", "trophies");
+const weaponUploadDir = path.join(process.cwd(), "uploads", "weapons");
 if (!fs.existsSync(profileUploadDir)) fs.mkdirSync(profileUploadDir, { recursive: true });
 if (!fs.existsSync(trophyUploadDir)) fs.mkdirSync(trophyUploadDir, { recursive: true });
+if (!fs.existsSync(weaponUploadDir)) fs.mkdirSync(weaponUploadDir, { recursive: true });
 
 const imageUploadConfig = {
   limits: { fileSize: 10 * 1024 * 1024 },
@@ -37,6 +39,17 @@ const profileUpload = multer({
 const trophyUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, trophyUploadDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || ".jpg";
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  ...imageUploadConfig,
+});
+
+const weaponUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, weaponUploadDir),
     filename: (_req, file, cb) => {
       const ext = path.extname(file.originalname) || ".jpg";
       cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
@@ -89,6 +102,12 @@ export async function registerRoutes(
     const deleted = await storage.deleteWeapon(req.params.id as string, getUserId(req));
     if (!deleted) return res.status(404).json({ message: "Weapon not found" });
     res.status(204).send();
+  });
+
+  app.post("/api/weapons/upload-image", isAuthenticated, weaponUpload.single("image"), async (req, res) => {
+    if (!req.file) return res.status(400).json({ message: "No image file provided" });
+    const imageUrl = `/uploads/weapons/${req.file.filename}`;
+    res.json({ imageUrl });
   });
 
   // ========== TROPHIES ==========

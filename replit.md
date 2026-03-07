@@ -4,7 +4,15 @@
 TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
-- **2026-03-07**: Trophy room redesigned: wall-mount layout with denser grid (2-5 cols), cards show 3D render image (DALL-E generated) or fallback to original photo, minimal overlay with species/score/date
+- **2026-03-07**: Location search: Nominatim geocoding autocomplete replaces text input, stores lat/lng in DB, shows Leaflet/OSM map on trophy detail
+- **2026-03-07**: Map view: `/trophies/map` page with all trophies plotted on interactive Leaflet map, clickable pins with trophy info
+- **2026-03-07**: Scoring thresholds: `shared/scoring-thresholds.ts` with SCI/Rowland Ward/B&C minimum scores for ~90 species, displayed on trophy detail and add dialog
+- **2026-03-07**: Certificate PDF: jsPDF-based dark-themed certificate with trophy image, details, scoring thresholds, notes; downloads on "Generate Certificate" click
+- **2026-03-07**: Weapon image upload: camera/gallery picker with crop replaces text URL input in The Safe
+- **2026-03-07**: Removed 3D badge from trophy room cards, stopped pre-populating location from AI
+- **2026-03-07**: Schema: added `latitude`, `longitude` columns to trophies table
+- **2026-03-07**: 3D render generation switched from broken DALL-E 3 to working gpt-image-1 model
+- **2026-03-07**: Trophy room redesigned: wall-mount layout with denser grid (2-5 cols), cards show 3D render image or fallback to original photo, minimal overlay with species/score/date
 - **2026-03-07**: Trophy detail: single-column scrollable layout, clear "Back to Vault" button at top, photo smaller with padding, shot distance shown, "TrophyVault Score" label (replaces "Symmetry Score"), no "Estimated Age"
 - **2026-03-07**: AI prompt updated: removed Estimated Age, added `trophy_vault_score` (1-10 impressiveness), added `render_prompt` for DALL-E 3D taxidermy render generation
 - **2026-03-07**: Schema: added `shotDistance`, `renderImageUrl` columns to trophies table
@@ -38,7 +46,8 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 ## Key Pages
 - `/` - Dashboard (hero + stats + featured trophies)
 - `/trophies` - Trophy Room (grid view, search/filter, add new)
-- `/trophies/:id` - Trophy Detail (image viewer, hunt details, WhatsApp share)
+- `/trophies/:id` - Trophy Detail (image viewer, hunt details, WhatsApp share, certificate PDF)
+- `/trophies/map` - Map View (interactive Leaflet map with trophy pins)
 - `/safe` - The Safe (weapon management)
 - `/community` - Community (leaderboards, rate rooms)
 - `/profile` - Profile & Settings (theme, about, locations, sharing)

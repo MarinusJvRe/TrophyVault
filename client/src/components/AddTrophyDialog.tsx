@@ -26,6 +26,8 @@ import { cn } from "@/lib/utils";
 import ReactCrop, { type Crop as CropType, centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import type { Weapon } from "@shared/schema";
+import { LocationSearch } from "@/components/LocationSearch";
+import { findClosestSpecies, getAllThresholds } from "@shared/scoring-thresholds";
 
 interface TrophyAnalysis {
   animal_detected: boolean;
@@ -148,6 +150,9 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const [renderImageUrl, setRenderImageUrl] = useState<string | null>(null);
   const [weaponId, setWeaponId] = useState<string>("");
   const [analysisUnits, setAnalysisUnits] = useState<string>("imperial");
+  const [locationName, setLocationName] = useState<string>("");
+  const [locationLat, setLocationLat] = useState<number | null>(null);
+  const [locationLng, setLocationLng] = useState<number | null>(null);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -174,6 +179,9 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     setRenderImageUrl(null);
     setWeaponId("");
     setAnalysisUnits("imperial");
+    setLocationName("");
+    setLocationLat(null);
+    setLocationLng(null);
   }, [previewUrl, croppedPreviewUrl]);
 
   const handleOpenChange = useCallback((val: boolean) => {
@@ -328,7 +336,9 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
       species: formData.get("species") as string,
       name: formData.get("name") as string,
       date: formData.get("date") as string,
-      location: (formData.get("location") as string) || null,
+      location: locationName || null,
+      latitude: locationLat,
+      longitude: locationLng,
       score: (formData.get("score") as string) || null,
       method: (formData.get("method") as string) || (selectedWeapon ? selectedWeapon.type : (weaponId === "__other__" ? "Other" : null)),
       weaponId: weaponId && weaponId !== "__other__" ? weaponId : null,
@@ -399,6 +409,12 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
               units={analysisUnits}
               onSubmit={handleCreateTrophy}
               isPending={createTrophyMutation.isPending}
+              locationName={locationName}
+              locationLat={locationLat}
+              locationLng={locationLng}
+              setLocationName={setLocationName}
+              setLocationLat={setLocationLat}
+              setLocationLng={setLocationLng}
             />
           )}
         </AnimatePresence>
@@ -694,6 +710,7 @@ function ResultsStep({
   const qualityScore = analysis.photo_quality.score;
   const unitAbbr = units === "metric" ? "cm" : "\"";
   const tq = analysis.trophy_qualification;
+  const speciesThresholds = findClosestSpecies(analysis.species.common_name);
 
   return (
     <motion.div
@@ -868,6 +885,29 @@ function ResultsStep({
         </div>
       )}
 
+      {speciesThresholds && (
+        <div className="bg-card border border-border/40 rounded-lg p-3 mb-4" data-testid="scoring-thresholds-panel">
+          <div className="flex items-center gap-2 mb-2">
+            <Shield className="h-4 w-4 text-primary" />
+            <span className="text-xs font-medium text-foreground">Official Scoring Thresholds — {speciesThresholds.species}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="text-center p-2 rounded bg-primary/5">
+              <div className="text-muted-foreground mb-0.5">SCI</div>
+              <div className="font-semibold text-foreground" data-testid="text-threshold-sci">{speciesThresholds.sci || "—"}</div>
+            </div>
+            <div className="text-center p-2 rounded bg-primary/5">
+              <div className="text-muted-foreground mb-0.5">Rowland Ward</div>
+              <div className="font-semibold text-foreground" data-testid="text-threshold-rw">{speciesThresholds.rowlandWard || "—"}</div>
+            </div>
+            <div className="text-center p-2 rounded bg-primary/5">
+              <div className="text-muted-foreground mb-0.5">B&C</div>
+              <div className="font-semibold text-foreground" data-testid="text-threshold-bc">{speciesThresholds.booneAndCrockett || "—"}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-card border border-border/40 rounded-lg p-3 mb-4">
         <div className="text-xs text-muted-foreground mb-2">Visibility Assessment</div>
         <div className="flex gap-3 text-xs">
@@ -913,6 +953,12 @@ function FormStep({
   units,
   onSubmit,
   isPending,
+  locationName,
+  locationLat,
+  locationLng,
+  setLocationName,
+  setLocationLat,
+  setLocationLng,
 }: {
   analysis: TrophyAnalysis | null;
   previewUrl: string | null;
@@ -922,6 +968,12 @@ function FormStep({
   units: string;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isPending: boolean;
+  locationName: string;
+  locationLat: number | null;
+  locationLng: number | null;
+  setLocationName: (v: string) => void;
+  setLocationLat: (v: number | null) => void;
+  setLocationLng: (v: number | null) => void;
 }) {
   const estimatedScore = getEstimatedScore(analysis, units);
 
@@ -1001,13 +1053,17 @@ function FormStep({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="location" className="text-xs">Location</Label>
-            <Input
-              id="location"
-              name="location"
-              defaultValue={analysis?.exif_hints.location_visible || ""}
-              placeholder="e.g., Limpopo, South Africa"
-              data-testid="input-trophy-location"
+            <Label className="text-xs">Location</Label>
+            <LocationSearch
+              value={locationName}
+              latitude={locationLat}
+              longitude={locationLng}
+              onChange={(loc, lat, lng) => {
+                setLocationName(loc);
+                setLocationLat(lat);
+                setLocationLng(lng);
+              }}
+              placeholder="Search for a location..."
             />
           </div>
         </div>
