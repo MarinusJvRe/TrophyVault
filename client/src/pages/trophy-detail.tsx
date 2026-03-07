@@ -3,14 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { 
   ArrowLeft, Share2, Ruler, Target, MapPin, 
-  Calendar, BadgeCheck, Camera, MessageCircle, Crosshair, X
+  Calendar, BadgeCheck, Camera, MessageCircle, Crosshair, X, Sword
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import type { Trophy } from "@shared/schema";
+import type { Trophy, Weapon } from "@shared/schema";
 
 export default function TrophyDetail() {
   const [match, params] = useRoute("/trophies/:id");
@@ -20,6 +20,13 @@ export default function TrophyDetail() {
     queryKey: ["/api/trophies", params?.id],
     enabled: !!match && !!params?.id,
   });
+
+  const { data: weapons = [] } = useQuery<Weapon[]>({
+    queryKey: ["/api/weapons"],
+    enabled: !!match,
+  });
+
+  const weapon = trophy?.weaponId ? weapons.find(w => w.id === trophy.weaponId) : null;
 
   if (!match) return <div>Not found</div>;
 
@@ -136,6 +143,12 @@ export default function TrophyDetail() {
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border/50 text-sm">
                     <Crosshair className="h-4 w-4 text-muted-foreground" />
                     <span>{trophy.shotDistance}</span>
+                  </div>
+                )}
+                {weapon && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border/50 text-sm">
+                    <Sword className="h-4 w-4 text-muted-foreground" />
+                    <span>{weapon.name}{weapon.caliber ? ` (${weapon.caliber})` : ""}</span>
                   </div>
                 )}
               </div>
