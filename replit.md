@@ -4,6 +4,12 @@
 TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
+- **2026-03-07**: Trophy room redesigned: wall-mount layout with denser grid (2-5 cols), cards show 3D render image (DALL-E generated) or fallback to original photo, minimal overlay with species/score/date
+- **2026-03-07**: Trophy detail: single-column scrollable layout, clear "Back to Vault" button at top, photo smaller with padding, shot distance shown, "TrophyVault Score" label (replaces "Symmetry Score"), no "Estimated Age"
+- **2026-03-07**: AI prompt updated: removed Estimated Age, added `trophy_vault_score` (1-10 impressiveness), added `render_prompt` for DALL-E 3D taxidermy render generation
+- **2026-03-07**: Schema: added `shotDistance`, `renderImageUrl` columns to trophies table
+- **2026-03-07**: Analyze endpoint generates DALL-E 3D render image after AI analysis, stores as separate file, returns `renderImageUrl`
+- **2026-03-07**: Trophy form: name field kept with greyed placeholder example (e.g. "Kudu bull Work trip 2026"), added shot distance field, score uses midpoint of AI estimated range
 - **2026-02-24**: AI prompt enhanced: gender identification, horn length in user's units (metric/imperial), trophy qualification estimate per scoring system (SCI/Rowland Ward/B&C)
 - **2026-02-24**: Trophy form: Weapon dropdown from Safe (+ "Other" fallback), score auto-filled with mid-range horn estimate, Trophy Notes + Hunt Notes (separate fields), method/location now optional
 - **2026-02-24**: Schema: added `huntNotes`, `gender` columns to trophies; `method`/`location` now nullable
@@ -42,7 +48,7 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 ## API Routes
 - `GET/POST /api/trophies`, `GET/PATCH/DELETE /api/trophies/:id`
 - `POST /api/trophies/upload-image` (file upload, returns imageUrl)
-- `POST /api/trophies/analyze` (file upload → OpenAI vision → species + quality + mount analysis)
+- `POST /api/trophies/analyze` (file upload → OpenAI vision → species + quality + mount analysis + DALL-E 3D render generation)
 - `GET/POST /api/weapons`, `GET/PATCH/DELETE /api/weapons/:id`
 - `GET/PUT /api/preferences`
 - `GET /api/stats`
@@ -55,7 +61,7 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 ## Database Tables
 - `users` (id, email, firstName, lastName, profileImageUrl, passwordHash, authProvider, authProviderId, createdAt, updatedAt)
 - `sessions` (sid, sess, expire)
-- `trophies` (species, name, date, location?, score, method?, weaponId, gender?, notes, huntNotes, imageUrl, featured)
+- `trophies` (species, name, date, location?, score, method?, weaponId, gender?, shotDistance?, notes, huntNotes, imageUrl, renderImageUrl?, featured)
 - `weapons` (name, type, caliber, make, model, optic, notes, imageUrl)
 - `user_preferences` (theme, pursuit, scoringSystem, units, roomVisibility, huntingLocations[])
 - `room_ratings` (roomOwnerId, raterId, score)

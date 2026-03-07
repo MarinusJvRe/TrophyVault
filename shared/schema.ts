@@ -33,7 +33,9 @@ export const trophies = pgTable("trophies", {
   notes: text("notes"),
   huntNotes: text("hunt_notes"),
   gender: text("gender"),
+  shotDistance: text("shot_distance"),
   imageUrl: text("image_url"),
+  renderImageUrl: text("render_image_url"),
   featured: boolean("featured").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });

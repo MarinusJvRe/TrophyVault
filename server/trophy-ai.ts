@@ -12,11 +12,12 @@ Your task:
 2. Identify the species (common + scientific name)
 3. Determine the gender of the animal (male/female/unknown)
 4. Assess photo quality for 3D model generation
-5. Locate the animal in the image (bounding box)
-6. Recommend the best mount type based on visibility
-7. Extract any visible horn/antler characteristics with numeric length estimates
-8. Estimate whether the trophy would qualify under a given scoring system
-9. Note any issues (occlusion, lighting, blur)
+5. Recommend the best mount type based on visibility
+6. Extract any visible horn/antler characteristics with numeric length estimates
+7. Estimate whether the trophy would qualify under a given scoring system
+8. Assign a TrophyVault Score (1-10) rating the overall impressiveness of the trophy
+9. Generate a DALL-E prompt for creating a 3D taxidermy-style render of this specific animal
+10. Note any issues (occlusion, lighting, blur)
 
 Return ONLY valid JSON matching the schema below. No markdown, no code fences, just raw JSON.`;
 
@@ -85,6 +86,8 @@ Respond with JSON matching this exact schema:
     "confidence": number (0-1, how confident you are in this qualification assessment),
     "notes": string | null (any caveats or additional context about the qualification estimate)
   },
+  "trophy_vault_score": number (1-10, overall impressiveness rating considering horn/antler size relative to species, symmetry, uniqueness, and trophy quality. 10 = exceptional world-class trophy, 5 = average representative, 1 = poor/damaged),
+  "render_prompt": string (a detailed DALL-E prompt to generate a photorealistic 3D taxidermy shoulder mount render of this specific animal species. Include species name, horn/antler details, coloring, and specify: "photorealistic 3D render, taxidermy shoulder mount, dark wooden plaque background, museum quality, dramatic studio lighting, no background, isolated on transparent background"),
   "additional_animals": number,
   "exif_hints": {
     "location_visible": string | null,
@@ -143,6 +146,8 @@ export interface TrophyAnalysis {
     confidence: number;
     notes: string | null;
   };
+  trophy_vault_score: number;
+  render_prompt: string;
   additional_animals: number;
   exif_hints: {
     location_visible: string | null;
@@ -176,7 +181,7 @@ export async function analyzeTrophyImage(
         ],
       },
     ],
-    max_tokens: 2000,
+    max_tokens: 2500,
     temperature: 0.2,
   });
 
@@ -199,4 +204,26 @@ export async function analyzeTrophyImage(
   }
 
   return parsed;
+}
+
+export async function generateTrophyRender(renderPrompt: string): Promise<Buffer | null> {
+  try {
+    const response = await openai.images.generate({
+      model: "dall-e-3",
+      prompt: renderPrompt,
+      n: 1,
+      size: "1024x1024",
+      quality: "standard",
+    });
+
+    const imageUrl = response.data[0]?.url;
+    if (!imageUrl) return null;
+
+    const imgResponse = await fetch(imageUrl);
+    const arrayBuffer = await imgResponse.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    console.error("Render generation failed:", error);
+    return null;
+  }
 }

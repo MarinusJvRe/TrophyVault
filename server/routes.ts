@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerEmailAuthRoutes } from "./auth";
 import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema } from "@shared/schema";
-import { analyzeTrophyImage } from "./trophy-ai";
+import { analyzeTrophyImage, generateTrophyRender } from "./trophy-ai";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -161,7 +161,23 @@ export async function registerRoutes(
       const units = prefs?.units || "imperial";
       const scoringSystem = prefs?.scoringSystem || "SCI";
       const analysis = await analyzeTrophyImage(base64, req.file.mimetype, units, scoringSystem);
-      res.json({ imageUrl, analysis, units, scoringSystem });
+
+      let renderImageUrl: string | null = null;
+      if (analysis.render_prompt) {
+        try {
+          const renderBuffer = await generateTrophyRender(analysis.render_prompt);
+          if (renderBuffer) {
+            const renderFilename = `render-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
+            const renderPath = path.join(trophyUploadDir, renderFilename);
+            fs.writeFileSync(renderPath, renderBuffer);
+            renderImageUrl = `/uploads/trophies/${renderFilename}`;
+          }
+        } catch (renderErr) {
+          console.error("Render generation failed (non-blocking):", renderErr);
+        }
+      }
+
+      res.json({ imageUrl, renderImageUrl, analysis, units, scoringSystem });
     } catch (error: any) {
       console.error("AI analysis error:", error);
       res.status(500).json({ message: "AI analysis failed", error: error.message });

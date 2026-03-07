@@ -77,6 +77,8 @@ interface TrophyAnalysis {
     confidence: number;
     notes: string | null;
   };
+  trophy_vault_score: number;
+  render_prompt: string;
   additional_animals: number;
   exif_hints: {
     location_visible: string | null;
@@ -143,6 +145,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const [crop, setCrop] = useState<CropType>();
   const [analysis, setAnalysis] = useState<TrophyAnalysis | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [renderImageUrl, setRenderImageUrl] = useState<string | null>(null);
   const [weaponId, setWeaponId] = useState<string>("");
   const [analysisUnits, setAnalysisUnits] = useState<string>("imperial");
 
@@ -168,6 +171,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     setCrop(undefined);
     setAnalysis(null);
     setUploadedImageUrl(null);
+    setRenderImageUrl(null);
     setWeaponId("");
     setAnalysisUnits("imperial");
   }, [previewUrl, croppedPreviewUrl]);
@@ -192,11 +196,12 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
         const err = await res.json().catch(() => ({ message: "Analysis failed" }));
         throw new Error(err.message || "Analysis failed");
       }
-      return res.json() as Promise<{ imageUrl: string; analysis: TrophyAnalysis; units: string; scoringSystem: string }>;
+      return res.json() as Promise<{ imageUrl: string; renderImageUrl: string | null; analysis: TrophyAnalysis; units: string; scoringSystem: string }>;
     },
     onSuccess: (data) => {
       setAnalysis(data.analysis);
       setUploadedImageUrl(data.imageUrl);
+      setRenderImageUrl(data.renderImageUrl || null);
       setAnalysisUnits(data.units || "imperial");
       setStep("results");
     },
@@ -325,12 +330,14 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
       date: formData.get("date") as string,
       location: (formData.get("location") as string) || null,
       score: (formData.get("score") as string) || null,
-      method: selectedWeapon ? selectedWeapon.type : (weaponId === "__other__" ? "Other" : null),
+      method: (formData.get("method") as string) || (selectedWeapon ? selectedWeapon.type : (weaponId === "__other__" ? "Other" : null)),
       weaponId: weaponId && weaponId !== "__other__" ? weaponId : null,
       gender: analysis?.gender?.estimated || (formData.get("gender") as string) || null,
+      shotDistance: (formData.get("shotDistance") as string) || null,
       notes: (formData.get("notes") as string) || null,
       huntNotes: (formData.get("huntNotes") as string) || null,
       imageUrl: uploadedImageUrl,
+      renderImageUrl: renderImageUrl,
       featured: false,
     });
   };
@@ -973,7 +980,9 @@ function FormStep({
               id="name"
               name="name"
               required
-              defaultValue={analysis ? `${analysis.species.common_name} Trophy` : ""}
+              defaultValue=""
+              placeholder={analysis ? `e.g. ${analysis.species.common_name} bull Work trip ${new Date().getFullYear()}` : "e.g. Kudu bull Work trip 2026"}
+              className="placeholder:text-muted-foreground/40"
               data-testid="input-trophy-name"
             />
           </div>
@@ -1029,6 +1038,27 @@ function FormStep({
                 <SelectItem value="__other__">Other / Not in Safe</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="shotDistance" className="text-xs">Shot Distance</Label>
+            <Input
+              id="shotDistance"
+              name="shotDistance"
+              placeholder={units === "metric" ? "e.g. 180m" : "e.g. 200 yards"}
+              data-testid="input-shot-distance"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="method" className="text-xs">Method</Label>
+            <Input
+              id="method"
+              name="method"
+              placeholder="e.g. Walk & Stalk"
+              data-testid="input-trophy-method"
+            />
           </div>
         </div>
 
