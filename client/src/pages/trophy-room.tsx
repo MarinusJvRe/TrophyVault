@@ -190,6 +190,7 @@ function WallMountCard({ trophy, index }: { trophy: Trophy, index: number }) {
 
       <div className="absolute bottom-0 left-0 right-0 z-10 p-2.5">
         <p className="text-white text-xs font-semibold uppercase tracking-wide truncate">{trophy.species}</p>
+        <p className="text-white/70 text-[10px] truncate mt-0.5">{trophy.name}</p>
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-white/60 text-[10px]">
             {new Date(trophy.date).toLocaleDateString(undefined, { month: "short", year: "numeric" })}
