@@ -166,16 +166,23 @@ export default function TrophyDetail() {
                   </Button>
                 </Link>
               )}
-              <div className="flex gap-2">
-                {editing && (
+              <div className="flex gap-1">
+                {editing ? (
                   <span className="text-xs text-primary font-medium flex items-center gap-1">
                     <Pencil className="h-3 w-3" /> Editing
                   </span>
-                )}
-                {!editing && (
-                  <Button onClick={handleShare} variant="ghost" size="icon" className="text-muted-foreground hover:text-green-500 hover:bg-green-500/10" data-testid="button-share">
-                    <Share2 className="h-4 w-4" />
-                  </Button>
+                ) : (
+                  <>
+                    <Button onClick={handleShare} variant="ghost" size="icon" className="text-muted-foreground hover:text-green-500 hover:bg-green-500/10" data-testid="button-share">
+                      <Share2 className="h-4 w-4" />
+                    </Button>
+                    <Button onClick={handleStartEdit} variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10" data-testid="button-edit">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button onClick={() => setDeleteDialogOpen(true)} variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" data-testid="button-delete">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -223,8 +230,6 @@ export default function TrophyDetail() {
                 trophy={trophy}
                 weapon={weapon}
                 onShare={handleShare}
-                onEdit={handleStartEdit}
-                onDelete={() => setDeleteDialogOpen(true)}
               />
             )}
           </div>
@@ -263,14 +268,10 @@ function ViewMode({
   trophy,
   weapon,
   onShare,
-  onEdit,
-  onDelete,
 }: {
   trophy: Trophy;
   weapon: Weapon | null | undefined;
   onShare: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
 }) {
   return (
     <motion.div
@@ -381,27 +382,9 @@ function ViewMode({
         </div>
       )}
 
-      <div className="pt-4 border-t border-border/50 flex gap-3">
-        <Button className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 font-serif" data-testid="button-certificate">
+      <div className="pt-4 border-t border-border/50">
+        <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-serif" data-testid="button-certificate">
           Generate Official Certificate
-        </Button>
-        <Button
-          variant="outline"
-          className="border-border/50 text-foreground hover:bg-card gap-1.5"
-          onClick={onEdit}
-          data-testid="button-edit"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          Edit
-        </Button>
-        <Button
-          variant="outline"
-          className="border-destructive/30 text-destructive hover:bg-destructive/10 gap-1.5"
-          onClick={onDelete}
-          data-testid="button-delete"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Delete
         </Button>
       </div>
     </motion.div>
