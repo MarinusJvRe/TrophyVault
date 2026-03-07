@@ -1,20 +1,34 @@
 import Layout from "@/components/Layout";
-import { useQuery } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRoute, Link, useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
+import { useState } from "react";
 import { 
   ArrowLeft, Share2, Ruler, Target, MapPin, 
-  Calendar, BadgeCheck, Camera, MessageCircle, Crosshair, X, Sword
+  Calendar, BadgeCheck, Camera, MessageCircle, Crosshair, X, Sword, Trash2, Pencil, AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import type { Trophy, Weapon } from "@shared/schema";
-
 export default function TrophyDetail() {
   const [match, params] = useRoute("/trophies/:id");
   const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   
   const { data: trophy, isLoading, error } = useQuery<Trophy>({
     queryKey: ["/api/trophies", params?.id],
@@ -27,6 +41,28 @@ export default function TrophyDetail() {
   });
 
   const weapon = trophy?.weaponId ? weapons.find(w => w.id === trophy.weaponId) : null;
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/trophies/${params?.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trophies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      toast({ title: "Trophy deleted", description: "Your trophy has been removed from the vault." });
+      navigate("/trophies");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleEdit = () => {
+    navigate("/trophies");
+    setTimeout(() => {
+      navigate(`/trophies/${params?.id}`);
+    }, 0);
+  };
 
   if (!match) return <div>Not found</div>;
 
@@ -218,18 +254,58 @@ export default function TrophyDetail() {
                 </div>
               )}
 
-              <div className="pt-4 border-t border-border/50 flex gap-4">
+              <div className="pt-4 border-t border-border/50 flex gap-3">
                 <Button className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 font-serif" data-testid="button-certificate">
                   Generate Official Certificate
                 </Button>
-                <Button variant="outline" className="border-border/50 text-foreground hover:bg-card" data-testid="button-edit">
+                <Button
+                  variant="outline"
+                  className="border-border/50 text-foreground hover:bg-card gap-1.5"
+                  onClick={() => navigate(`/trophies`)}
+                  data-testid="button-edit"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
                   Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-destructive/30 text-destructive hover:bg-destructive/10 gap-1.5"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  data-testid="button-delete"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
                 </Button>
               </div>
             </motion.div>
           </div>
         </div>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-card border-border/50">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Delete Trophy
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete your <strong>{trophy.species}</strong> trophy "{trophy.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Yes, Delete Trophy"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }
