@@ -318,10 +318,6 @@ function ViewMode({
         )}
       </div>
 
-      <Button onClick={onShare} className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 font-medium" data-testid="button-share-whatsapp">
-        <MessageCircle className="h-4 w-4" /> Share on WhatsApp
-      </Button>
-
       <Separator className="bg-border/50" />
 
       <div>
@@ -383,7 +379,10 @@ function ViewMode({
         </div>
       )}
 
-      <div className="pt-4 border-t border-border/50">
+      <div className="pt-4 border-t border-border/50 space-y-3">
+        <Button onClick={onShare} className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 font-medium" data-testid="button-share-whatsapp">
+          <MessageCircle className="h-4 w-4" /> Share on WhatsApp
+        </Button>
         <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-serif" data-testid="button-certificate">
           Generate Official Certificate
         </Button>
