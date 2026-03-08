@@ -231,36 +231,81 @@ export async function registerRoutes(
     res.json(rating);
   });
 
+  app.post("/api/trophies/:id/star", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const trophyId = req.params.id as string;
+    const trophy = await storage.getTrophy(trophyId, userId);
+    if (!trophy) return res.status(404).json({ message: "Trophy not found" });
+
+    const allTrophies = await storage.getTrophies(userId);
+    for (const t of allTrophies) {
+      if (t.featured && t.id !== trophyId) {
+        await storage.updateTrophy(t.id, userId, { featured: false });
+      }
+    }
+
+    const updated = await storage.updateTrophy(trophyId, userId, { featured: !trophy.featured });
+    res.json(updated);
+  });
+
   // ========== STATS ==========
   app.get("/api/stats", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     const allTrophies = await storage.getTrophies(userId);
+    const allWeapons = await storage.getWeapons(userId);
+    const prefs = await storage.getPreferences(userId);
     const uniqueSpecies = new Set(allTrophies.map(t => t.species));
-    const qualifyingTrophies = allTrophies.filter(t => t.score && t.score.trim() !== "");
     const roomRating = await storage.getRoomRating(userId);
 
+    const scoringSystem = prefs?.scoringSystem || "SCI";
+    const { getThreshold, parseScoreNumeric } = await import("@shared/scoring-thresholds");
+    let qualifyingCount = 0;
+    allTrophies.forEach(t => {
+      if (!t.score || t.score.trim() === "") return;
+      const threshold = getThreshold(t.species, scoringSystem);
+      if (!threshold || threshold === "n/a") return;
+      const numericScore = parseScoreNumeric(t.score);
+      const numericThreshold = parseScoreNumeric(threshold);
+      if (numericScore !== null && numericThreshold !== null && numericScore >= numericThreshold) {
+        qualifyingCount++;
+      }
+    });
+
+    const roomVisibility = prefs?.roomVisibility || "private";
     let rating: number | null = null;
-    let ratingSource: "community" | "auto" = "auto";
-    if (roomRating.totalRatings > 0) {
+    let ratingSource: "community" | "none" = "none";
+    if (roomVisibility === "public" && roomRating.totalRatings > 0) {
       rating = Math.round(roomRating.avgScore * 100) / 100;
       ratingSource = "community";
-    } else if (allTrophies.length > 0) {
-      const hasImage = allTrophies.filter(t => t.imageUrl).length;
-      const hasScore = qualifyingTrophies.length;
-      const hasNotes = allTrophies.filter(t => t.notes && t.notes.trim() !== "").length;
-      const total = allTrophies.length;
-      const completeness = ((hasImage / total) * 0.4 + (hasScore / total) * 0.35 + (hasNotes / total) * 0.25) * 5;
-      rating = Math.round(Math.min(5, Math.max(0.5, completeness)) * 100) / 100;
     }
+
+    let furthestShot: string | null = null;
+    let furthestShotSpecies: string | null = null;
+    allTrophies.forEach(t => {
+      if (!t.shotDistance) return;
+      const dist = parseFloat(t.shotDistance.replace(/[^0-9.]/g, ""));
+      if (!isNaN(dist)) {
+        const currentMax = furthestShot ? parseFloat(furthestShot.replace(/[^0-9.]/g, "")) : 0;
+        if (dist > currentMax) {
+          furthestShot = t.shotDistance;
+          furthestShotSpecies = t.species;
+        }
+      }
+    });
 
     res.json({
       totalHunts: allTrophies.length,
-      totalTrophies: qualifyingTrophies.length,
+      qualifyingTrophies: qualifyingCount,
+      scoringSystem,
       speciesCollected: uniqueSpecies.size,
       recentSpecies: allTrophies[0]?.species || null,
       roomRating: rating,
       roomRatingSource: ratingSource,
       roomRatingCount: roomRating.totalRatings,
+      roomVisibility,
+      weaponCount: allWeapons.length,
+      furthestShot,
+      furthestShotSpecies,
     });
   });
 

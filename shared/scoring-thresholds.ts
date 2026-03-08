@@ -121,6 +121,21 @@ export function getAllThresholds(species: string): ScoringThreshold | null {
   return thresholds.find(t => normalize(t.species) === normalizedSpecies) || null;
 }
 
+export function parseScoreNumeric(raw: string): number | null {
+  if (!raw || raw.trim() === "" || raw.toLowerCase() === "n/a") return null;
+  const cleaned = raw.replace(/[""″]/g, "").replace(/\(.*?\)/g, "").trim();
+  const fractionMatch = cleaned.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (fractionMatch) {
+    return parseInt(fractionMatch[1]) + parseInt(fractionMatch[2]) / parseInt(fractionMatch[3]);
+  }
+  const simpleFraction = cleaned.match(/^(\d+)\/(\d+)$/);
+  if (simpleFraction) {
+    return parseInt(simpleFraction[1]) / parseInt(simpleFraction[2]);
+  }
+  const num = parseFloat(cleaned.replace(/[^0-9.\-]/g, ""));
+  return isNaN(num) ? null : num;
+}
+
 export function findClosestSpecies(species: string): ScoringThreshold | null {
   const normalizedSpecies = normalize(species);
   const exact = thresholds.find(t => normalize(t.species) === normalizedSpecies);

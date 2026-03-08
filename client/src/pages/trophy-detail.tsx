@@ -5,7 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
 import { 
   ArrowLeft, Share2, Target, MapPin, 
-  Calendar, BadgeCheck, Camera, MessageCircle, Crosshair, Sword, Trash2, Pencil, AlertTriangle, Check, Loader2, X
+  Calendar, BadgeCheck, Camera, MessageCircle, Crosshair, Sword, Trash2, Pencil, AlertTriangle, Check, Loader2, X, Star
 } from "lucide-react";
 import { LocationMap } from "@/components/LocationMap";
 import { LocationSearch } from "@/components/LocationSearch";
@@ -91,6 +91,24 @@ export default function TrophyDetail() {
     },
     onError: (error: Error) => {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const starMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/trophies/${params?.id}/star`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trophies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trophies", params?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      toast({
+        title: trophy?.featured ? "Trophy unstarred" : "Trophy starred",
+        description: trophy?.featured ? "Removed from featured." : "This trophy is now featured on your dashboard.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
     },
   });
 
@@ -186,6 +204,16 @@ export default function TrophyDetail() {
                   </span>
                 ) : (
                   <>
+                    <Button
+                      onClick={() => starMutation.mutate()}
+                      variant="ghost"
+                      size="icon"
+                      className={trophy?.featured ? "text-primary hover:text-primary/80 hover:bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10"}
+                      disabled={starMutation.isPending}
+                      data-testid="button-star"
+                    >
+                      <Star className={`h-4 w-4 ${trophy?.featured ? "fill-primary" : ""}`} />
+                    </Button>
                     <Button onClick={handleShare} variant="ghost" size="icon" className="text-muted-foreground hover:text-green-500 hover:bg-green-500/10" data-testid="button-share">
                       <Share2 className="h-4 w-4" />
                     </Button>

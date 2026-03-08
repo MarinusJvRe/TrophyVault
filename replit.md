@@ -4,6 +4,13 @@
 TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
+- **2026-03-08**: Dashboard refactored: mobile hero layout fix (shorter 45vh on mobile, responsive text), 6 stat cards in 2x3/3x2 grid (Hunts, Qualifying Trophies, Species, Room Rating, Weapons in Safe, Furthest Shot)
+- **2026-03-08**: Qualifying trophies: compares trophy score vs species threshold from user's scoring system (SCI/RW/B&C) using `parseScoreNumeric()` for fraction support
+- **2026-03-08**: Room rating: private rooms show "Unrated · Private", public rooms show community rating or "Unrated · No ratings yet" — removed auto-completeness score
+- **2026-03-08**: Trophy timeline: replaces "Recent Harvests" section, grouped by year, chronological entries with thumbnails
+- **2026-03-08**: Featured trophy: star button on trophy detail page toggles `featured` status (only one at a time), featured trophy section on dashboard
+- **2026-03-08**: Star endpoint: `POST /api/trophies/:id/star` — toggles featured, un-stars any other featured trophy
+- **2026-03-08**: `parseScoreNumeric()` added to `shared/scoring-thresholds.ts` — handles fractions like `53 1/2"`, parenthetical notes, inch marks
 - **2026-03-07**: Location search: Nominatim geocoding autocomplete replaces text input, stores lat/lng in DB, shows Leaflet/OSM map on trophy detail
 - **2026-03-07**: Map view: `/trophies/map` page with all trophies plotted on interactive Leaflet map, clickable pins with trophy info
 - **2026-03-07**: Scoring thresholds: `shared/scoring-thresholds.ts` with SCI/Rowland Ward/B&C minimum scores for ~90 species, displayed on trophy detail and add dialog
