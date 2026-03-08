@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Filter, SlidersHorizontal, ChevronDown, Calendar, Ruler } from "lucide-react";
+import { Search, Filter, SlidersHorizontal, ChevronDown, Calendar, Ruler, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -89,6 +89,13 @@ export default function TrophyRoom() {
               />
             </div>
             
+            <Link href="/trophies/map">
+              <Button variant="outline" size="sm" className="gap-1.5 border-border/50 bg-card text-muted-foreground hover:text-foreground h-9" data-testid="button-show-on-map">
+                <MapPin className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Show on Map</span>
+              </Button>
+            </Link>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-1.5 border-border/50 bg-card text-muted-foreground hover:text-foreground h-9" data-testid="button-filter">

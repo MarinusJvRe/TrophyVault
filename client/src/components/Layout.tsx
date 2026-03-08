@@ -1,4 +1,4 @@
-import { Calendar, User, LogOut, Shield, Users, Trophy, MapPin } from "lucide-react";
+import { Calendar, User, LogOut, Shield, Users, Trophy } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
@@ -13,17 +13,13 @@ import themeMinimal from "../assets/theme-minimal.png";
 const navItems = [
   { icon: Calendar, label: "Dashboard", href: "/", exact: true },
   { icon: Trophy, label: "Trophy Room", href: "/trophies", exact: false },
-  { icon: MapPin, label: "Map", href: "/trophies/map", exact: true },
   { icon: Shield, label: "The Safe", href: "/safe", exact: false },
   { icon: Users, label: "Community", href: "/community", exact: false },
 ];
 
 function isNavActive(location: string, item: typeof navItems[0]) {
   if (item.exact) return location === item.href;
-  if (location === item.href) return true;
-  if (!location.startsWith(item.href + "/")) return false;
-  const hasMoreSpecific = navItems.some(other => other.href !== item.href && other.href.startsWith(item.href + "/") && (location === other.href || location.startsWith(other.href + "/")));
-  return !hasMoreSpecific;
+  return location === item.href || location.startsWith(item.href + "/");
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {

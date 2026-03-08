@@ -1,10 +1,12 @@
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { motion } from "framer-motion";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { Trophy } from "@shared/schema";
 
 export default function TrophyMap() {
@@ -43,11 +45,24 @@ export default function TrophyMap() {
     const markers: L.Marker[] = [];
 
     trophiesWithCoords.forEach((trophy) => {
+      const labelText = trophy.name || trophy.species;
+      const iconContainer = document.createElement("div");
+      iconContainer.style.cssText = "display:flex;flex-direction:column;align-items:center;position:relative;";
+
+      const dot = document.createElement("div");
+      dot.style.cssText = "background:#b87333;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);flex-shrink:0;";
+      iconContainer.appendChild(dot);
+
+      const label = document.createElement("div");
+      label.style.cssText = "font-size:10px;font-weight:600;color:#1a1a1a;white-space:nowrap;margin-top:2px;text-shadow:0 0 3px white,0 0 3px white,0 0 3px white;max-width:100px;overflow:hidden;text-overflow:ellipsis;";
+      label.textContent = labelText;
+      iconContainer.appendChild(label);
+
       const icon = L.divIcon({
-        html: `<div style="background:#b87333;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`,
+        html: iconContainer.outerHTML,
         className: "",
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
+        iconSize: [100, 30],
+        iconAnchor: [50, 7],
       });
 
       const marker = L.marker([trophy.latitude!, trophy.longitude!], { icon }).addTo(map);
@@ -145,6 +160,12 @@ export default function TrophyMap() {
           transition={{ duration: 0.4, ease: "easeOut" }}
           className="mb-4"
         >
+          <Link href="/trophies">
+            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground mb-2 -ml-2" data-testid="button-back-to-vault">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Vault
+            </Button>
+          </Link>
           <h1 className="text-2xl md:text-3xl font-serif font-bold text-primary mb-1" data-testid="text-map-title">
             Trophy Map
           </h1>
