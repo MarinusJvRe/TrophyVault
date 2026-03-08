@@ -21,7 +21,12 @@ export default function Community() {
   return (
     <Layout>
       <div className="p-6 md:p-12 max-w-7xl mx-auto min-h-full">
-        <header className="mb-10">
+        <motion.header
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="mb-10"
+        >
           <h1 className="text-3xl md:text-4xl font-serif font-bold text-primary mb-2 flex items-center gap-3">
             <Users className="h-8 w-8" />
             Community
@@ -29,7 +34,7 @@ export default function Community() {
           <p className="text-muted-foreground max-w-md">
             Compare your achievements, rate other trophy rooms, and climb the global leaderboards.
           </p>
-        </header>
+        </motion.header>
 
         <Tabs defaultValue="leaderboards" className="w-full">
           <TabsList className="bg-card border border-border/40 mb-8">
@@ -75,7 +80,13 @@ export default function Community() {
                       <h3 className="text-xl font-serif font-bold mb-4">Public Rooms to Explore</h3>
                       <div className="space-y-4">
                         {rooms.slice(0, 5).map((room: any, i: number) => (
-                          <div key={room.userId || i} className="flex items-center justify-between p-3 rounded-lg border border-border/40 hover:bg-primary/5 transition-colors">
+                          <motion.div
+                            key={room.userId || i}
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.3, delay: i * 0.08 }}
+                          >
+                          <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 hover:bg-primary/5 transition-colors">
                             <div>
                               <div className="text-sm font-medium" data-testid={`text-room-name-${i}`}>
                                 {room.firstName ? `${room.firstName} ${room.lastName || ""}`.trim() : `User ${room.userId?.slice(0, 6)}`}
@@ -90,6 +101,7 @@ export default function Community() {
                               )}
                             </div>
                           </div>
+                          </motion.div>
                         ))}
                       </div>
                     </CardContent>

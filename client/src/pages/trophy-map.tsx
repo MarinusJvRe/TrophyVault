@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { motion } from "framer-motion";
 import type { Trophy } from "@shared/schema";
 
 export default function TrophyMap() {
@@ -138,14 +139,19 @@ export default function TrophyMap() {
   return (
     <Layout>
       <div className="p-4 md:p-8 max-w-7xl mx-auto h-full flex flex-col">
-        <header className="mb-4">
+        <motion.header
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="mb-4"
+        >
           <h1 className="text-2xl md:text-3xl font-serif font-bold text-primary mb-1" data-testid="text-map-title">
             Trophy Map
           </h1>
           <p className="text-sm text-muted-foreground" data-testid="text-map-subtitle">
             {trophiesWithCoords.length} of {trophies.length} trophies with locations plotted
           </p>
-        </header>
+        </motion.header>
 
         {isLoading ? (
           <div className="flex items-center justify-center flex-1">

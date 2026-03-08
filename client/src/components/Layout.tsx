@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/hooks/use-auth";
+import { motion } from "framer-motion";
 import trophyVaultLogo from "@assets/trophy_vault_logo_transparent.png";
 
 import themeLodge from "../assets/theme-lodge.png";
@@ -10,12 +11,20 @@ import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
 
 const navItems = [
-  { icon: Calendar, label: "Dashboard", href: "/" },
-  { icon: Trophy, label: "Trophy Room", href: "/trophies" },
-  { icon: MapPin, label: "Map", href: "/trophies/map" },
-  { icon: Shield, label: "The Safe", href: "/safe" },
-  { icon: Users, label: "Community", href: "/community" },
+  { icon: Calendar, label: "Dashboard", href: "/", exact: true },
+  { icon: Trophy, label: "Trophy Room", href: "/trophies", exact: false },
+  { icon: MapPin, label: "Map", href: "/trophies/map", exact: true },
+  { icon: Shield, label: "The Safe", href: "/safe", exact: false },
+  { icon: Users, label: "Community", href: "/community", exact: false },
 ];
+
+function isNavActive(location: string, item: typeof navItems[0]) {
+  if (item.exact) return location === item.href;
+  if (location === item.href) return true;
+  if (!location.startsWith(item.href + "/")) return false;
+  const hasMoreSpecific = navItems.some(other => other.href !== item.href && other.href.startsWith(item.href + "/") && (location === other.href || location.startsWith(other.href + "/")));
+  return !hasMoreSpecific;
+}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -37,20 +46,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="text-xs font-medium text-muted-foreground mb-4 px-2 tracking-widest uppercase opacity-70">Menu</div>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location === item.href;
+            const isActive = isNavActive(location, item);
             return (
               <Link key={item.href} href={item.href}>
-                <div
+                <motion.div
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 group cursor-pointer",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors duration-200 group cursor-pointer relative overflow-hidden",
                     isActive
-                      ? "bg-primary/10 text-primary border-r-2 border-primary"
+                      ? "text-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
                   )}
                 >
-                  <Icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                  <span className="font-medium text-sm">{item.label}</span>
-                </div>
+                  {isActive && (
+                    <motion.div
+                      layoutId="sidebar-active"
+                      className="absolute inset-0 bg-primary/10 rounded-md"
+                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                  <Icon className={cn("h-4 w-4 relative z-10", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                  <span className="font-medium text-sm relative z-10">{item.label}</span>
+                  {isActive && (
+                    <motion.div
+                      layoutId="sidebar-indicator"
+                      className="absolute right-0 top-1 bottom-1 w-[3px] bg-primary rounded-full"
+                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                </motion.div>
               </Link>
             );
           })}
@@ -104,25 +130,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center justify-around h-16">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location === item.href;
+            const isActive = isNavActive(location, item);
             return (
               <Link key={item.href} href={item.href}>
-                <div className="flex flex-col items-center gap-1 cursor-pointer py-2 px-3" data-testid={`mobile-nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}>
-                  <Icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-muted-foreground")} />
-                  <span className={cn("text-[10px] font-medium", isActive ? "text-primary" : "text-muted-foreground")}>{item.label}</span>
-                </div>
+                <motion.div
+                  whileTap={{ scale: 0.85 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  className="flex flex-col items-center gap-1 cursor-pointer py-2 px-3 relative"
+                  data-testid={`mobile-nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="mobile-active"
+                      className="absolute -top-[1px] left-2 right-2 h-[2px] bg-primary rounded-full"
+                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                  <Icon className={cn("h-5 w-5 transition-colors duration-200", isActive ? "text-primary" : "text-muted-foreground")} />
+                  <span className={cn("text-[10px] font-medium transition-colors duration-200", isActive ? "text-primary" : "text-muted-foreground")}>{item.label}</span>
+                </motion.div>
               </Link>
             );
           })}
           <Link href="/profile">
-            <div className="flex flex-col items-center gap-1 cursor-pointer py-2 px-3" data-testid="mobile-nav-profile">
+            <motion.div
+              whileTap={{ scale: 0.85 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20 }}
+              className="flex flex-col items-center gap-1 cursor-pointer py-2 px-3 relative"
+              data-testid="mobile-nav-profile"
+            >
+              {location === "/profile" && (
+                <motion.div
+                  layoutId="mobile-active"
+                  className="absolute -top-[1px] left-2 right-2 h-[2px] bg-primary rounded-full"
+                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                />
+              )}
               {user?.profileImageUrl ? (
                 <img src={user.profileImageUrl} alt="Profile" className="h-5 w-5 rounded-full object-cover" />
               ) : (
-                <User className={cn("h-5 w-5", location === "/profile" ? "text-primary" : "text-muted-foreground")} />
+                <User className={cn("h-5 w-5 transition-colors duration-200", location === "/profile" ? "text-primary" : "text-muted-foreground")} />
               )}
-              <span className={cn("text-[10px] font-medium", location === "/profile" ? "text-primary" : "text-muted-foreground")}>Profile</span>
-            </div>
+              <span className={cn("text-[10px] font-medium transition-colors duration-200", location === "/profile" ? "text-primary" : "text-muted-foreground")}>Profile</span>
+            </motion.div>
           </Link>
         </div>
       </nav>

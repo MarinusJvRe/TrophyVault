@@ -11,6 +11,7 @@ import { User, Palette, MapPin, Target, Ruler, Eye, Check, Mountain, Home, Feath
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { motion } from "framer-motion";
 import type { UserPreferences } from "@shared/schema";
 
 import themeLodge from "../assets/theme-lodge.png";
@@ -176,14 +177,23 @@ export default function Profile() {
   return (
     <Layout>
       <div className="p-6 md:p-12 max-w-4xl mx-auto min-h-full space-y-8 pb-24">
-        <header>
+        <motion.header
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
           <h1 className="text-3xl md:text-4xl font-serif font-bold text-primary mb-2 flex items-center gap-3">
             <User className="h-8 w-8" />
             Profile & Settings
           </h1>
           <p className="text-muted-foreground">Manage your account, preferences, and trophy room settings.</p>
-        </header>
+        </motion.header>
 
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}
+        >
         <Card className="bg-card border-border/40">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
@@ -232,7 +242,13 @@ export default function Profile() {
             </div>
           </CardContent>
         </Card>
+        </motion.div>
 
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
+        >
         <Card className="bg-card border-border/40">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -253,7 +269,14 @@ export default function Profile() {
             </div>
           </CardContent>
         </Card>
+        </motion.div>
 
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }}
+          className="space-y-8"
+        >
         <Card className="bg-card border-border/40">
           <CardHeader>
             <CardTitle className="font-serif flex items-center gap-2 text-lg">
@@ -405,7 +428,13 @@ export default function Profile() {
             </div>
           </CardContent>
         </Card>
+        </motion.div>
 
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.4, ease: "easeOut" }}
+        >
         <div className="flex justify-end pt-2">
           <Button
             size="lg"
@@ -421,6 +450,7 @@ export default function Profile() {
             <LogOut className="h-4 w-4" /> Sign Out
           </Button>
         </div>
+        </motion.div>
       </div>
     </Layout>
   );

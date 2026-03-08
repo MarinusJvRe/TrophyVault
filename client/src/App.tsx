@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -23,22 +23,47 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Chrome, Apple } from "lucide-react";
 import { setAuthToken } from "@/lib/auth-token";
+import { motion, AnimatePresence } from "framer-motion";
 import themeLodge from "./assets/theme-lodge.png";
 import trophyVaultLogo from "@assets/trophy_vault_logo_transparent.png";
 
-function Router() {
+const pageVariants = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+  exit: { opacity: 0, y: -8, transition: { duration: 0.15, ease: "easeIn" } },
+};
+
+function AnimatedPage({ children }: { children: React.ReactNode }) {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/onboarding" component={Onboarding} />
-      <Route path="/trophies" component={TrophyRoom} />
-      <Route path="/trophies/map" component={TrophyMap} />
-      <Route path="/trophies/:id" component={TrophyDetail} />
-      <Route path="/safe" component={Safe} />
-      <Route path="/community" component={Community} />
-      <Route path="/profile" component={Profile} />
-      <Route component={NotFound} />
-    </Switch>
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      style={{ height: "100%" }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function Router() {
+  const [location] = useLocation();
+
+  return (
+    <AnimatePresence mode="wait">
+      <Switch key={location}>
+        <Route path="/">{() => <AnimatedPage><Home /></AnimatedPage>}</Route>
+        <Route path="/onboarding">{() => <AnimatedPage><Onboarding /></AnimatedPage>}</Route>
+        <Route path="/trophies">{() => <AnimatedPage><TrophyRoom /></AnimatedPage>}</Route>
+        <Route path="/trophies/map">{() => <AnimatedPage><TrophyMap /></AnimatedPage>}</Route>
+        <Route path="/trophies/:id">{() => <AnimatedPage><TrophyDetail /></AnimatedPage>}</Route>
+        <Route path="/safe">{() => <AnimatedPage><Safe /></AnimatedPage>}</Route>
+        <Route path="/community">{() => <AnimatedPage><Community /></AnimatedPage>}</Route>
+        <Route path="/profile">{() => <AnimatedPage><Profile /></AnimatedPage>}</Route>
+        <Route>{() => <AnimatedPage><NotFound /></AnimatedPage>}</Route>
+      </Switch>
+    </AnimatePresence>
   );
 }
 
@@ -143,14 +168,23 @@ function AuthPage() {
         </div>
 
         <div className="max-w-sm w-full space-y-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-serif font-bold text-white mb-2" data-testid="text-auth-heading">
-              {mode === "signin" ? "Welcome Back" : "Create Account"}
-            </h2>
-            <p className="text-white/60 text-sm">
-              {mode === "signin" ? "Sign in to access your trophy room" : "Start preserving your hunting legacy"}
-            </p>
-          </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={mode}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="text-center"
+            >
+              <h2 className="text-2xl font-serif font-bold text-white mb-2" data-testid="text-auth-heading">
+                {mode === "signin" ? "Welcome Back" : "Create Account"}
+              </h2>
+              <p className="text-white/60 text-sm">
+                {mode === "signin" ? "Sign in to access your trophy room" : "Start preserving your hunting legacy"}
+              </p>
+            </motion.div>
+          </AnimatePresence>
 
           <div className="space-y-3">
             <Button
