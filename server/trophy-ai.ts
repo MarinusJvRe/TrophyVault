@@ -6,40 +6,16 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-const SYSTEM_PROMPT = `You are TrophyVault's image analysis assistant. Analyze hunting trophy photos and return structured JSON.
-
-Your task:
-1. Identify if there is a recognizable game animal
-2. Identify the species (common + scientific name)
-3. Determine the gender of the animal (male/female/unknown)
-4. Assess photo quality for 3D model generation
-5. Recommend the best mount type based on visibility
-6. Extract any visible horn/antler characteristics with numeric length estimates
-7. Estimate whether the trophy would qualify under a given scoring system
-8. Assign a TrophyVault Score (1-10) rating the overall impressiveness of the trophy
-9. Generate a DALL-E prompt for creating a 3D taxidermy-style render of this specific animal
-10. Note any issues (occlusion, lighting, blur)
-
-Return ONLY valid JSON matching the schema below. No markdown, no code fences, just raw JSON.`;
+const SYSTEM_PROMPT = `You are TrophyVault's trophy photo analyzer. Return ONLY valid JSON. No markdown, no code fences.`;
 
 function buildUserPrompt(units: string, scoringSystem: string): string {
-  const unitLabel = units === "metric" ? "centimeters (cm)" : "inches (in)";
-  const unitAbbr = units === "metric" ? "cm" : "in";
+  const unitLabel = units === "metric" ? "cm" : "inches";
 
-  return `Analyze this hunting trophy photo.
+  return `Analyze this hunting trophy photo. Focus on the most prominent game animal. Measurements in ${unitLabel}. Evaluate against ${scoringSystem}.
 
-Focus on the MOST PROMINENT game animal in the image.
-Ignore any people, weapons, vehicles, or dogs.
-
-IMPORTANT CONTEXT:
-- Report all measurements in ${unitLabel}
-- Evaluate trophy qualification against the ${scoringSystem} scoring system
-- Identify the gender of the animal
-
-Respond with JSON matching this exact schema:
+JSON schema:
 {
   "animal_detected": boolean,
-  "rejection_reason": string | null,
   "species": {
     "common_name": string,
     "scientific_name": string,
@@ -49,56 +25,41 @@ Respond with JSON matching this exact schema:
   "gender": {
     "estimated": "male"|"female"|"unknown",
     "confidence": number (0-1),
-    "indicators": string (brief explanation of how gender was determined, e.g. "prominent horns indicate male")
+    "indicators": string
   },
   "photo_quality": {
     "score": number (1-10),
     "issues": string[],
-    "suitable_for_3d": boolean,
-    "suggestion": string | null
-  },
-  "animal_pose": "standing"|"lying"|"mounted"|"held_up"|"partial",
-  "visibility": {
-    "head_visible": boolean,
-    "horns_visible": boolean,
-    "body_visible": boolean,
-    "occlusion_percent": number (0-100),
-    "occluded_by": string | null
+    "suitable_for_3d": boolean
   },
   "mount_recommendation": {
     "best": "shoulder"|"horns"|"full_body",
-    "viable": ["shoulder","horns","full_body"],
     "reason": string
   },
   "horn_details": {
     "has_horns": boolean,
     "horn_type": "spiral"|"lyre"|"straight"|"curved"|"antler"|"boss"|null,
-    "estimated_length_inches": number | null (estimated horn/antler length in inches, your best numeric estimate even if approximate),
-    "estimated_length_cm": number | null (estimated horn/antler length in centimeters),
-    "length_range_low_${unitAbbr}": number | null (lower bound of estimated length in ${unitLabel}),
-    "length_range_high_${unitAbbr}": number | null (upper bound of estimated length in ${unitLabel}),
-    "notable_features": string | null
+    "estimated_length_inches": number|null,
+    "estimated_length_cm": number|null,
+    "length_range_low": number|null (in ${unitLabel}),
+    "length_range_high": number|null (in ${unitLabel}),
+    "notable_features": string|null
   },
   "trophy_qualification": {
     "scoring_system": "${scoringSystem}",
-    "minimum_qualifying_score": string | null (use TrophyVault's official scoring threshold database for this species under ${scoringSystem} — do NOT guess or invent minimum scores; if the species is not in the database, return null),
-    "estimated_score": string | null (your estimated score based on visible horn/antler measurements, in ${unitLabel}),
-    "likely_qualifies": boolean | null (whether the trophy likely meets the minimum qualifying score),
-    "confidence": number (0-1, how confident you are in this qualification assessment),
-    "notes": string | null (any caveats or additional context about the qualification estimate)
+    "minimum_qualifying_score": string|null,
+    "estimated_score": string|null,
+    "likely_qualifies": boolean|null,
+    "confidence": number (0-1),
+    "notes": string|null
   },
-  "trophy_vault_score": number (1-10, overall impressiveness rating considering horn/antler size relative to species, symmetry, uniqueness, and trophy quality. 10 = exceptional world-class trophy, 5 = average representative, 1 = poor/damaged),
-  "render_prompt": string (a detailed DALL-E prompt to generate a photorealistic 3D taxidermy shoulder mount render of this specific animal species. Include species name, horn/antler details, coloring, and specify: "photorealistic 3D render, taxidermy shoulder mount, dark wooden plaque background, museum quality, dramatic studio lighting, no background, isolated on transparent background"),
-  "additional_animals": number,
-  "exif_hints": {
-    "time_of_day": "morning"|"midday"|"afternoon"|"evening"|"night"|null
-  }
+  "trophy_vault_score": number (1-10, overall impressiveness),
+  "render_prompt": string (DALL-E prompt for photorealistic 3D taxidermy shoulder mount render of this animal, include species details, horn/antler description, coloring, dark wooden plaque, studio lighting, isolated on transparent background)
 }`;
 }
 
 export interface TrophyAnalysis {
   animal_detected: boolean;
-  rejection_reason: string | null;
   species: {
     common_name: string;
     scientific_name: string;
@@ -114,19 +75,9 @@ export interface TrophyAnalysis {
     score: number;
     issues: string[];
     suitable_for_3d: boolean;
-    suggestion: string | null;
-  };
-  animal_pose: string;
-  visibility: {
-    head_visible: boolean;
-    horns_visible: boolean;
-    body_visible: boolean;
-    occlusion_percent: number;
-    occluded_by: string | null;
   };
   mount_recommendation: {
     best: string;
-    viable: string[];
     reason: string;
   };
   horn_details: {
@@ -148,11 +99,6 @@ export interface TrophyAnalysis {
   };
   trophy_vault_score: number;
   render_prompt: string;
-  additional_animals: number;
-  exif_hints: {
-    location_visible: string | null;
-    time_of_day: string | null;
-  };
 }
 
 export async function analyzeTrophyImage(
@@ -181,7 +127,7 @@ export async function analyzeTrophyImage(
         ],
       },
     ],
-    max_tokens: 2500,
+    max_tokens: 1500,
     temperature: 0.2,
   });
 

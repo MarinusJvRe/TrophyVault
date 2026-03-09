@@ -4,6 +4,13 @@
 TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
+- **2026-03-09**: AI prompt optimised: stripped `animal_pose`, `visibility`, `exif_hints`, `additional_animals`, `mount_recommendation.viable`, `photo_quality.suggestion`; reduced max_tokens from 2500→1500
+- **2026-03-09**: Background AI analysis: "Analyze with AI" now goes directly to form, AI runs in background with loading indicator, fields auto-populate when ready
+- **2026-03-09**: Shot distance unit toggle: Meters/Yards toggle next to input, stored as `"200 yards"` or `"180 m"`; defaults from user prefs
+- **2026-03-09**: Score/size unit toggle: cm/inches/Score 3-option toggle, stored as `"52"`, `"132 cm"`, or `"100 Score"`; defaults from user prefs
+- **2026-03-09**: Hunting method dropdown: replaced free-text with Select dropdown (Walk and stalk, Ground blind/Hide, Tree stand/Elevated, Vehicle, Driven hunt, Other)
+- **2026-03-09**: All unit toggles and method dropdown also added to trophy-detail edit form
+- **2026-03-09**: `HUNTING_METHODS` constant and `TrophyAnalysis` interface exported from `AddTrophyDialog.tsx`
 - **2026-03-09**: EXIF metadata extraction: photo date & GPS auto-extracted from trophy images using `exifr`, pre-populates date and location fields with "From photo" indicator
 - **2026-03-09**: "Use current location" button: added to LocationSearch component (available on add trophy + edit trophy), requests device GPS, reverse geocodes via Nominatim
 - **2026-03-09**: `reverseGeocode()` helper exported from LocationSearch for reuse (EXIF GPS → place name)

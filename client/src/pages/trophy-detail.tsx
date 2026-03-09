@@ -37,6 +37,31 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import type { Trophy, Weapon } from "@shared/schema";
 import { findClosestSpecies } from "@shared/scoring-thresholds";
+import { HUNTING_METHODS } from "@/components/AddTrophyDialog";
+
+function parseStoredDistance(value: string | null): { num: string; unit: string } {
+  if (!value) return { num: "", unit: "yards" };
+  const v = value.trim();
+  const mMatch = v.match(/^([\d.]+)\s*(?:m|meters?|metres?)$/i);
+  if (mMatch) return { num: mMatch[1], unit: "m" };
+  const ydMatch = v.match(/^([\d.]+)\s*(?:yards?|yds?)$/i);
+  if (ydMatch) return { num: ydMatch[1], unit: "yards" };
+  const numOnly = v.match(/^[\d.]+$/);
+  if (numOnly) return { num: v, unit: "yards" };
+  return { num: v, unit: "yards" };
+}
+
+function parseStoredScore(value: string | null): { num: string; unit: string } {
+  if (!value) return { num: "", unit: '"' };
+  const v = value.trim();
+  const cmMatch = v.match(/^([\d.\/ ]+)\s*(?:cm|centimeters?)$/i);
+  if (cmMatch) return { num: cmMatch[1].trim(), unit: "cm" };
+  const sciMatch = v.match(/^([\d.\/ ]+)\s*(?:SCI|B&C|RW|Score)$/i);
+  if (sciMatch) return { num: sciMatch[1].trim(), unit: "Score" };
+  const inMatch = v.match(/^([\d.\/ ]+)\s*(?:["″]|in(?:ch(?:es)?)?)?$/i);
+  if (inMatch) return { num: inMatch[1].trim(), unit: '"' };
+  return { num: v, unit: '"' };
+}
 
 export default function TrophyDetail() {
   const [match, params] = useRoute("/trophies/:id");
@@ -49,6 +74,11 @@ export default function TrophyDetail() {
   const [editLocation, setEditLocation] = useState<string>("");
   const [editLat, setEditLat] = useState<number | null>(null);
   const [editLng, setEditLng] = useState<number | null>(null);
+  const [editMethod, setEditMethod] = useState<string>("");
+  const [editDistanceUnit, setEditDistanceUnit] = useState<string>("yards");
+  const [editDistanceNum, setEditDistanceNum] = useState<string>("");
+  const [editScoreUnit, setEditScoreUnit] = useState<string>('"');
+  const [editScoreNum, setEditScoreNum] = useState<string>("");
   
   const { data: trophy, isLoading } = useQuery<Trophy>({
     queryKey: ["/api/trophies", params?.id],
@@ -117,6 +147,13 @@ export default function TrophyDetail() {
     setEditLocation(trophy?.location || "");
     setEditLat(trophy?.latitude || null);
     setEditLng(trophy?.longitude || null);
+    setEditMethod(trophy?.method || "");
+    const parsedDist = parseStoredDistance(trophy?.shotDistance || null);
+    setEditDistanceNum(parsedDist.num);
+    setEditDistanceUnit(parsedDist.unit);
+    const parsedScore = parseStoredScore(trophy?.score || null);
+    setEditScoreNum(parsedScore.num);
+    setEditScoreUnit(parsedScore.unit);
     setEditing(true);
   };
 
@@ -128,6 +165,20 @@ export default function TrophyDetail() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const selectedWeapon = weapons.find(w => w.id === editWeaponId);
+
+    const distNum = editDistanceNum.trim();
+    const shotDistVal = distNum ? `${distNum} ${editDistanceUnit}` : null;
+
+    const sNum = editScoreNum.trim();
+    let scoreVal: string | null = null;
+    if (sNum) {
+      if (editScoreUnit === "cm") scoreVal = `${sNum} cm`;
+      else if (editScoreUnit === '"') scoreVal = `${sNum}"`;
+      else scoreVal = `${sNum} Score`;
+    }
+
+    const method = editMethod && editMethod !== "__none__" ? editMethod : null;
+
     updateMutation.mutate({
       species: formData.get("species") as string,
       name: formData.get("name") as string,
@@ -135,11 +186,11 @@ export default function TrophyDetail() {
       location: editLocation || null,
       latitude: editLat,
       longitude: editLng,
-      score: (formData.get("score") as string) || null,
-      method: (formData.get("method") as string) || (selectedWeapon ? selectedWeapon.type : null),
+      score: scoreVal,
+      method: method || (selectedWeapon ? selectedWeapon.type : null),
       weaponId: editWeaponId && editWeaponId !== "__other__" ? editWeaponId : null,
       gender: (formData.get("gender") as string) || null,
-      shotDistance: (formData.get("shotDistance") as string) || null,
+      shotDistance: shotDistVal,
       notes: (formData.get("notes") as string) || null,
       huntNotes: (formData.get("huntNotes") as string) || null,
     });
@@ -273,6 +324,16 @@ export default function TrophyDetail() {
                 onSubmit={handleSaveEdit}
                 onCancel={handleCancelEdit}
                 isPending={updateMutation.isPending}
+                editMethod={editMethod}
+                setEditMethod={setEditMethod}
+                editDistanceUnit={editDistanceUnit}
+                setEditDistanceUnit={setEditDistanceUnit}
+                editDistanceNum={editDistanceNum}
+                setEditDistanceNum={setEditDistanceNum}
+                editScoreUnit={editScoreUnit}
+                setEditScoreUnit={setEditScoreUnit}
+                editScoreNum={editScoreNum}
+                setEditScoreNum={setEditScoreNum}
               />
             ) : (
               <ViewMode
@@ -473,6 +534,32 @@ function ViewMode({
   );
 }
 
+function EditUnitToggle({ options, value, onChange, testId }: {
+  options: { label: string; value: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  testId?: string;
+}) {
+  return (
+    <div className="flex rounded-md border border-border/50 overflow-hidden" data-testid={testId}>
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          className={`px-2 py-1 text-xs font-medium transition-colors ${
+            value === opt.value
+              ? "bg-primary text-primary-foreground"
+              : "bg-card text-muted-foreground hover:bg-muted"
+          }`}
+          onClick={() => onChange(opt.value)}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function EditForm({
   trophy,
   weapons,
@@ -485,6 +572,16 @@ function EditForm({
   onSubmit,
   onCancel,
   isPending,
+  editMethod,
+  setEditMethod,
+  editDistanceUnit,
+  setEditDistanceUnit,
+  editDistanceNum,
+  setEditDistanceNum,
+  editScoreUnit,
+  setEditScoreUnit,
+  editScoreNum,
+  setEditScoreNum,
 }: {
   trophy: Trophy;
   weapons: Weapon[];
@@ -497,6 +594,16 @@ function EditForm({
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
   isPending: boolean;
+  editMethod: string;
+  setEditMethod: (v: string) => void;
+  editDistanceUnit: string;
+  setEditDistanceUnit: (v: string) => void;
+  editDistanceNum: string;
+  setEditDistanceNum: (v: string) => void;
+  editScoreUnit: string;
+  setEditScoreUnit: (v: string) => void;
+  editScoreNum: string;
+  setEditScoreNum: (v: string) => void;
 }) {
   return (
     <motion.div
@@ -556,11 +663,24 @@ function EditForm({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="edit-score" className="text-xs">Score / Size</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="edit-score" className="text-xs">Score / Size</Label>
+              <EditUnitToggle
+                options={[
+                  { label: "cm", value: "cm" },
+                  { label: '"', value: '"' },
+                  { label: "Score", value: "Score" },
+                ]}
+                value={editScoreUnit}
+                onChange={setEditScoreUnit}
+                testId="toggle-edit-score-unit"
+              />
+            </div>
             <Input
               id="edit-score"
-              name="score"
-              defaultValue={trophy.score || ""}
+              value={editScoreNum}
+              onChange={(e) => setEditScoreNum(e.target.value)}
+              placeholder={editScoreUnit === "cm" ? "e.g. 132" : editScoreUnit === '"' ? "e.g. 52" : "e.g. 100"}
               data-testid="input-edit-score"
             />
           </div>
@@ -584,24 +704,40 @@ function EditForm({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="edit-shotDistance" className="text-xs">Shot Distance</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="edit-shotDistance" className="text-xs">Shot Distance</Label>
+              <EditUnitToggle
+                options={[
+                  { label: "m", value: "m" },
+                  { label: "yards", value: "yards" },
+                ]}
+                value={editDistanceUnit}
+                onChange={setEditDistanceUnit}
+                testId="toggle-edit-distance-unit"
+              />
+            </div>
             <Input
               id="edit-shotDistance"
-              name="shotDistance"
-              defaultValue={trophy.shotDistance || ""}
-              placeholder="e.g. 200 yards"
+              type="number"
+              min="0"
+              value={editDistanceNum}
+              onChange={(e) => setEditDistanceNum(e.target.value)}
+              placeholder={editDistanceUnit === "m" ? "e.g. 180" : "e.g. 200"}
               data-testid="input-edit-shot-distance"
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="edit-method" className="text-xs">Method</Label>
-            <Input
-              id="edit-method"
-              name="method"
-              defaultValue={trophy.method || ""}
-              placeholder="e.g. Walk & Stalk"
-              data-testid="input-edit-method"
-            />
+            <Label className="text-xs">Method</Label>
+            <Select value={editMethod} onValueChange={setEditMethod}>
+              <SelectTrigger data-testid="select-edit-method">
+                <SelectValue placeholder="Select method" />
+              </SelectTrigger>
+              <SelectContent>
+                {HUNTING_METHODS.map((m) => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
