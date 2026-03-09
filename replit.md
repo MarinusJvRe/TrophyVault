@@ -5,7 +5,7 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 
 ## Recent Changes
 - **2026-03-09**: AI prompt optimised: stripped `animal_pose`, `visibility`, `exif_hints`, `additional_animals`, `mount_recommendation.viable`, `photo_quality.suggestion`; reduced max_tokens from 2500→1500
-- **2026-03-09**: Background AI analysis: "Analyze with AI" now goes directly to form, AI runs in background with loading indicator, fields auto-populate when ready
+- **2026-03-09**: Background render generation: AI vision analysis (species, horns, score) blocks until complete, then form shows; 3D render generation runs in background with polling + server auto-patches trophy when done
 - **2026-03-09**: Shot distance unit toggle: Meters/Yards toggle next to input, stored as `"200 yards"` or `"180 m"`; defaults from user prefs
 - **2026-03-09**: Score/size unit toggle: cm/inches/Score 3-option toggle, stored as `"52"`, `"132 cm"`, or `"100 Score"`; defaults from user prefs
 - **2026-03-09**: Hunting method dropdown: replaced free-text with Select dropdown (Walk and stalk, Ground blind/Hide, Tree stand/Elevated, Vehicle, Driven hunt, Other)
