@@ -26,8 +26,9 @@ import { cn } from "@/lib/utils";
 import ReactCrop, { type Crop as CropType, centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import type { Weapon } from "@shared/schema";
-import { LocationSearch } from "@/components/LocationSearch";
+import { LocationSearch, reverseGeocode } from "@/components/LocationSearch";
 import { findClosestSpecies, getAllThresholds } from "@shared/scoring-thresholds";
+import exifr from "exifr";
 
 interface TrophyAnalysis {
   animal_detected: boolean;
@@ -153,6 +154,9 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const [locationName, setLocationName] = useState<string>("");
   const [locationLat, setLocationLat] = useState<number | null>(null);
   const [locationLng, setLocationLng] = useState<number | null>(null);
+  const [exifDate, setExifDate] = useState<string | null>(null);
+  const [exifLocationSource, setExifLocationSource] = useState<string | null>(null);
+  const fileSelectionIdRef = useRef(0);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -182,6 +186,8 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     setLocationName("");
     setLocationLat(null);
     setLocationLng(null);
+    setExifDate(null);
+    setExifLocationSource(null);
   }, [previewUrl, croppedPreviewUrl]);
 
   const handleOpenChange = useCallback((val: boolean) => {
@@ -260,13 +266,55 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     },
   });
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
+    const selectionId = ++fileSelectionIdRef.current;
     setSelectedFile(file);
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     setCroppedPreviewUrl(null);
     setCroppedFile(null);
     setCrop(undefined);
+    setExifDate(null);
+    setExifLocationSource(null);
+    setLocationName("");
+    setLocationLat(null);
+    setLocationLng(null);
+
+    try {
+      const exifData = await exifr.parse(file, {
+        gps: true,
+        pick: ["DateTimeOriginal", "CreateDate", "GPSLatitude", "GPSLongitude"],
+      });
+
+      if (selectionId !== fileSelectionIdRef.current) return;
+
+      if (exifData) {
+        const dateValue = exifData.DateTimeOriginal || exifData.CreateDate;
+        if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+          const yyyy = dateValue.getFullYear();
+          const mm = String(dateValue.getMonth() + 1).padStart(2, "0");
+          const dd = String(dateValue.getDate()).padStart(2, "0");
+          setExifDate(`${yyyy}-${mm}-${dd}`);
+        }
+
+        if (exifData.latitude != null && exifData.longitude != null) {
+          const lat = exifData.latitude;
+          const lng = exifData.longitude;
+          setLocationLat(lat);
+          setLocationLng(lng);
+          setExifLocationSource("photo");
+          try {
+            const name = await reverseGeocode(lat, lng);
+            if (selectionId !== fileSelectionIdRef.current) return;
+            setLocationName(name);
+          } catch {
+            if (selectionId !== fileSelectionIdRef.current) return;
+            setLocationName(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+          }
+        }
+      }
+    } catch {
+    }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -369,7 +417,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
               onAnalyze={startAnalysis}
               onSkip={skipAnalysis}
               onCrop={() => setStep("crop")}
-              onRemoveFile={() => { setSelectedFile(null); setPreviewUrl(null); setCroppedFile(null); setCroppedPreviewUrl(null); }}
+              onRemoveFile={() => { fileSelectionIdRef.current++; setSelectedFile(null); setPreviewUrl(null); setCroppedFile(null); setCroppedPreviewUrl(null); setExifDate(null); setExifLocationSource(null); setLocationName(""); setLocationLat(null); setLocationLng(null); }}
               isUploading={uploadOnlyMutation.isPending}
             />
           )}
@@ -415,6 +463,9 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
               setLocationName={setLocationName}
               setLocationLat={setLocationLat}
               setLocationLng={setLocationLng}
+              exifDate={exifDate}
+              exifLocationSource={exifLocationSource}
+              setExifLocationSource={setExifLocationSource}
             />
           )}
         </AnimatePresence>
@@ -959,6 +1010,9 @@ function FormStep({
   setLocationName,
   setLocationLat,
   setLocationLng,
+  exifDate,
+  exifLocationSource,
+  setExifLocationSource,
 }: {
   analysis: TrophyAnalysis | null;
   previewUrl: string | null;
@@ -974,6 +1028,9 @@ function FormStep({
   setLocationName: (v: string) => void;
   setLocationLat: (v: number | null) => void;
   setLocationLng: (v: number | null) => void;
+  exifDate: string | null;
+  exifLocationSource: string | null;
+  setExifLocationSource: (v: string | null) => void;
 }) {
   const estimatedScore = getEstimatedScore(analysis, units);
 
@@ -1042,18 +1099,32 @@ function FormStep({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="date" className="text-xs">Date *</Label>
+            <Label htmlFor="date" className="text-xs flex items-center gap-1.5">
+              Date *
+              {exifDate && (
+                <span className="text-[10px] text-primary font-normal flex items-center gap-0.5">
+                  <Camera className="h-2.5 w-2.5" /> From photo
+                </span>
+              )}
+            </Label>
             <Input
               id="date"
               name="date"
               type="date"
               required
-              defaultValue={new Date().toISOString().split("T")[0]}
+              defaultValue={exifDate || new Date().toISOString().split("T")[0]}
               data-testid="input-trophy-date"
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Location</Label>
+            <Label className="text-xs flex items-center gap-1.5">
+              Location
+              {exifLocationSource === "photo" && locationLat != null && (
+                <span className="text-[10px] text-primary font-normal flex items-center gap-0.5">
+                  <Camera className="h-2.5 w-2.5" /> From photo
+                </span>
+              )}
+            </Label>
             <LocationSearch
               value={locationName}
               latitude={locationLat}
@@ -1062,6 +1133,7 @@ function FormStep({
                 setLocationName(loc);
                 setLocationLat(lat);
                 setLocationLng(lng);
+                if (loc !== locationName) setExifLocationSource(null);
               }}
               placeholder="Search for a location..."
             />

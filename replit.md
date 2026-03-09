@@ -4,6 +4,9 @@
 TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
+- **2026-03-09**: EXIF metadata extraction: photo date & GPS auto-extracted from trophy images using `exifr`, pre-populates date and location fields with "From photo" indicator
+- **2026-03-09**: "Use current location" button: added to LocationSearch component (available on add trophy + edit trophy), requests device GPS, reverse geocodes via Nominatim
+- **2026-03-09**: `reverseGeocode()` helper exported from LocationSearch for reuse (EXIF GPS → place name)
 - **2026-03-08**: Dashboard refactored: mobile hero layout fix (shorter 45vh on mobile, responsive text), 6 stat cards in 2x3/3x2 grid (Hunts, Qualifying Trophies, Species, Room Rating, Weapons in Safe, Furthest Shot)
 - **2026-03-08**: Qualifying trophies: compares trophy score vs species threshold from user's scoring system (SCI/RW/B&C) using `parseScoreNumeric()` for fraction support
 - **2026-03-08**: Room rating: private rooms show "Unrated · Private", public rooms show community rating or "Unrated · No ratings yet" — removed auto-completeness score

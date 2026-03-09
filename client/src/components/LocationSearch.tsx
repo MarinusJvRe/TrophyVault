@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
-import { MapPin, X, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MapPin, X, Loader2, Navigation } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface LocationResult {
   display_name: string;
@@ -17,6 +19,23 @@ interface LocationSearchProps {
   placeholder?: string;
 }
 
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`,
+    { headers: { "Accept-Language": "en" } }
+  );
+  if (!response.ok) {
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  }
+  const data = await response.json();
+  if (data.display_name) {
+    return formatLocationName(data.display_name);
+  }
+  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+}
+
+export { reverseGeocode };
+
 export function LocationSearch({
   value,
   latitude,
@@ -28,8 +47,10 @@ export function LocationSearch({
   const [results, setResults] = useState<LocationResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     setQuery(value || "");
@@ -92,6 +113,44 @@ export function LocationSearch({
     onChange("", null, null);
   };
 
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast({ title: "Not supported", description: "Location is not available on this device.", variant: "destructive" });
+      return;
+    }
+
+    setIsGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude: lat, longitude: lng } = position.coords;
+        try {
+          const locationName = await reverseGeocode(lat, lng);
+          setQuery(locationName);
+          onChange(locationName, lat, lng);
+        } catch {
+          const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          setQuery(fallback);
+          onChange(fallback, lat, lng);
+        } finally {
+          setIsGettingLocation(false);
+        }
+      },
+      (error) => {
+        setIsGettingLocation(false);
+        let message = "Could not get your location.";
+        if (error.code === error.PERMISSION_DENIED) {
+          message = "Location access was denied. Please enable it in your browser settings.";
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          message = "Location information is unavailable.";
+        } else if (error.code === error.TIMEOUT) {
+          message = "Location request timed out.";
+        }
+        toast({ title: "Location unavailable", description: message, variant: "destructive" });
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  };
+
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
@@ -117,6 +176,23 @@ export function LocationSearch({
           </button>
         )}
       </div>
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={useCurrentLocation}
+        disabled={isGettingLocation}
+        className="mt-1.5 h-7 px-2 text-[11px] text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
+        data-testid="button-use-current-location"
+      >
+        {isGettingLocation ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <Navigation className="h-3 w-3" />
+        )}
+        {isGettingLocation ? "Getting location..." : "Use current location"}
+      </Button>
 
       {showResults && results.length > 0 && (
         <div className="absolute z-50 mt-1 w-full bg-card border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
