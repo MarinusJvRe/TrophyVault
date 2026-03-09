@@ -36,6 +36,9 @@ export interface IStorage {
   // Public trophy room
   getPublicTrophies(userId: string): Promise<Trophy[]>;
   getUserPublic(userId: string): Promise<{ user: User; preferences: UserPreferences | null } | undefined>;
+
+  // Render patching
+  patchTrophyRenderByImage(imageUrl: string, renderImageUrl: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -183,6 +186,10 @@ export class DatabaseStorage implements IStorage {
     const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
     if (!prefs || prefs.roomVisibility !== "public") return undefined;
     return { user, preferences: prefs };
+  }
+
+  async patchTrophyRenderByImage(imageUrl: string, renderImageUrl: string): Promise<void> {
+    await db.update(trophies).set({ renderImageUrl }).where(eq(trophies.imageUrl, imageUrl));
   }
 }
 

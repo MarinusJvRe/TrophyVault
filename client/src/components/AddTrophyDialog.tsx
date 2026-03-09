@@ -82,7 +82,7 @@ export const HUNTING_METHODS = [
   "Other",
 ] as const;
 
-type Step = "upload" | "crop" | "form";
+type Step = "upload" | "crop" | "analyzing" | "form";
 
 interface AddTrophyDialogProps {
   open: boolean;
@@ -148,10 +148,10 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const [locationLng, setLocationLng] = useState<number | null>(null);
   const [exifDate, setExifDate] = useState<string | null>(null);
   const [exifLocationSource, setExifLocationSource] = useState<string | null>(null);
-  const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [methodValue, setMethodValue] = useState<string>("");
   const [distanceUnit, setDistanceUnit] = useState<string>("yards");
   const [scoreUnit, setScoreUnit] = useState<string>('"');
+  const [renderPollingImageUrl, setRenderPollingImageUrl] = useState<string | null>(null);
   const fileSelectionIdRef = useRef(0);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -178,6 +178,27 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     }
   }, [prefs?.units]);
 
+  useEffect(() => {
+    if (!renderPollingImageUrl || renderImageUrl) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/trophies/render-status?imageUrl=${encodeURIComponent(renderPollingImageUrl)}`, {
+          credentials: "include",
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.status === "done" && data.renderImageUrl) {
+          setRenderImageUrl(data.renderImageUrl);
+          setRenderPollingImageUrl(null);
+        } else if (data.status === "failed") {
+          setRenderPollingImageUrl(null);
+        }
+      } catch {}
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [renderPollingImageUrl, renderImageUrl]);
+
   const resetState = useCallback(() => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     if (croppedPreviewUrl) URL.revokeObjectURL(croppedPreviewUrl);
@@ -197,8 +218,8 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     setLocationLng(null);
     setExifDate(null);
     setExifLocationSource(null);
-    setAiAnalyzing(false);
     setMethodValue("");
+    setRenderPollingImageUrl(null);
     setDistanceUnit(prefs?.units === "metric" ? "m" : "yards");
     setScoreUnit(prefs?.units === "metric" ? "cm" : '"');
   }, [previewUrl, croppedPreviewUrl, prefs?.units]);
@@ -230,11 +251,12 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
       setUploadedImageUrl(data.imageUrl);
       setRenderImageUrl(data.renderImageUrl || null);
       setAnalysisUnits(data.units || "imperial");
-      setAiAnalyzing(false);
+      setRenderPollingImageUrl(data.imageUrl);
+      setStep("form");
     },
     onError: (error: Error) => {
       toast({ title: "AI analysis failed", description: error.message, variant: "destructive" });
-      setAiAnalyzing(false);
+      setStep("upload");
     },
   });
 
@@ -379,9 +401,8 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const startAnalysis = () => {
     const file = getFileToUpload();
     if (!file) return;
-    setAiAnalyzing(true);
+    setStep("analyzing");
     analyzeMutation.mutate(file);
-    setStep("form");
   };
 
   const skipAnalysis = () => {
@@ -461,11 +482,14 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
               onCancel={() => setStep("upload")}
             />
           )}
+          {step === "analyzing" && (
+            <AnalyzingStep key="analyzing" previewUrl={getPreviewToShow()} />
+          )}
           {step === "form" && (
             <FormStep
               key="form"
               analysis={analysis}
-              aiAnalyzing={aiAnalyzing}
+              renderGenerating={!!renderPollingImageUrl}
               previewUrl={getPreviewToShow()}
               weaponId={weaponId}
               setWeaponId={setWeaponId}
@@ -723,6 +747,43 @@ function CropStep({
   );
 }
 
+function AnalyzingStep({ previewUrl }: { previewUrl: string | null }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="p-6 text-center"
+    >
+      <DialogHeader className="mb-5">
+        <DialogTitle className="font-serif text-xl flex items-center justify-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+          Analyzing Trophy
+        </DialogTitle>
+      </DialogHeader>
+
+      <div className="relative rounded-xl overflow-hidden mb-6 border border-border/40">
+        {previewUrl && (
+          <img
+            src={previewUrl}
+            alt="Analyzing..."
+            className="w-full max-h-[250px] object-contain bg-black/5"
+          />
+        )}
+        <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px] flex items-center justify-center">
+          <div className="text-center">
+            <div className="relative mx-auto mb-3">
+              <div className="h-12 w-12 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+            </div>
+            <p className="text-sm font-medium text-foreground">Identifying species...</p>
+            <p className="text-xs text-muted-foreground mt-1">Analyzing horns, quality, and trophy details</p>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function UnitToggle({ options, value, onChange, testId }: {
   options: { label: string; value: string }[];
   value: string;
@@ -752,7 +813,7 @@ function UnitToggle({ options, value, onChange, testId }: {
 
 function FormStep({
   analysis,
-  aiAnalyzing,
+  renderGenerating,
   previewUrl,
   weaponId,
   setWeaponId,
@@ -777,7 +838,7 @@ function FormStep({
   setScoreUnit,
 }: {
   analysis: TrophyAnalysis | null;
-  aiAnalyzing: boolean;
+  renderGenerating: boolean;
   previewUrl: string | null;
   weaponId: string;
   setWeaponId: (v: string) => void;
@@ -802,26 +863,6 @@ function FormStep({
   setScoreUnit: (v: string) => void;
 }) {
   const estimatedScore = getEstimatedScoreNumber(analysis);
-  const speciesInputRef = useRef<HTMLInputElement>(null);
-  const scoreInputRef = useRef<HTMLInputElement>(null);
-  const notesInputRef = useRef<HTMLTextAreaElement>(null);
-  const [prevAnalysis, setPrevAnalysis] = useState<TrophyAnalysis | null>(null);
-
-  useEffect(() => {
-    if (analysis && analysis !== prevAnalysis) {
-      setPrevAnalysis(analysis);
-      if (speciesInputRef.current && !speciesInputRef.current.value) {
-        speciesInputRef.current.value = analysis.species.common_name || "";
-      }
-      if (scoreInputRef.current && !scoreInputRef.current.value) {
-        const score = getEstimatedScoreNumber(analysis);
-        if (score) scoreInputRef.current.value = score;
-      }
-      if (notesInputRef.current && !notesInputRef.current.value && analysis.horn_details?.notable_features) {
-        notesInputRef.current.value = analysis.horn_details.notable_features;
-      }
-    }
-  }, [analysis, prevAnalysis]);
 
   return (
     <motion.div
@@ -834,15 +875,14 @@ function FormStep({
         <DialogTitle className="font-serif text-xl">Trophy Details</DialogTitle>
       </DialogHeader>
 
-      {aiAnalyzing && (
-        <div className="flex items-center gap-2 mb-4 p-2.5 bg-primary/5 border border-primary/20 rounded-lg">
-          <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />
-          <span className="text-xs text-primary font-medium">AI analyzing your photo...</span>
-          <Sparkles className="h-3 w-3 text-primary/60 ml-auto" />
+      {renderGenerating && (
+        <div className="flex items-center gap-2 mb-4 p-2 bg-primary/5 border border-primary/20 rounded-lg">
+          <Loader2 className="h-3.5 w-3.5 text-primary animate-spin shrink-0" />
+          <span className="text-xs text-primary/80">Generating 3D mount render...</span>
         </div>
       )}
 
-      {!aiAnalyzing && analysis && (
+      {analysis && (
         <div className="flex items-center gap-3 mb-4 p-2 bg-card border border-border/40 rounded-lg">
           <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0">
             {previewUrl && <img src={previewUrl} alt="Trophy" className="w-full h-full object-cover" />}
@@ -864,7 +904,7 @@ function FormStep({
         </div>
       )}
 
-      {!aiAnalyzing && !analysis && previewUrl && (
+      {!analysis && previewUrl && (
         <div className="flex items-center gap-3 mb-4 p-2 bg-card border border-border/40 rounded-lg">
           <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0">
             <img src={previewUrl} alt="Trophy" className="w-full h-full object-cover" />
@@ -878,7 +918,6 @@ function FormStep({
           <div className="space-y-1.5">
             <Label htmlFor="species" className="text-xs">Species *</Label>
             <Input
-              ref={speciesInputRef}
               id="species"
               name="species"
               required
@@ -959,7 +998,6 @@ function FormStep({
               />
             </div>
             <Input
-              ref={scoreInputRef}
               id="scoreNum"
               name="scoreNum"
               placeholder={scoreUnit === "cm" ? "e.g. 132" : scoreUnit === '"' ? "e.g. 52" : "e.g. 100"}
@@ -1031,7 +1069,6 @@ function FormStep({
         <div className="space-y-1.5">
           <Label htmlFor="notes" className="text-xs">Trophy Notes</Label>
           <Textarea
-            ref={notesInputRef}
             id="notes"
             name="notes"
             rows={2}
@@ -1055,16 +1092,12 @@ function FormStep({
         <Button
           type="submit"
           className="w-full gap-2"
-          disabled={isPending || aiAnalyzing}
+          disabled={isPending}
           data-testid="button-submit-trophy"
         >
           {isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" /> Adding...
-            </>
-          ) : aiAnalyzing ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Waiting for AI...
             </>
           ) : (
             <>

@@ -170,6 +170,8 @@ export async function registerRoutes(
   });
 
   // ========== AI TROPHY ANALYSIS ==========
+  const pendingRenders = new Map<string, { status: "pending" | "done" | "failed"; renderImageUrl: string | null }>();
+
   app.post("/api/trophies/analyze", isAuthenticated, trophyUpload.single("image"), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "No image file provided" });
@@ -181,26 +183,45 @@ export async function registerRoutes(
       const scoringSystem = prefs?.scoringSystem || "SCI";
       const analysis = await analyzeTrophyImage(base64, req.file.mimetype, units, scoringSystem);
 
-      let renderImageUrl: string | null = null;
-      if (analysis.render_prompt) {
-        try {
-          const renderBuffer = await generateTrophyRender(analysis.render_prompt);
-          if (renderBuffer) {
-            const renderFilename = `render-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
-            const renderPath = path.join(trophyUploadDir, renderFilename);
-            fs.writeFileSync(renderPath, renderBuffer);
-            renderImageUrl = `/uploads/trophies/${renderFilename}`;
-          }
-        } catch (renderErr) {
-          console.error("Render generation failed (non-blocking):", renderErr);
-        }
-      }
+      res.json({ imageUrl, renderImageUrl: null, analysis, units, scoringSystem });
 
-      res.json({ imageUrl, renderImageUrl, analysis, units, scoringSystem });
+      if (analysis.render_prompt) {
+        pendingRenders.set(imageUrl, { status: "pending", renderImageUrl: null });
+        generateTrophyRender(analysis.render_prompt)
+          .then((renderBuffer) => {
+            if (renderBuffer) {
+              const renderFilename = `render-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
+              const renderPath = path.join(trophyUploadDir, renderFilename);
+              fs.writeFileSync(renderPath, renderBuffer);
+              const renderUrl = `/uploads/trophies/${renderFilename}`;
+              pendingRenders.set(imageUrl, { status: "done", renderImageUrl: renderUrl });
+              storage.patchTrophyRenderByImage(imageUrl, renderUrl).catch((err) => {
+                console.error("Failed to patch trophy render:", err);
+              });
+            } else {
+              pendingRenders.set(imageUrl, { status: "failed", renderImageUrl: null });
+            }
+          })
+          .catch((err) => {
+            console.error("Render generation failed:", err);
+            pendingRenders.set(imageUrl, { status: "failed", renderImageUrl: null });
+          });
+      }
     } catch (error: any) {
       console.error("AI analysis error:", error);
       res.status(500).json({ message: "AI analysis failed", error: error.message });
     }
+  });
+
+  app.get("/api/trophies/render-status", isAuthenticated, (req, res) => {
+    const imageUrl = req.query.imageUrl as string;
+    if (!imageUrl) return res.status(400).json({ message: "imageUrl query param required" });
+    const entry = pendingRenders.get(imageUrl);
+    if (!entry) return res.json({ status: "unknown", renderImageUrl: null });
+    if (entry.status === "done") {
+      pendingRenders.delete(imageUrl);
+    }
+    res.json(entry);
   });
 
   // ========== COMMUNITY / ROOM RATINGS ==========
