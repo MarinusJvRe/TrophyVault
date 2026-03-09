@@ -111,9 +111,22 @@ export async function registerRoutes(
   });
 
   // ========== TROPHIES ==========
+  const pendingRenders = new Map<string, { status: "pending" | "done" | "failed"; renderImageUrl: string | null }>();
+
   app.get("/api/trophies", isAuthenticated, async (req, res) => {
     const list = await storage.getTrophies(getUserId(req));
     res.json(list);
+  });
+
+  app.get("/api/trophies/render-status", isAuthenticated, (req, res) => {
+    const imageUrl = req.query.imageUrl as string;
+    if (!imageUrl) return res.status(400).json({ message: "imageUrl query param required" });
+    const entry = pendingRenders.get(imageUrl);
+    if (!entry) return res.json({ status: "unknown", renderImageUrl: null });
+    if (entry.status === "done") {
+      pendingRenders.delete(imageUrl);
+    }
+    res.json(entry);
   });
 
   app.get("/api/trophies/:id", isAuthenticated, async (req, res) => {
@@ -170,8 +183,6 @@ export async function registerRoutes(
   });
 
   // ========== AI TROPHY ANALYSIS ==========
-  const pendingRenders = new Map<string, { status: "pending" | "done" | "failed"; renderImageUrl: string | null }>();
-
   app.post("/api/trophies/analyze", isAuthenticated, trophyUpload.single("image"), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "No image file provided" });
@@ -187,6 +198,7 @@ export async function registerRoutes(
 
       if (analysis.render_prompt) {
         pendingRenders.set(imageUrl, { status: "pending", renderImageUrl: null });
+        console.log(`[render] Started background render for ${imageUrl}`);
         generateTrophyRender(analysis.render_prompt)
           .then((renderBuffer) => {
             if (renderBuffer) {
@@ -195,15 +207,19 @@ export async function registerRoutes(
               fs.writeFileSync(renderPath, renderBuffer);
               const renderUrl = `/uploads/trophies/${renderFilename}`;
               pendingRenders.set(imageUrl, { status: "done", renderImageUrl: renderUrl });
-              storage.patchTrophyRenderByImage(imageUrl, renderUrl).catch((err) => {
-                console.error("Failed to patch trophy render:", err);
+              console.log(`[render] Completed render for ${imageUrl} → ${renderUrl}`);
+              storage.patchTrophyRenderByImage(imageUrl, renderUrl).then(() => {
+                console.log(`[render] Auto-patched trophy render for ${imageUrl}`);
+              }).catch((err) => {
+                console.error("[render] Failed to patch trophy render:", err);
               });
             } else {
+              console.error(`[render] Render returned empty for ${imageUrl}`);
               pendingRenders.set(imageUrl, { status: "failed", renderImageUrl: null });
             }
           })
           .catch((err) => {
-            console.error("Render generation failed:", err);
+            console.error(`[render] Render generation failed for ${imageUrl}:`, err);
             pendingRenders.set(imageUrl, { status: "failed", renderImageUrl: null });
           });
       }
@@ -211,17 +227,6 @@ export async function registerRoutes(
       console.error("AI analysis error:", error);
       res.status(500).json({ message: "AI analysis failed", error: error.message });
     }
-  });
-
-  app.get("/api/trophies/render-status", isAuthenticated, (req, res) => {
-    const imageUrl = req.query.imageUrl as string;
-    if (!imageUrl) return res.status(400).json({ message: "imageUrl query param required" });
-    const entry = pendingRenders.get(imageUrl);
-    if (!entry) return res.json({ status: "unknown", renderImageUrl: null });
-    if (entry.status === "done") {
-      pendingRenders.delete(imageUrl);
-    }
-    res.json(entry);
   });
 
   // ========== COMMUNITY / ROOM RATINGS ==========
