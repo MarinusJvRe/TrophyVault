@@ -888,19 +888,19 @@ function FormStep({
             {previewUrl && <img src={previewUrl} alt="Trophy" className="w-full h-full object-cover" />}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground truncate">{analysis.species.common_name}</p>
             <div className="flex items-center gap-2">
-              <p className="text-xs text-muted-foreground italic">{analysis.species.scientific_name}</p>
+              <p className="text-sm font-medium text-foreground truncate">{analysis.species.common_name}</p>
+              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0">
+                AI Filled
+              </span>
               {analysis.gender?.estimated && analysis.gender.estimated !== "unknown" && (
-                <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded capitalize">
+                <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded capitalize shrink-0">
                   {analysis.gender.estimated}
                 </span>
               )}
             </div>
+            <p className="text-xs text-muted-foreground italic truncate">{analysis.species.scientific_name}</p>
           </div>
-          <span className="ml-auto text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0">
-            AI Filled
-          </span>
         </div>
       )}
 
@@ -982,7 +982,7 @@ function FormStep({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 items-end">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
               <Label htmlFor="scoreNum" className="text-xs">Score / Size</Label>
@@ -1023,7 +1023,7 @@ function FormStep({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 items-end">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
               <Label htmlFor="shotDistanceNum" className="text-xs">Shot Distance</Label>

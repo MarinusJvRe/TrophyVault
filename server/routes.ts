@@ -197,9 +197,19 @@ export async function registerRoutes(
       res.json({ imageUrl, renderImageUrl: null, analysis, units, scoringSystem });
 
       if (analysis.render_prompt) {
+        const theme = prefs?.theme || "lodge";
+        const themeBackgrounds: Record<string, string> = {
+          lodge: "mounted on a dark rustic wooden plaque, warm cabin lighting, dark wood-paneled wall background",
+          manor: "mounted on a rich mahogany plaque, warm golden ambient lighting, dark safari-themed wall background with warm earth tones",
+          minimal: "mounted on a clean light oak plaque, bright studio lighting, clean white wall background",
+        };
+        const themedPrompt = analysis.render_prompt.replace(
+          /dark wooden plaque.*$/i,
+          themeBackgrounds[theme] || themeBackgrounds.lodge
+        );
         pendingRenders.set(imageUrl, { status: "pending", renderImageUrl: null });
-        console.log(`[render] Started background render for ${imageUrl}`);
-        generateTrophyRender(analysis.render_prompt)
+        console.log(`[render] Started background render for ${imageUrl} (theme: ${theme})`);
+        generateTrophyRender(themedPrompt)
           .then((renderBuffer) => {
             if (renderBuffer) {
               const renderFilename = `render-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
