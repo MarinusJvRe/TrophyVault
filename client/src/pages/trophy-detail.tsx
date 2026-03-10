@@ -5,7 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
 import { 
   ArrowLeft, Share2, Target, MapPin, 
-  Calendar, BadgeCheck, Camera, MessageCircle, Crosshair, Sword, Trash2, Pencil, AlertTriangle, Check, Loader2, X, Star
+  Calendar, BadgeCheck, Camera, MessageCircle, Crosshair, Sword, Trash2, Pencil, AlertTriangle, Check, Loader2, X, Star, Box
 } from "lucide-react";
 import { LocationMap } from "@/components/LocationMap";
 import { LocationSearch } from "@/components/LocationSearch";
@@ -38,6 +38,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { Trophy, Weapon } from "@shared/schema";
 import { findClosestSpecies } from "@shared/scoring-thresholds";
 import { HUNTING_METHODS } from "@/components/AddTrophyDialog";
+import TrophyARViewer from "@/components/TrophyARViewer";
+import { useTheme } from "@/lib/theme-context";
 
 function parseStoredDistance(value: string | null): { num: string; unit: string } {
   if (!value) return { num: "", unit: "yards" };
@@ -70,6 +72,8 @@ export default function TrophyDetail() {
   const queryClient = useQueryClient();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [showAR, setShowAR] = useState(false);
+  const { theme } = useTheme();
   const [editWeaponId, setEditWeaponId] = useState<string>("");
   const [editLocation, setEditLocation] = useState<string>("");
   const [editLat, setEditLat] = useState<number | null>(null);
@@ -341,6 +345,7 @@ export default function TrophyDetail() {
                 weapon={weapon}
                 onShare={handleShare}
                 onCertificate={() => generateTrophyCertificate(trophy, weapon)}
+                onViewAR={() => setShowAR(true)}
               />
             )}
           </div>
@@ -371,6 +376,16 @@ export default function TrophyDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {showAR && trophy?.glbUrl && (
+        <TrophyARViewer
+          glbUrl={trophy.glbUrl}
+          species={trophy.species}
+          mountType={trophy.mountType || null}
+          theme={theme}
+          onClose={() => setShowAR(false)}
+        />
+      )}
     </Layout>
   );
 }
@@ -380,11 +395,13 @@ function ViewMode({
   weapon,
   onShare,
   onCertificate,
+  onViewAR,
 }: {
   trophy: Trophy;
   weapon: Weapon | null | undefined;
   onShare: () => void;
   onCertificate: () => void;
+  onViewAR: () => void;
 }) {
   const speciesThresholds = findClosestSpecies(trophy.species);
 
@@ -529,6 +546,11 @@ function ViewMode({
         <Button onClick={onCertificate} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-serif" data-testid="button-certificate">
           Generate Certificate
         </Button>
+        {trophy.glbUrl && (
+          <Button onClick={onViewAR} className="w-full bg-[#b87333] hover:bg-[#a0622a] text-white flex items-center gap-2 font-serif" data-testid="button-view-ar-detail">
+            <Box className="h-4 w-4" /> View in 3D / AR
+          </Button>
+        )}
       </div>
     </motion.div>
   );

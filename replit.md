@@ -4,6 +4,12 @@
 TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
+- **2026-03-10**: 3D AR trophy viewer: fal.ai pipeline (BiRefNet bg removal → Tripo image-to-3D → Draco-compressed GLB), Google `<model-viewer>` AR viewer with wall placement, background 3D generation with polling
+- **2026-03-10**: Schema: added `glbUrl`, `glbPreviewUrl`, `mountType` columns to trophies table
+- **2026-03-10**: New endpoint: `GET /api/trophies/model-status` for 3D model generation status polling
+- **2026-03-10**: Trophy room cards show "3D" badge (clickable to open AR viewer) or spinning indicator while generating
+- **2026-03-10**: Trophy detail page "View in 3D / AR" button opens full-screen model viewer with wall AR placement
+- **2026-03-10**: New files: `server/trophy-3d.ts` (pipeline), `client/src/components/TrophyARViewer.tsx` (viewer), `client/src/types/model-viewer.d.ts` (types)
 - **2026-03-09**: AI prompt optimised: stripped `animal_pose`, `visibility`, `exif_hints`, `additional_animals`, `mount_recommendation.viable`, `photo_quality.suggestion`; reduced max_tokens from 2500→1500
 - **2026-03-09**: Background render generation: AI vision analysis (species, horns, score) blocks until complete, then form shows; 3D render generation runs in background with polling + server auto-patches trophy when done
 - **2026-03-09**: Shot distance unit toggle: Meters/Yards toggle next to input, stored as `"200 yards"` or `"180 m"`; defaults from user prefs
@@ -59,6 +65,7 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 - **Backend**: Express.js, Drizzle ORM, PostgreSQL (Neon-backed)
 - **Auth**: Multi-provider — Email/Password (bcrypt) + auth token fallback, Replit OIDC (Passport.js), Google OAuth (planned), Apple Sign-In (planned)
 - **AI**: OpenAI GPT-4o vision for trophy analysis + gpt-image-1 for 3D trophy render generation (via Replit AI Integrations); Gemini integration also available
+- **3D/AR**: fal.ai (BiRefNet bg removal + Tripo image-to-3D), gltf-transform + draco3dgltf for GLB compression, Google model-viewer for 3D viewing + AR wall placement
 
 ## Key Pages
 - `/` - Dashboard (hero + stats + featured trophies)
@@ -87,7 +94,7 @@ TrophyVault is a virtual trophy room application for hunters. Users can track hu
 ## Database Tables
 - `users` (id, email, firstName, lastName, profileImageUrl, passwordHash, authProvider, authProviderId, createdAt, updatedAt)
 - `sessions` (sid, sess, expire)
-- `trophies` (species, name, date, location?, score, method?, weaponId, gender?, shotDistance?, notes, huntNotes, imageUrl, renderImageUrl?, featured)
+- `trophies` (species, name, date, location?, score, method?, weaponId, gender?, shotDistance?, notes, huntNotes, imageUrl, renderImageUrl?, glbUrl?, glbPreviewUrl?, mountType?, featured)
 - `weapons` (name, type, caliber, make, model, optic, notes, imageUrl)
 - `user_preferences` (theme, pursuit, scoringSystem, units, roomVisibility, huntingLocations[])
 - `room_ratings` (roomOwnerId, raterId, score)

@@ -152,6 +152,9 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const [distanceUnit, setDistanceUnit] = useState<string>("yards");
   const [scoreUnit, setScoreUnit] = useState<string>('"');
   const [renderPollingImageUrl, setRenderPollingImageUrl] = useState<string | null>(null);
+  const [glbUrl, setGlbUrl] = useState<string | null>(null);
+  const [glbPreviewUrl, setGlbPreviewUrl] = useState<string | null>(null);
+  const [modelPollingImageUrl, setModelPollingImageUrl] = useState<string | null>(null);
   const fileSelectionIdRef = useRef(0);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -199,6 +202,28 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     return () => clearInterval(interval);
   }, [renderPollingImageUrl, renderImageUrl]);
 
+  useEffect(() => {
+    if (!modelPollingImageUrl || glbUrl) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/trophies/model-status?imageUrl=${encodeURIComponent(modelPollingImageUrl)}`, {
+          credentials: "include",
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.status === "done" && data.glbUrl) {
+          setGlbUrl(data.glbUrl);
+          setGlbPreviewUrl(data.glbPreviewUrl || null);
+          setModelPollingImageUrl(null);
+        } else if (data.status === "failed") {
+          setModelPollingImageUrl(null);
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [modelPollingImageUrl, glbUrl]);
+
   const resetState = useCallback(() => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     if (croppedPreviewUrl) URL.revokeObjectURL(croppedPreviewUrl);
@@ -220,6 +245,9 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     setExifLocationSource(null);
     setMethodValue("");
     setRenderPollingImageUrl(null);
+    setGlbUrl(null);
+    setGlbPreviewUrl(null);
+    setModelPollingImageUrl(null);
     setDistanceUnit(prefs?.units === "metric" ? "m" : "yards");
     setScoreUnit(prefs?.units === "metric" ? "cm" : '"');
   }, [previewUrl, croppedPreviewUrl, prefs?.units]);
@@ -252,6 +280,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
       setRenderImageUrl(data.renderImageUrl || null);
       setAnalysisUnits(data.units || "imperial");
       setRenderPollingImageUrl(data.imageUrl);
+      setModelPollingImageUrl(data.imageUrl);
       setStep("form");
     },
     onError: (error: Error) => {
@@ -445,6 +474,9 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
       huntNotes: (formData.get("huntNotes") as string) || null,
       imageUrl: uploadedImageUrl,
       renderImageUrl: renderImageUrl,
+      glbUrl: glbUrl,
+      glbPreviewUrl: glbPreviewUrl,
+      mountType: analysis?.mount_recommendation?.best || null,
       featured: false,
     });
   };

@@ -5,6 +5,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { registerEmailAuthRoutes } from "./auth";
 import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema } from "@shared/schema";
 import { analyzeTrophyImage, generateTrophyRender } from "./trophy-ai";
+import { generate3DModel } from "./trophy-3d";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -112,6 +113,7 @@ export async function registerRoutes(
 
   // ========== TROPHIES ==========
   const pendingRenders = new Map<string, { status: "pending" | "done" | "failed"; renderImageUrl: string | null }>();
+  const pendingModels = new Map<string, { status: "pending" | "done" | "failed"; glbUrl: string | null; glbPreviewUrl: string | null }>();
 
   app.get("/api/trophies", isAuthenticated, async (req, res) => {
     const list = await storage.getTrophies(getUserId(req));
@@ -125,6 +127,17 @@ export async function registerRoutes(
     if (!entry) return res.json({ status: "unknown", renderImageUrl: null });
     if (entry.status === "done") {
       pendingRenders.delete(imageUrl);
+    }
+    res.json(entry);
+  });
+
+  app.get("/api/trophies/model-status", isAuthenticated, (req, res) => {
+    const imageUrl = req.query.imageUrl as string;
+    if (!imageUrl) return res.status(400).json({ message: "imageUrl query param required" });
+    const entry = pendingModels.get(imageUrl);
+    if (!entry) return res.json({ status: "unknown", glbUrl: null, glbPreviewUrl: null });
+    if (entry.status === "done") {
+      pendingModels.delete(imageUrl);
     }
     res.json(entry);
   });
@@ -233,6 +246,24 @@ export async function registerRoutes(
             pendingRenders.set(imageUrl, { status: "failed", renderImageUrl: null });
           });
       }
+
+      pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null });
+      const mountType = analysis.mount_recommendation?.best || null;
+      console.log(`[3d-model] Started background 3D generation for ${imageUrl} (mount: ${mountType})`);
+      generate3DModel(req.file!.path, mountType)
+        .then(({ glbUrl, glbPreviewUrl }) => {
+          pendingModels.set(imageUrl, { status: "done", glbUrl, glbPreviewUrl });
+          console.log(`[3d-model] Completed 3D model for ${imageUrl} → ${glbUrl}`);
+          storage.patchTrophyGlb(imageUrl, glbUrl, glbPreviewUrl, mountType).then(() => {
+            console.log(`[3d-model] Auto-patched trophy GLB for ${imageUrl}`);
+          }).catch((err) => {
+            console.error("[3d-model] Failed to patch trophy GLB:", err);
+          });
+        })
+        .catch((err) => {
+          console.error(`[3d-model] 3D model generation failed for ${imageUrl}:`, err);
+          pendingModels.set(imageUrl, { status: "failed", glbUrl: null, glbPreviewUrl: null });
+        });
     } catch (error: any) {
       console.error("AI analysis error:", error);
       res.status(500).json({ message: "AI analysis failed", error: error.message });

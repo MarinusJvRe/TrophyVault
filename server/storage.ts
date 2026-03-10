@@ -39,6 +39,7 @@ export interface IStorage {
 
   // Render patching
   patchTrophyRenderByImage(imageUrl: string, renderImageUrl: string): Promise<void>;
+  patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -190,6 +191,13 @@ export class DatabaseStorage implements IStorage {
 
   async patchTrophyRenderByImage(imageUrl: string, renderImageUrl: string): Promise<void> {
     await db.update(trophies).set({ renderImageUrl }).where(eq(trophies.imageUrl, imageUrl));
+  }
+
+  async patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null): Promise<void> {
+    const updates: Record<string, any> = { glbUrl };
+    if (glbPreviewUrl) updates.glbPreviewUrl = glbPreviewUrl;
+    if (mountType) updates.mountType = mountType;
+    await db.update(trophies).set(updates).where(eq(trophies.imageUrl, imageUrl));
   }
 }
 

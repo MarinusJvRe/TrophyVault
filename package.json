@@ -12,7 +12,12 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@fal-ai/client": "^1.9.4",
+    "@gltf-transform/core": "^4.3.0",
+    "@gltf-transform/extensions": "^4.3.0",
+    "@gltf-transform/functions": "^4.3.0",
     "@google/genai": "^1.44.0",
+    "@google/model-viewer": "^4.1.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@octokit/rest": "^22.0.0",
@@ -54,6 +59,7 @@
     "cmdk": "^1.1.1",
     "connect-pg-simple": "^10.0.0",
     "date-fns": "^3.6.0",
+    "draco3dgltf": "^1.5.7",
     "drizzle-orm": "^0.39.3",
     "drizzle-zod": "^0.7.1",
     "embla-carousel-react": "^8.6.0",

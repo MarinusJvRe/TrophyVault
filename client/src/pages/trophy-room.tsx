@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Filter, SlidersHorizontal, ChevronDown, Calendar, Ruler, MapPin } from "lucide-react";
+import { Search, Filter, SlidersHorizontal, ChevronDown, Calendar, Ruler, MapPin, Box, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import type { Trophy } from "@shared/schema";
 import { useTheme } from "@/lib/theme-context";
 import AddTrophyDialog from "@/components/AddTrophyDialog";
+import TrophyARViewer from "@/components/TrophyARViewer";
 
 import wallLodge from "@/assets/wall-lodge.png";
 import wallManor from "@/assets/wall-manor-texture.png";
@@ -33,6 +34,7 @@ export default function TrophyRoom() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSpecies, setFilterSpecies] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [arTrophy, setArTrophy] = useState<Trophy | null>(null);
   const { theme } = useTheme();
   const wallTexture = WALL_TEXTURES[theme] || WALL_TEXTURES.lodge;
 
@@ -139,7 +141,7 @@ export default function TrophyRoom() {
           {filteredTrophies.map((trophy, i) => (
             <Link key={trophy.id} href={`/trophies/${trophy.id}`}>
               <div className="cursor-pointer h-full">
-                <WallMountCard trophy={trophy} index={i} />
+                <WallMountCard trophy={trophy} index={i} onViewAR={(e) => { e.preventDefault(); e.stopPropagation(); setArTrophy(trophy); }} />
               </div>
             </Link>
           ))}
@@ -148,11 +150,21 @@ export default function TrophyRoom() {
       </div>
 
       <AddTrophyDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
+      {arTrophy?.glbUrl && (
+        <TrophyARViewer
+          glbUrl={arTrophy.glbUrl}
+          species={arTrophy.species}
+          mountType={arTrophy.mountType || null}
+          theme={theme}
+          onClose={() => setArTrophy(null)}
+        />
+      )}
     </Layout>
   );
 }
 
-function WallMountCard({ trophy, index }: { trophy: Trophy, index: number }) {
+function WallMountCard({ trophy, index, onViewAR }: { trophy: Trophy, index: number, onViewAR: (e: React.MouseEvent) => void }) {
   const displayImage = trophy.renderImageUrl || trophy.imageUrl;
   
   return (
@@ -178,14 +190,30 @@ function WallMountCard({ trophy, index }: { trophy: Trophy, index: number }) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
       </div>
 
-      {trophy.score && (
-        <div className="absolute top-2 right-2 z-10">
+      <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+        {trophy.glbUrl && (
+          <button
+            onClick={onViewAR}
+            className="bg-primary/90 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded border border-primary/30 flex items-center gap-0.5 hover:bg-primary transition-colors"
+            data-testid={`button-ar-${trophy.id}`}
+          >
+            <Box className="h-2.5 w-2.5" />
+            3D
+          </button>
+        )}
+        {!trophy.glbUrl && trophy.imageUrl && trophy.createdAt && (Date.now() - new Date(trophy.createdAt).getTime() < 30 * 60 * 1000) && (
+          <div className="bg-background/70 backdrop-blur-sm text-muted-foreground text-[10px] px-1.5 py-0.5 rounded border border-border/30 flex items-center gap-0.5">
+            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+            3D
+          </div>
+        )}
+        {trophy.score && (
           <div className="bg-background/70 backdrop-blur-sm text-primary text-[10px] font-bold px-1.5 py-0.5 rounded border border-primary/20 flex items-center gap-0.5">
             <Ruler className="h-2.5 w-2.5" />
             {trophy.score}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="absolute bottom-0 left-0 right-0 z-10 p-2.5">
         <p className="text-white text-xs font-semibold uppercase tracking-wide truncate">{trophy.species}</p>
