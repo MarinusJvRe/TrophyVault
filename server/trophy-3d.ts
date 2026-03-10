@@ -66,7 +66,7 @@ export async function removeBackground(localImagePath: string): Promise<string> 
   const result = await fal.subscribe("fal-ai/birefnet/v2", {
     input: {
       image_url: uploadedUrl,
-      model: "BiRefNet_lite",
+      model: "General Use (Light)",
     },
     logs: true,
     onQueueUpdate: (update) => {
