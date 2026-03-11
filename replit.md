@@ -4,6 +4,7 @@
 Honor The Hunt is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
+- **2026-03-11**: Google Maps integration upgrade: replaced OpenStreetMap/Leaflet with Google Maps JavaScript API and Google Places Autocomplete. LocationSearch now uses Google Places API for location search (finds specific game farms, ranches, lodges). LocationMap and TrophyMap use Google Maps with terrain/satellite/hybrid/road toggle. API key served via `/api/maps-config` endpoint. Removed leaflet/react-leaflet/@types/leaflet dependencies, added @types/google.maps.
 - **2026-03-11**: Renamed app from TrophyVault to "Honor The Hunt" throughout codebase. Updated all user-facing text ("the vault" → "the trophy room"), splash screen now displays "Honor the Hunt" below logo. Trophy room title changed to "The Trophy Room". Certificate generation updated to reflect new branding.
 
 - **2026-03-10**: 3D AR trophy viewer: fal.ai pipeline (BiRefNet bg removal → Tripo image-to-3D → Draco-compressed GLB), Google `<model-viewer>` AR viewer with wall placement, background 3D generation with polling
@@ -29,8 +30,8 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - **2026-03-08**: Featured trophy: star button on trophy detail page toggles `featured` status (only one at a time), featured trophy section on dashboard
 - **2026-03-08**: Star endpoint: `POST /api/trophies/:id/star` — toggles featured, un-stars any other featured trophy
 - **2026-03-08**: `parseScoreNumeric()` added to `shared/scoring-thresholds.ts` — handles fractions like `53 1/2"`, parenthetical notes, inch marks
-- **2026-03-07**: Location search: Nominatim geocoding autocomplete replaces text input, stores lat/lng in DB, shows Leaflet/OSM map on trophy detail
-- **2026-03-07**: Map view: `/trophies/map` page with all trophies plotted on interactive Leaflet map, clickable pins with trophy info
+- **2026-03-07**: Location search: geocoding autocomplete, stores lat/lng in DB, shows map on trophy detail
+- **2026-03-07**: Map view: `/trophies/map` page with all trophies plotted on interactive map, clickable pins with trophy info
 - **2026-03-07**: Scoring thresholds: `shared/scoring-thresholds.ts` with SCI/Rowland Ward/B&C minimum scores for ~90 species, displayed on trophy detail and add dialog
 - **2026-03-07**: Certificate PDF: jsPDF-based dark-themed certificate with trophy image, details, scoring thresholds, notes; downloads on "Generate Certificate" click
 - **2026-03-07**: Weapon image upload: camera/gallery picker with crop replaces text URL input in The Safe
@@ -73,7 +74,7 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - `/` - Dashboard (hero + stats + featured trophies)
 - `/trophies` - Trophy Room (grid view, search/filter, add new)
 - `/trophies/:id` - Trophy Detail (image viewer, hunt details, WhatsApp share, certificate PDF)
-- `/trophies/map` - Map View (interactive Leaflet map with trophy pins)
+- `/trophies/map` - Map View (interactive Google Maps with trophy pins, terrain/satellite/hybrid/road toggle)
 - `/safe` - The Safe (weapon management)
 - `/community` - Community (leaderboards, rate rooms)
 - `/profile` - Profile & Settings (theme, about, locations, sharing)
@@ -89,6 +90,7 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - `GET /api/stats`
 - `GET /api/community/rooms`, `GET /api/community/room/:userId`, `POST /api/community/rate`
 - `GET /api/my-room-rating`
+- `GET /api/maps-config` (returns Google Maps API key for frontend)
 - Auth: `/api/login`, `/api/logout`, `/api/callback`, `/api/auth/user`
 - Email Auth: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/email-logout`
 - OAuth: `GET /api/auth/google`, `GET /api/auth/apple` (pending credential setup)

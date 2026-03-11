@@ -74,6 +74,14 @@ export async function registerRoutes(
   // Helper to get user ID from request
   const getUserId = (req: any): string => req.user?.claims?.sub;
 
+  app.get("/api/maps-config", isAuthenticated, (_req, res) => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ message: "Google Maps API key not configured" });
+    }
+    res.json({ apiKey });
+  });
+
   // ========== WEAPONS (The Safe) ==========
   app.get("/api/weapons", isAuthenticated, async (req, res) => {
     const weapons = await storage.getWeapons(getUserId(req));
