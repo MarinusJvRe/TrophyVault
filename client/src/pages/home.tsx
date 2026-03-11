@@ -12,7 +12,7 @@ import type { Trophy as TrophyType } from "@shared/schema";
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
-import trophyVaultLogo from "@assets/trophy_vault_logo_transparent.png";
+import trophyVaultLogo from "@assets/honor_the_hunt_logo.png";
 
 interface Stats {
   totalHunts: number;

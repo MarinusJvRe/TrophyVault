@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import trophyVaultLogo from "@assets/trophy_vault_logo_transparent.png";
+import trophyVaultLogo from "@assets/honor_the_hunt_logo.png";
 
 interface SplashScreenProps {
   children: React.ReactNode;
