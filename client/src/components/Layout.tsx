@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/hooks/use-auth";
 import { motion } from "framer-motion";
-import trophyVaultLogo from "@assets/honor_the_hunt_logo_clean.png";
+import trophyVaultLogo from "@assets/honor_the_hunt_logo_final.png";
 
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";

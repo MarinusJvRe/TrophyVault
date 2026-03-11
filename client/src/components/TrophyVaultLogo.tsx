@@ -1,4 +1,4 @@
-import trophyVaultLogo from "@assets/honor_the_hunt_logo_clean.png";
+import trophyVaultLogo from "@assets/honor_the_hunt_logo_final.png";
 
 interface TrophyVaultLogoProps {
   className?: string;
