@@ -153,7 +153,7 @@ function AuthPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-black/40" />
         <div className="relative z-10 p-12 max-w-lg">
           <div className="mb-8">
-            <img src={trophyVaultLogo} alt="Honor The Hunt" className="h-28 w-auto" data-testid="img-logo-landing-desktop" />
+            <img src={trophyVaultLogo} alt="Honor The Hunt" className="h-14 w-auto" data-testid="img-logo-landing-desktop" />
           </div>
           <p className="text-xl text-white/80 font-light leading-relaxed">
             Your digital trophy room, enhanced with AI identification and 3D modeling.
@@ -164,7 +164,7 @@ function AuthPage() {
 
       <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 bg-[#1a1a1a] overflow-y-auto">
         <div className="lg:hidden mb-8">
-          <img src={trophyVaultLogo} alt="Honor The Hunt" className="h-48 w-auto mx-auto" data-testid="img-logo-landing-mobile" />
+          <img src={trophyVaultLogo} alt="Honor The Hunt" className="h-24 w-auto mx-auto" data-testid="img-logo-landing-mobile" />
         </div>
 
         <div className="max-w-sm w-full space-y-6">
