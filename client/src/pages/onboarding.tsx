@@ -308,7 +308,7 @@ export default function Onboarding() {
                 data-testid="button-finish"
                 disabled={savePreferencesMutation.isPending}
               >
-                {savePreferencesMutation.isPending ? "Saving..." : "Enter TrophyVault"}
+                {savePreferencesMutation.isPending ? "Saving..." : "Enter Honor The Hunt"}
               </Button>
             </div>
           </motion.div>

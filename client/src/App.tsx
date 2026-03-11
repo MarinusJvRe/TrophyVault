@@ -115,7 +115,7 @@ function AuthPage() {
         if (userData.authToken) setAuthToken(userData.authToken);
         sessionStorage.setItem("isNewUser", "true");
         queryClient.setQueryData(["/api/auth/user"], userData);
-        toast({ title: "Account created", description: "Welcome to Trophy Vault!" });
+        toast({ title: "Account created", description: "Welcome to Honor The Hunt!" });
       } else {
         const res = await fetch("/api/auth/login", {
           method: "POST",
@@ -147,13 +147,13 @@ function AuthPage() {
       <div className="hidden lg:flex w-1/2 relative items-center justify-center bg-black">
         <img
           src={themeLodge}
-          alt="Trophy Vault"
+          alt="Honor The Hunt"
           className="absolute inset-0 w-full h-full object-cover opacity-50"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-black/40" />
         <div className="relative z-10 p-12 max-w-lg">
           <div className="mb-8">
-            <img src={trophyVaultLogo} alt="Trophy Vault" className="h-28 w-auto" data-testid="img-logo-landing-desktop" />
+            <img src={trophyVaultLogo} alt="Honor The Hunt" className="h-28 w-auto" data-testid="img-logo-landing-desktop" />
           </div>
           <p className="text-xl text-white/80 font-light leading-relaxed">
             Your digital trophy room, enhanced with AI identification and 3D modeling.
@@ -164,7 +164,7 @@ function AuthPage() {
 
       <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 bg-[#1a1a1a] overflow-y-auto">
         <div className="lg:hidden mb-8">
-          <img src={trophyVaultLogo} alt="Trophy Vault" className="h-48 w-auto mx-auto" data-testid="img-logo-landing-mobile" />
+          <img src={trophyVaultLogo} alt="Honor The Hunt" className="h-48 w-auto mx-auto" data-testid="img-logo-landing-mobile" />
         </div>
 
         <div className="max-w-sm w-full space-y-6">

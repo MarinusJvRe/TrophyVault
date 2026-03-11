@@ -73,7 +73,7 @@ export default function TrophyRoom() {
         <div className="relative p-4 md:p-8 max-w-7xl mx-auto min-h-full">
         <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-serif font-bold text-primary mb-1">The Vault</h1>
+            <h1 className="text-2xl md:text-3xl font-serif font-bold text-primary mb-1">The Trophy Room</h1>
             <p className="text-sm text-muted-foreground max-w-md">
               Your curated collection of achievements.
             </p>

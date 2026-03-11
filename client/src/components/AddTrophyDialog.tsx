@@ -323,7 +323,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
       queryClient.invalidateQueries({ queryKey: ["/api/trophies"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       handleOpenChange(false);
-      toast({ title: "Trophy added", description: "Your trophy has been added to the vault." });
+      toast({ title: "Trophy added", description: "Your trophy has been added to your trophy room." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });

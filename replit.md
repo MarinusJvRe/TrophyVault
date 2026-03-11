@@ -1,9 +1,11 @@
-# TrophyVault
+# Honor The Hunt
 
 ## Overview
-TrophyVault is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
+Honor The Hunt is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
+- **2026-03-11**: Renamed app from TrophyVault to "Honor The Hunt" throughout codebase. Updated all user-facing text ("the vault" → "the trophy room"), splash screen now displays "Honor the Hunt" below logo. Trophy room title changed to "The Trophy Room". Certificate generation updated to reflect new branding.
+
 - **2026-03-10**: 3D AR trophy viewer: fal.ai pipeline (BiRefNet bg removal → Tripo image-to-3D → Draco-compressed GLB), Google `<model-viewer>` AR viewer with wall placement, background 3D generation with polling
 - **2026-03-10**: Schema: added `glbUrl`, `glbPreviewUrl`, `mountType` columns to trophies table
 - **2026-03-10**: New endpoint: `GET /api/trophies/model-status` for 3D model generation status polling

@@ -104,7 +104,7 @@ export default function TrophyDetail() {
       setDeleteDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/trophies"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      toast({ title: "Trophy deleted", description: "Your trophy has been removed from the vault." });
+      toast({ title: "Trophy deleted", description: "Your trophy has been removed from your trophy room." });
       navigate("/trophies");
     },
     onError: (error: Error) => {
@@ -223,7 +223,7 @@ export default function TrophyDetail() {
   }
 
   const handleShare = () => {
-    const text = `Check out my ${trophy.species} trophy on TrophyVault! Score: ${trophy.score}.`;
+    const text = `Check out my ${trophy.species} trophy on Honor The Hunt! Score: ${trophy.score}.`;
     const url = `https://trophyvault.app/t/${trophy.id}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text + " " + url)}`;
     window.open(whatsappUrl, '_blank');
@@ -487,7 +487,7 @@ function ViewMode({
         <div className="p-4 rounded-lg bg-card border border-border/50 space-y-3">
           {trophy.score && (
             <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">TrophyVault Score</span>
+              <span className="text-muted-foreground">Honor The Hunt Score</span>
               <span className="font-mono text-primary font-semibold" data-testid="text-tv-score">
                 {trophy.score}
               </span>
@@ -496,7 +496,7 @@ function ViewMode({
           
           <div className="flex items-start gap-2 text-xs text-muted-foreground bg-primary/5 p-2 rounded">
             <BadgeCheck className="h-4 w-4 text-primary shrink-0" />
-            <span>Verified by TrophyVault AI algorithm against scoring database standards.</span>
+            <span>Verified by Honor The Hunt AI algorithm against scoring database standards.</span>
           </div>
         </div>
       </div>

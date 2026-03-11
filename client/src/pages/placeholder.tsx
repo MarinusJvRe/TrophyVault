@@ -12,7 +12,7 @@ export default function Placeholder({ title = "Coming Soon" }: { title?: string 
         </div>
         <h1 className="text-4xl font-serif font-bold text-foreground mb-4">{title}</h1>
         <p className="text-muted-foreground max-w-md mb-8">
-          This feature is currently under development. Check back soon for updates to the TrophyVault system.
+          This feature is currently under development. Check back soon for updates to Honor The Hunt.
         </p>
         <Link href="/">
           <Button variant="outline" className="border-border/50">Return Dashboard</Button>
