@@ -74,6 +74,16 @@ export default function Home() {
     groupedByYear[year].push(t);
   });
 
+  // Sort years in descending order (latest first), and sort trophies within each year by date descending
+  const sortedYears = Object.keys(groupedByYear)
+    .sort((a, b) => parseInt(b) - parseInt(a))
+    .map(year => ({
+      year,
+      trophies: groupedByYear[year].sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      )
+    }));
+
   return (
     <Layout>
       <div className="min-h-full pb-10">
@@ -206,7 +216,7 @@ export default function Home() {
 
             {sortedTrophies.length > 0 ? (
               <div className="space-y-8">
-                {Object.entries(groupedByYear).map(([year, yearTrophies]) => (
+                {sortedYears.map(({ year, trophies: yearTrophies }) => (
                   <div key={year}>
                     <div className="flex items-center gap-3 mb-4">
                       <span className="text-lg font-serif font-bold text-primary">{year}</span>
