@@ -12,7 +12,7 @@ import type { Trophy as TrophyType } from "@shared/schema";
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
-import trophyVaultLogo from "@assets/honor_the_hunt_logo.png";
+import trophyVaultLogo from "@assets/image_1773256452663.png";
 
 interface Stats {
   totalHunts: number;
@@ -107,7 +107,7 @@ export default function Home() {
               transition={{ duration: 0.8, delay: 0.2 }}
               className="mb-4 md:mb-6"
             >
-              <img src={trophyVaultLogo} alt="TrophyVault" className="h-44 md:h-80 w-auto opacity-90 drop-shadow-lg" data-testid="img-logo-dashboard-hero" />
+              <img src={trophyVaultLogo} alt="Honor The Hunt" className="h-32 md:h-56 w-auto opacity-90 drop-shadow-lg" data-testid="img-logo-dashboard-hero" />
             </motion.div>
             <motion.div 
               initial={{ opacity: 0, y: 20 }}

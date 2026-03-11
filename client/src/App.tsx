@@ -25,7 +25,7 @@ import { Eye, EyeOff, Mail, Chrome, Apple } from "lucide-react";
 import { setAuthToken } from "@/lib/auth-token";
 import { motion, AnimatePresence } from "framer-motion";
 import themeLodge from "./assets/theme-lodge.png";
-import trophyVaultLogo from "@assets/honor_the_hunt_logo.png";
+import trophyVaultLogo from "@assets/image_1773256452663.png";
 
 const pageVariants = {
   initial: { opacity: 0, y: 12 },
