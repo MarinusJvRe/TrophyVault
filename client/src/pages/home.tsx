@@ -90,20 +90,20 @@ export default function Home() {
             className="absolute inset-0 w-full h-full object-cover"
           />
           
-          <div className="relative z-20 h-full flex flex-col items-center justify-between p-6 md:p-12 max-w-5xl mx-auto">
+          <div className="relative z-20 h-full flex flex-col items-center justify-center p-6 md:p-12 max-w-5xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
-              className="pt-2 md:pt-4"
+              className="mb-4 md:mb-6"
             >
-              <img src={trophyVaultLogo} alt="TrophyVault" className="h-20 md:h-44 w-auto opacity-90 drop-shadow-lg" data-testid="img-logo-dashboard-hero" />
+              <img src={trophyVaultLogo} alt="TrophyVault" className="h-28 md:h-52 w-auto opacity-90 drop-shadow-lg" data-testid="img-logo-dashboard-hero" />
             </motion.div>
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
-              className="text-center mb-2 md:mb-4"
+              className="text-center"
             >
               <h1 className={`text-2xl md:text-6xl font-serif font-bold mb-2 md:mb-4 leading-tight ${theme === "minimal" ? "text-foreground" : "text-white drop-shadow-lg"}`} data-testid="text-hero-heading">
                 Preserve your Legacy.<br/>
