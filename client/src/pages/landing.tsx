@@ -1,0 +1,473 @@
+import { motion } from "framer-motion";
+import MarketingLayout from "@/components/MarketingLayout";
+import { Link } from "wouter";
+import {
+  Brain,
+  Box,
+  Palette,
+  Users,
+  Shield,
+  Award,
+  Smartphone,
+  Monitor,
+  Trophy,
+  ChevronRight,
+  Check,
+  Crosshair,
+  Star,
+} from "lucide-react";
+
+import heroBg from "../assets/hero-bg.png";
+import themeLodge from "../assets/theme-lodge.png";
+import themeManor from "../assets/theme-manor.png";
+import themeMinimal from "../assets/theme-minimal.png";
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.1, duration: 0.6, ease: "easeOut" as const },
+  }),
+};
+
+const features = [
+  {
+    icon: Brain,
+    title: "AI-Powered Trophy Upload",
+    description:
+      "Effortlessly upload a photo and let our AI instantly identify species, estimate scores, and classify your trophy — no manual guesswork.",
+  },
+  {
+    icon: Box,
+    title: "3D Models & AR",
+    description:
+      "Transform your trophies into stunning 3D models. View them in augmented reality and share immersive experiences.",
+  },
+  {
+    icon: Palette,
+    title: "Virtual Trophy Room Themes",
+    description:
+      "Choose from beautifully crafted room themes — from classic lodge to modern gallery — to showcase your collection.",
+  },
+  {
+    icon: Users,
+    title: "Community & Leaderboards",
+    description:
+      "Connect with fellow hunters. Compare collections, rate trophy rooms, and climb the leaderboards.",
+  },
+  {
+    icon: Shield,
+    title: "Weapon Safe",
+    description:
+      "Digitally catalog your firearms and bows with full specifications, serial numbers, and maintenance logs.",
+  },
+  {
+    icon: Award,
+    title: "Certificates & Records",
+    description:
+      "Generate certificates for qualifying trophies and use them as proof of hunt records. Track scores across SCI, B&C, and Rowland Ward systems.",
+  },
+];
+
+const pricingTiers = [
+  {
+    name: "Free",
+    price: "$0",
+    period: "forever",
+    description: "Start preserving your legacy",
+    features: [
+      "3 AI trophy analyses",
+      "1 3D trophy model",
+      "25 manual trophy entries",
+      "Public trophy room",
+      "Basic species database",
+    ],
+    cta: "Get Started",
+    highlighted: false,
+  },
+  {
+    name: "Paid",
+    price: "$9.99",
+    period: "/month",
+    description: "For the serious hunter",
+    features: [
+      "Unlimited AI analyses",
+      "Unlimited 3D models",
+      "Unlimited trophy entries",
+      "Private trophy rooms",
+      "Leaderboard access",
+      "Advanced scoring systems",
+      "Priority support",
+    ],
+    cta: "Get Started",
+    highlighted: true,
+  },
+  {
+    name: "Pro",
+    price: "$19.99",
+    period: "/month",
+    description: "Business & outfitter tools",
+    features: [
+      "Everything in Paid",
+      "Referral program access",
+      "Pro badge & verification",
+      "Business management tools",
+      "Client trophy management",
+      "Bulk upload & export",
+      "Dedicated support",
+    ],
+    cta: "Get Started",
+    highlighted: false,
+  },
+];
+
+const showcaseImages = [
+  { src: themeLodge, label: "Classic Lodge", description: "Warm wood and leather ambiance" },
+  { src: themeManor, label: "Safari Manor", description: "African safari luxury" },
+  { src: themeMinimal, label: "Modern Gallery", description: "Clean, contemporary showcase" },
+];
+
+export default function LandingPage() {
+  return (
+    <MarketingLayout>
+      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden" data-testid="section-hero">
+        <div className="absolute inset-0">
+          <img
+            src={heroBg}
+            alt="Honor The Hunt"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#111]/70 via-[#111]/50 to-[#111]" />
+        </div>
+
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center py-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#b87333]/10 border border-[#b87333]/20 mb-8">
+              <Crosshair className="h-3.5 w-3.5 text-[#b87333]" />
+              <span className="text-xs text-[#b87333] font-medium tracking-wider uppercase">Your Digital Trophy Room</span>
+            </div>
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.1 }}
+            className="text-4xl sm:text-5xl md:text-7xl font-serif font-bold leading-tight mb-6"
+            data-testid="text-hero-headline"
+          >
+            Preserve your Legacy.
+            <br />
+            <span className="text-[#b87333] italic font-light">Honor the Hunt.</span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="text-lg sm:text-xl text-white/70 max-w-2xl mx-auto mb-10 font-light leading-relaxed"
+            data-testid="text-hero-subheadline"
+          >
+            Take your trophies home in your pocket and share it with fellow hunters. AI-powered trophy identification, 3D models, and a stunning virtual trophy room — all in one app.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          >
+            <Link href="/login">
+              <span
+                className="px-8 py-3.5 bg-[#b87333] hover:bg-[#a0622d] text-white font-medium rounded-lg text-base transition-colors flex items-center gap-2 shadow-lg shadow-[#b87333]/20 cursor-pointer"
+                data-testid="button-hero-cta"
+              >
+                Get Started Free <ChevronRight className="h-4 w-4" />
+              </span>
+            </Link>
+            <Link href="/pricing">
+              <span
+                className="px-8 py-3.5 border border-white/20 hover:border-white/40 text-white font-medium rounded-lg text-base transition-colors cursor-pointer"
+                data-testid="link-hero-pricing"
+              >
+                View Pricing
+              </span>
+            </Link>
+          </motion.div>
+        </div>
+      </section>
+
+      <section className="py-24 px-4 sm:px-6 bg-[#111]" data-testid="section-features">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            className="text-center mb-16"
+          >
+            <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
+              Everything You Need
+            </motion.p>
+            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-features-heading">
+              Preserve Every Detail of Your Hunt
+            </motion.h2>
+            <motion.p variants={fadeUp} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
+              From AI identification to 3D scanning, Honor The Hunt gives you the most advanced tools to document and showcase your achievements.
+            </motion.p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((feature, i) => (
+              <motion.div
+                key={feature.title}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.2 }}
+                variants={fadeUp}
+                custom={i}
+                className="group p-6 rounded-xl bg-white/[0.02] border border-white/5 hover:border-[#b87333]/20 transition-all duration-300"
+                data-testid={`card-feature-${i}`}
+              >
+                <div className="w-12 h-12 rounded-lg bg-[#b87333]/10 flex items-center justify-center mb-4 group-hover:bg-[#b87333]/20 transition-colors">
+                  <feature.icon className="h-6 w-6 text-[#b87333]" />
+                </div>
+                <h3 className="text-lg font-serif font-semibold mb-2">{feature.title}</h3>
+                <p className="text-white/50 text-sm leading-relaxed">{feature.description}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-24 px-4 sm:px-6 bg-[#0d0d0d]" data-testid="section-showcase">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            className="text-center mb-16"
+          >
+            <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
+              Stunning Trophy Rooms
+            </motion.p>
+            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-showcase-heading">
+              Choose Your Perfect Theme
+            </motion.h2>
+            <motion.p variants={fadeUp} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
+              Your trophies deserve a world-class showcase. Pick from handcrafted room themes that bring your collection to life.
+            </motion.p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {showcaseImages.map((img, i) => (
+              <motion.div
+                key={img.label}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.2 }}
+                variants={fadeUp}
+                custom={i}
+                className="group relative overflow-hidden rounded-xl border border-white/5"
+                data-testid={`card-showcase-${i}`}
+              >
+                <div className="aspect-[4/3] overflow-hidden">
+                  <img
+                    src={img.src}
+                    alt={img.label}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-5">
+                  <h3 className="font-serif font-semibold text-lg">{img.label}</h3>
+                  <p className="text-white/60 text-sm">{img.description}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-24 px-4 sm:px-6 bg-[#111]" data-testid="section-cross-device">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            className="text-center"
+          >
+            <motion.div variants={fadeUp} custom={0} className="flex items-center justify-center gap-6 mb-8">
+              <div className="w-16 h-16 rounded-2xl bg-[#b87333]/10 flex items-center justify-center">
+                <Smartphone className="h-8 w-8 text-[#b87333]" />
+              </div>
+              <div className="text-3xl text-white/20 font-light">+</div>
+              <div className="w-16 h-16 rounded-2xl bg-[#b87333]/10 flex items-center justify-center">
+                <Monitor className="h-8 w-8 text-[#b87333]" />
+              </div>
+            </motion.div>
+
+            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-crossdevice-heading">
+              Works on Your Phone and Your Computer
+            </motion.h2>
+            <motion.p variants={fadeUp} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg mb-8">
+              Capture trophies in the field on your phone, then explore your full collection on desktop. Your data syncs seamlessly across all your devices.
+            </motion.p>
+            <motion.div variants={fadeUp} custom={3} className="flex flex-wrap items-center justify-center gap-4 text-sm text-white/40">
+              <span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#b87333]" /> Mobile-optimized camera</span>
+              <span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#b87333]" /> Desktop trophy management</span>
+              <span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#b87333]" /> Real-time sync</span>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      <section className="py-24 px-4 sm:px-6 bg-[#0d0d0d]" data-testid="section-social-proof">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            className="text-center"
+          >
+            <motion.div variants={fadeUp} custom={0} className="flex items-center justify-center gap-1 mb-6">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Star key={s} className="h-5 w-5 text-[#b87333] fill-[#b87333]" />
+              ))}
+            </motion.div>
+            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-6" data-testid="text-socialproof-heading">
+              Join 2,500+ Hunters Preserving Their Legacy
+            </motion.h2>
+            <motion.div variants={fadeUp} custom={2} className="grid grid-cols-1 sm:grid-cols-3 gap-8 mt-12">
+              <div className="text-center">
+                <p className="text-4xl font-serif font-bold text-[#b87333]" data-testid="text-stat-trophies">15,000+</p>
+                <p className="text-white/50 text-sm mt-1">Trophies Documented</p>
+              </div>
+              <div className="text-center">
+                <p className="text-4xl font-serif font-bold text-[#b87333]" data-testid="text-stat-species">350+</p>
+                <p className="text-white/50 text-sm mt-1">Species Identified</p>
+              </div>
+              <div className="text-center">
+                <p className="text-4xl font-serif font-bold text-[#b87333]" data-testid="text-stat-countries">45+</p>
+                <p className="text-white/50 text-sm mt-1">Countries Represented</p>
+              </div>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      <section className="py-24 px-4 sm:px-6 bg-[#111]" data-testid="section-pricing-summary">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            className="text-center mb-16"
+          >
+            <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
+              Simple Pricing
+            </motion.p>
+            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-pricing-heading">
+              Start Free, Upgrade When Ready
+            </motion.h2>
+            <motion.p variants={fadeUp} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
+              No credit card required. Begin documenting your hunts today and upgrade as your collection grows.
+            </motion.p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {pricingTiers.map((tier, i) => (
+              <motion.div
+                key={tier.name}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.2 }}
+                variants={fadeUp}
+                custom={i}
+                className={`relative p-6 rounded-xl border ${
+                  tier.highlighted
+                    ? "border-[#b87333]/40 bg-[#b87333]/5"
+                    : "border-white/5 bg-white/[0.02]"
+                }`}
+                data-testid={`card-pricing-${tier.name.toLowerCase()}`}
+              >
+                {tier.highlighted && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-[#b87333] text-white text-xs font-semibold rounded-full uppercase tracking-wider">
+                    Most Popular
+                  </div>
+                )}
+                <h3 className="font-serif text-xl font-semibold mb-1">{tier.name}</h3>
+                <p className="text-white/50 text-sm mb-4">{tier.description}</p>
+                <div className="mb-6">
+                  <span className="text-3xl font-serif font-bold">{tier.price}</span>
+                  <span className="text-white/40 text-sm ml-1">{tier.period}</span>
+                </div>
+                <ul className="space-y-3 mb-6">
+                  {tier.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-sm text-white/70">
+                      <Check className="h-4 w-4 text-[#b87333] shrink-0 mt-0.5" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/login">
+                  <span
+                    className={`block text-center py-2.5 rounded-lg font-medium text-sm transition-colors cursor-pointer ${
+                      tier.highlighted
+                        ? "bg-[#b87333] hover:bg-[#a0622d] text-white"
+                        : "bg-white/5 hover:bg-white/10 text-white border border-white/10"
+                    }`}
+                    data-testid={`button-pricing-${tier.name.toLowerCase()}`}
+                  >
+                    {tier.cta}
+                  </span>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="text-center mt-8">
+            <Link href="/pricing">
+              <span className="text-[#b87333] hover:text-[#d4935f] text-sm font-medium cursor-pointer flex items-center justify-center gap-1" data-testid="link-full-pricing">
+                View full pricing comparison <ChevronRight className="h-4 w-4" />
+              </span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-24 px-4 sm:px-6 bg-[#0d0d0d]" data-testid="section-final-cta">
+        <div className="max-w-3xl mx-auto text-center">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+          >
+            <motion.div variants={fadeUp} custom={0} className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#b87333]/10 mb-6">
+              <Trophy className="h-8 w-8 text-[#b87333]" />
+            </motion.div>
+            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-finalcta-heading">
+              Ready to Preserve Your Legacy?
+            </motion.h2>
+            <motion.p variants={fadeUp} custom={2} className="text-white/60 text-lg mb-8 max-w-xl mx-auto">
+              Join thousands of hunters who trust Honor The Hunt to document, protect, and share their greatest achievements.
+            </motion.p>
+            <motion.div variants={fadeUp} custom={3}>
+              <Link href="/login">
+                <span
+                  className="inline-flex items-center gap-2 px-8 py-3.5 bg-[#b87333] hover:bg-[#a0622d] text-white font-medium rounded-lg text-base transition-colors shadow-lg shadow-[#b87333]/20 cursor-pointer"
+                  data-testid="button-final-cta"
+                >
+                  Get Started Free <ChevronRight className="h-4 w-4" />
+                </span>
+              </Link>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+    </MarketingLayout>
+  );
+}

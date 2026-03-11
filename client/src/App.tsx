@@ -16,6 +16,11 @@ import Safe from "@/pages/safe";
 import Community from "@/pages/community";
 import Profile from "@/pages/profile";
 import TrophyMap from "@/pages/trophy-map";
+import LandingPage from "@/pages/landing";
+import PricingPage from "@/pages/pricing";
+import TermsPage from "@/pages/terms";
+import PrivacyPage from "@/pages/privacy";
+import ContactPage from "@/pages/contact";
 import SplashScreen from "@/components/SplashScreen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -348,7 +353,10 @@ function AuthPage() {
           </p>
 
           <p className="text-xs text-white/30 text-center">
-            By signing in, you agree to our terms of service and privacy policy.
+            By signing in, you agree to our{" "}
+            <a href="/terms" className="text-[#b87333]/60 hover:text-[#b87333]" data-testid="link-auth-terms">terms of service</a>
+            {" "}and{" "}
+            <a href="/privacy" className="text-[#b87333]/60 hover:text-[#b87333]" data-testid="link-auth-privacy">privacy policy</a>.
           </p>
         </div>
       </div>
@@ -356,13 +364,48 @@ function AuthPage() {
   );
 }
 
+function PublicRouter() {
+  const [location] = useLocation();
+
+  return (
+    <AnimatePresence mode="wait">
+      <Switch key={location}>
+        <Route path="/">{() => <LandingPage />}</Route>
+        <Route path="/login">{() => <AuthPage />}</Route>
+        <Route path="/pricing">{() => <PricingPage />}</Route>
+        <Route path="/terms">{() => <TermsPage />}</Route>
+        <Route path="/privacy">{() => <PrivacyPage />}</Route>
+        <Route path="/contact">{() => <ContactPage />}</Route>
+        <Route>{() => <LandingPage />}</Route>
+      </Switch>
+    </AnimatePresence>
+  );
+}
+
 function AuthGate() {
   const { user, isLoading } = useAuth();
+  const [location] = useLocation();
   const isNewUser = sessionStorage.getItem("isNewUser") === "true";
   const { data: preferences, isLoading: prefsLoading } = useQuery({
     queryKey: ["/api/preferences"],
     enabled: !!user && isNewUser,
   });
+
+  const publicPages = ["/pricing", "/terms", "/privacy", "/contact"];
+  const isPublicPage = publicPages.includes(location);
+
+  if (isPublicPage) {
+    return (
+      <AnimatePresence mode="wait">
+        <Switch key={location}>
+          <Route path="/pricing">{() => <PricingPage />}</Route>
+          <Route path="/terms">{() => <TermsPage />}</Route>
+          <Route path="/privacy">{() => <PrivacyPage />}</Route>
+          <Route path="/contact">{() => <ContactPage />}</Route>
+        </Switch>
+      </AnimatePresence>
+    );
+  }
 
   if (isLoading || (user && isNewUser && prefsLoading)) {
     return (
@@ -373,7 +416,10 @@ function AuthGate() {
   }
 
   if (!user) {
-    return <AuthPage />;
+    if (location === "/login") {
+      return <AuthPage />;
+    }
+    return <PublicRouter />;
   }
 
   if (isNewUser && (!preferences || !(preferences as any).pursuit)) {
