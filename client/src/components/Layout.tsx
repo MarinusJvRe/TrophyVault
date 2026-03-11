@@ -35,7 +35,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden transition-colors duration-700">
       <aside className="w-64 border-r border-border/40 bg-card/80 backdrop-blur-xl hidden md:flex flex-col relative z-20">
         <div className="p-4">
-          <img src={trophyVaultLogo} alt="Trophy Vault" className="h-12 w-auto" data-testid="img-logo-sidebar" />
+          <img src={trophyVaultLogo} alt="Honor The Hunt" className="h-8 w-auto" data-testid="img-logo-sidebar" />
         </div>
 
         <nav className="flex-1 px-4 space-y-2">

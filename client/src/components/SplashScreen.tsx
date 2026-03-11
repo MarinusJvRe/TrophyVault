@@ -29,7 +29,7 @@ export default function SplashScreen({ children }: SplashScreenProps) {
             <motion.img
               src={trophyVaultLogo}
               alt="Honor The Hunt"
-              className="h-56 md:h-72 w-auto mb-8"
+              className="h-36 md:h-48 w-auto mb-8"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6 }}
