@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import trophyVaultLogo from "@assets/honor_hunt_logo_v2.png";
+import splashLogo from "@assets/splash_logo.png";
 
 interface SplashScreenProps {
   children: React.ReactNode;
@@ -27,9 +27,9 @@ export default function SplashScreen({ children }: SplashScreenProps) {
             data-testid="splash-screen"
           >
             <motion.img
-              src={trophyVaultLogo}
+              src={splashLogo}
               alt="Honor The Hunt"
-              className="h-36 md:h-48 w-auto mb-8"
+              className="h-32 md:h-44 w-auto mb-4 rounded-2xl"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6 }}
@@ -38,8 +38,8 @@ export default function SplashScreen({ children }: SplashScreenProps) {
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.2, duration: 0.4 }}
-              className="text-white text-lg font-light mb-6"
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="text-[#b87333] text-xl font-serif tracking-widest mb-6"
             >
               Honor the Hunt
             </motion.p>
