@@ -223,19 +223,34 @@ export default function Profile() {
                 data-testid="input-profile-photo"
               />
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-serif font-bold text-foreground" data-testid="text-profile-name">
-                    {user?.firstName || ""} {user?.lastName || ""}
-                  </h2>
-                  <span className={cn(
-                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider",
-                    isPremium
-                      ? "bg-amber-500/20 text-amber-500 border border-amber-500/30"
-                      : "bg-muted text-muted-foreground border border-border/40"
-                  )} data-testid="badge-membership">
-                    {isPremium && <Crown className="h-2.5 w-2.5" />}
-                    {isPremium ? "Premium" : "Free"}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-serif font-bold text-foreground" data-testid="text-profile-name">
+                      {user?.firstName || ""} {user?.lastName || ""}
+                    </h2>
+                    <span className={cn(
+                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider",
+                      isPremium
+                        ? "bg-amber-500/20 text-amber-500 border border-amber-500/30"
+                        : "bg-muted text-muted-foreground border border-border/40"
+                    )} data-testid="badge-membership">
+                      {isPremium && <Crown className="h-2.5 w-2.5" />}
+                      {isPremium ? "Premium" : "Free"}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 border-border/40 text-muted-foreground hover:text-destructive hover:border-destructive/50"
+                    data-testid="button-profile-logout"
+                    onClick={() => {
+                      fetch("/api/auth/email-logout", { method: "POST", credentials: "include" })
+                        .then(r => { if (r.ok) window.location.href = "/"; else window.location.href = "/api/logout"; })
+                        .catch(() => window.location.href = "/api/logout");
+                    }}
+                  >
+                    <LogOut className="h-3.5 w-3.5" /> Sign Out
+                  </Button>
                 </div>
                 <p className="text-sm text-muted-foreground" data-testid="text-profile-email">{user?.email || ""}</p>
               </div>
@@ -430,27 +445,6 @@ export default function Profile() {
         </Card>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.4, ease: "easeOut" }}
-        >
-        <div className="flex justify-end pt-2">
-          <Button
-            size="lg"
-            variant="outline"
-            className="gap-2 border-border/40 text-muted-foreground hover:text-destructive hover:border-destructive/50"
-            data-testid="button-profile-logout"
-            onClick={() => {
-              fetch("/api/auth/email-logout", { method: "POST", credentials: "include" })
-                .then(r => { if (r.ok) window.location.href = "/"; else window.location.href = "/api/logout"; })
-                .catch(() => window.location.href = "/api/logout");
-            }}
-          >
-            <LogOut className="h-4 w-4" /> Sign Out
-          </Button>
-        </div>
-        </motion.div>
       </div>
     </Layout>
   );
