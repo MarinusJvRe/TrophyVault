@@ -85,7 +85,8 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - `/trophies/:id` - Trophy Detail (image viewer, hunt details, WhatsApp share, certificate PDF)
 - `/trophies/map` - Map View (interactive Google Maps with trophy pins, terrain/satellite toggle)
 - `/safe` - The Safe (weapon management)
-- `/community` - Community (leaderboards, rate rooms)
+- `/community` - Community (paginated public rooms with search/sort, species leaderboards with region filter, my room status)
+- `/community/room/:userId` - Public Room Viewer (read-only trophy wall, hunt locations, rating, trophy detail modal - no sensitive data exposed)
 - `/profile` - Profile & Settings (theme, about, locations, sharing, tier badge, leaderboard verification)
 - `/onboarding` - First-time setup (Hunter vs Pro fork → theme → preferences → locations)
 - `/pro` - Pro Dashboard (referral stats, tag stats, copy referral link)
@@ -97,7 +98,12 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - `GET/POST /api/weapons`, `GET/PATCH/DELETE /api/weapons/:id`
 - `GET/PUT /api/preferences`
 - `GET /api/stats`
-- `GET /api/community/rooms`, `GET /api/community/room/:userId`, `POST /api/community/rate`
+- `GET /api/community/rooms?limit=20&offset=0&sort=rating&search=` (paginated public rooms, single joined SQL query)
+- `GET /api/community/room/:userId` (public room viewer - excludes lat/lng, weapon details, private notes)
+- `GET /api/community/leaderboard?species=&region=&limit=20&offset=0` (species leaderboard with top-10 badges)
+- `GET /api/community/species` (distinct species with scores for leaderboard dropdown)
+- `GET /api/community/locations` (distinct locations for region filter)
+- `POST /api/community/rate`
 - `GET /api/my-room-rating`
 - `GET /api/maps-config` (returns Google Maps API key for authenticated users)
 - Tiers: `GET /api/usage` (usage stats), `POST /api/verify-leaderboard`

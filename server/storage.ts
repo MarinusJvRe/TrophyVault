@@ -12,7 +12,7 @@ import {
   AI_COSTS,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, avg, count, gte, or, ilike } from "drizzle-orm";
+import { eq, and, desc, sql, avg, count, gte, or, ilike, asc } from "drizzle-orm";
 import crypto from "crypto";
 
 export interface IStorage {
@@ -33,10 +33,50 @@ export interface IStorage {
 
   getRoomRating(roomOwnerId: string): Promise<{ avgScore: number; totalRatings: number }>;
   rateRoom(raterId: string, rating: InsertRoomRating): Promise<RoomRating>;
-  getPublicRooms(): Promise<{ userId: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null; theme: string | null; avgScore: number; totalRatings: number; trophyCount: number }[]>;
+  isRoomPublic(userId: string): Promise<boolean>;
+
+  getPublicRooms(options?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    sort?: "rating" | "trophies" | "newest";
+  }): Promise<{
+    rooms: { userId: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null; theme: string | null; avgScore: number; totalRatings: number; trophyCount: number; createdAt: Date | null }[];
+    total: number;
+  }>;
 
   getPublicTrophies(userId: string): Promise<Trophy[]>;
   getUserPublic(userId: string): Promise<{ user: User; preferences: UserPreferences | null } | undefined>;
+
+  getSpeciesLeaderboard(options: {
+    species: string;
+    region?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    entries: {
+      trophyId: string;
+      trophyName: string;
+      species: string;
+      score: string;
+      numericScore: number;
+      location: string | null;
+      imageUrl: string | null;
+      renderImageUrl: string | null;
+      date: string;
+      userId: string;
+      firstName: string | null;
+      lastName: string | null;
+      profileImageUrl: string | null;
+      rank: number;
+    }[];
+    total: number;
+  }>;
+
+  getDistinctSpeciesWithScores(): Promise<string[]>;
+  getDistinctLocations(): Promise<string[]>;
+
+  getTop10ForSpecies(species: string): Promise<Map<string, { rank: number; badge: "gold" | "silver" | "bronze" | "top10" }>>;
 
   patchTrophyRenderByImage(imageUrl: string, renderImageUrl: string): Promise<void>;
   patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null): Promise<void>;
@@ -63,6 +103,18 @@ export interface IStorage {
   getTrophiesTaggingPro(proUserId: string): Promise<Trophy[]>;
   getTagStats(proUserId: string): Promise<{ totalTags: number; recentTags: Trophy[] }>;
 }
+
+const numericScoreExpr = sql<number>`
+  CASE
+    WHEN ${trophies.score} IS NULL OR TRIM(${trophies.score}) = '' THEN NULL
+    ELSE (
+      regexp_replace(
+        regexp_replace(${trophies.score}, '[^0-9./]', '', 'g'),
+        '/.*$', '', 'g'
+      )
+    )::numeric
+  END
+`;
 
 export class DatabaseStorage implements IStorage {
   async getWeapons(userId: string): Promise<Weapon[]> {
@@ -163,32 +215,107 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getPublicRooms(): Promise<any[]> {
-    const publicPrefs = await db
-      .select()
-      .from(userPreferences)
-      .where(eq(userPreferences.roomVisibility, "public"));
+  async isRoomPublic(userId: string): Promise<boolean> {
+    const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+    return prefs?.roomVisibility === "public";
+  }
 
-    const rooms = [];
-    for (const pref of publicPrefs) {
-      const [user] = await db.select().from(users).where(eq(users.id, pref.userId));
-      if (!user) continue;
+  async getPublicRooms(options?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    sort?: "rating" | "trophies" | "newest";
+  }): Promise<{
+    rooms: any[];
+    total: number;
+  }> {
+    const limit = options?.limit ?? 20;
+    const offset = options?.offset ?? 0;
+    const search = options?.search;
+    const sort = options?.sort ?? "rating";
 
-      const rating = await this.getRoomRating(pref.userId);
-      const trophyList = await db.select().from(trophies).where(eq(trophies.userId, pref.userId));
-
-      rooms.push({
-        userId: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        profileImageUrl: user.profileImageUrl,
-        theme: pref.theme,
-        avgScore: rating.avgScore,
-        totalRatings: rating.totalRatings,
-        trophyCount: trophyList.length,
-      });
+    const conditions = [eq(userPreferences.roomVisibility, "public")];
+    if (search) {
+      conditions.push(
+        or(
+          ilike(users.firstName, `%${search}%`),
+          ilike(users.lastName, `%${search}%`)
+        )!
+      );
     }
-    return rooms;
+
+    const trophyCountSq = db
+      .select({
+        userId: trophies.userId,
+        cnt: count(trophies.id).as("cnt"),
+      })
+      .from(trophies)
+      .groupBy(trophies.userId)
+      .as("trophy_counts");
+
+    const ratingSq = db
+      .select({
+        roomOwnerId: roomRatings.roomOwnerId,
+        avgScore: avg(roomRatings.score).as("avg_score"),
+        totalRatings: count(roomRatings.id).as("total_ratings"),
+      })
+      .from(roomRatings)
+      .groupBy(roomRatings.roomOwnerId)
+      .as("rating_agg");
+
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+
+    const [countResult] = await db
+      .select({ total: count(users.id) })
+      .from(users)
+      .innerJoin(userPreferences, eq(users.id, userPreferences.userId))
+      .where(whereClause);
+
+    const total = countResult?.total ?? 0;
+
+    let orderClause;
+    if (sort === "trophies") {
+      orderClause = sql`COALESCE(${trophyCountSq.cnt}, 0) DESC`;
+    } else if (sort === "newest") {
+      orderClause = sql`${users.createdAt} DESC NULLS LAST`;
+    } else {
+      orderClause = sql`COALESCE(${ratingSq.avgScore}, '0') DESC`;
+    }
+
+    const rows = await db
+      .select({
+        userId: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+        theme: userPreferences.theme,
+        createdAt: users.createdAt,
+        avgScore: ratingSq.avgScore,
+        totalRatings: ratingSq.totalRatings,
+        trophyCount: trophyCountSq.cnt,
+      })
+      .from(users)
+      .innerJoin(userPreferences, eq(users.id, userPreferences.userId))
+      .leftJoin(trophyCountSq, eq(users.id, trophyCountSq.userId))
+      .leftJoin(ratingSq, eq(users.id, ratingSq.roomOwnerId))
+      .where(whereClause)
+      .orderBy(orderClause)
+      .limit(limit)
+      .offset(offset);
+
+    const rooms = rows.map(r => ({
+      userId: r.userId,
+      firstName: r.firstName,
+      lastName: r.lastName,
+      profileImageUrl: r.profileImageUrl,
+      theme: r.theme,
+      createdAt: r.createdAt,
+      avgScore: r.avgScore ? parseFloat(r.avgScore as string) : 0,
+      totalRatings: r.totalRatings ?? 0,
+      trophyCount: r.trophyCount ?? 0,
+    }));
+
+    return { rooms, total };
   }
 
   async getPublicTrophies(userId: string): Promise<Trophy[]> {
@@ -203,6 +330,130 @@ export class DatabaseStorage implements IStorage {
     const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
     if (!prefs || prefs.roomVisibility !== "public") return undefined;
     return { user, preferences: prefs };
+  }
+
+  async getSpeciesLeaderboard(options: {
+    species: string;
+    region?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    entries: any[];
+    total: number;
+  }> {
+    const limit = options.limit ?? 20;
+    const offset = options.offset ?? 0;
+
+    const conditions = [
+      eq(trophies.species, options.species),
+      sql`${trophies.score} IS NOT NULL AND TRIM(${trophies.score}) != ''`,
+      eq(userPreferences.roomVisibility, "public"),
+    ];
+
+    if (options.region) {
+      conditions.push(ilike(trophies.location, `%${options.region}%`));
+    }
+
+    const whereClause = and(...conditions);
+
+    const [countResult] = await db
+      .select({ total: count(trophies.id) })
+      .from(trophies)
+      .innerJoin(userPreferences, eq(trophies.userId, userPreferences.userId))
+      .where(whereClause);
+
+    const total = countResult?.total ?? 0;
+
+    const rows = await db
+      .select({
+        trophyId: trophies.id,
+        trophyName: trophies.name,
+        species: trophies.species,
+        score: trophies.score,
+        numericScore: numericScoreExpr,
+        location: trophies.location,
+        imageUrl: trophies.imageUrl,
+        renderImageUrl: trophies.renderImageUrl,
+        date: trophies.date,
+        userId: trophies.userId,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+      })
+      .from(trophies)
+      .innerJoin(users, eq(trophies.userId, users.id))
+      .innerJoin(userPreferences, eq(trophies.userId, userPreferences.userId))
+      .where(whereClause)
+      .orderBy(sql`${numericScoreExpr} DESC NULLS LAST`)
+      .limit(limit)
+      .offset(offset);
+
+    const entries = rows.map((r, i) => ({
+      ...r,
+      numericScore: r.numericScore ?? 0,
+      rank: offset + i + 1,
+    }));
+
+    return { entries, total };
+  }
+
+  async getDistinctSpeciesWithScores(): Promise<string[]> {
+    const rows = await db
+      .selectDistinct({ species: trophies.species })
+      .from(trophies)
+      .innerJoin(userPreferences, eq(trophies.userId, userPreferences.userId))
+      .where(
+        and(
+          sql`${trophies.score} IS NOT NULL AND TRIM(${trophies.score}) != ''`,
+          eq(userPreferences.roomVisibility, "public")
+        )
+      )
+      .orderBy(asc(trophies.species));
+    return rows.map(r => r.species);
+  }
+
+  async getDistinctLocations(): Promise<string[]> {
+    const rows = await db
+      .selectDistinct({ location: trophies.location })
+      .from(trophies)
+      .innerJoin(userPreferences, eq(trophies.userId, userPreferences.userId))
+      .where(
+        and(
+          sql`${trophies.location} IS NOT NULL AND TRIM(${trophies.location}) != ''`,
+          eq(userPreferences.roomVisibility, "public")
+        )
+      )
+      .orderBy(asc(trophies.location));
+    return rows.map(r => r.location!);
+  }
+
+  async getTop10ForSpecies(species: string): Promise<Map<string, { rank: number; badge: "gold" | "silver" | "bronze" | "top10" }>> {
+    const rows = await db
+      .select({
+        trophyId: trophies.id,
+        numericScore: numericScoreExpr,
+      })
+      .from(trophies)
+      .innerJoin(userPreferences, eq(trophies.userId, userPreferences.userId))
+      .where(
+        and(
+          eq(trophies.species, species),
+          sql`${trophies.score} IS NOT NULL AND TRIM(${trophies.score}) != ''`,
+          eq(userPreferences.roomVisibility, "public")
+        )
+      )
+      .orderBy(sql`${numericScoreExpr} DESC NULLS LAST`)
+      .limit(10);
+
+    const result = new Map<string, { rank: number; badge: "gold" | "silver" | "bronze" | "top10" }>();
+    rows.forEach((s, i) => {
+      if (s.numericScore == null) return;
+      const rank = i + 1;
+      const badge = rank === 1 ? "gold" as const : rank === 2 ? "silver" as const : rank === 3 ? "bronze" as const : "top10" as const;
+      result.set(s.trophyId, { rank, badge });
+    });
+
+    return result;
   }
 
   async patchTrophyRenderByImage(imageUrl: string, renderImageUrl: string): Promise<void> {

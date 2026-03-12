@@ -14,6 +14,7 @@ import Placeholder from "@/pages/placeholder";
 import Onboarding from "@/pages/onboarding";
 import Safe from "@/pages/safe";
 import Community from "@/pages/community";
+import PublicRoom from "@/pages/public-room";
 import Profile from "@/pages/profile";
 import TrophyMap from "@/pages/trophy-map";
 import LandingPage from "@/pages/landing";
@@ -66,6 +67,7 @@ function Router() {
         <Route path="/trophies/:id">{() => <AnimatedPage><TrophyDetail /></AnimatedPage>}</Route>
         <Route path="/safe">{() => <AnimatedPage><Safe /></AnimatedPage>}</Route>
         <Route path="/community">{() => <AnimatedPage><Community /></AnimatedPage>}</Route>
+        <Route path="/community/room/:userId">{() => <AnimatedPage><PublicRoom /></AnimatedPage>}</Route>
         <Route path="/profile">{() => <AnimatedPage><Profile /></AnimatedPage>}</Route>
         <Route path="/pro">{() => <AnimatedPage><ProDashboard /></AnimatedPage>}</Route>
         <Route>{() => <AnimatedPage><NotFound /></AnimatedPage>}</Route>

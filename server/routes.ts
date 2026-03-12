@@ -507,17 +507,105 @@ export async function registerRoutes(
   });
 
   // ========== COMMUNITY / ROOM RATINGS ==========
-  app.get("/api/community/rooms", async (_req, res) => {
-    const rooms = await storage.getPublicRooms();
-    res.json(rooms);
+  app.get("/api/community/rooms", async (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+    const search = (req.query.search as string) || undefined;
+    const sort = (req.query.sort as string) || "rating";
+    const validSorts = ["rating", "trophies", "newest"];
+    const result = await storage.getPublicRooms({
+      limit,
+      offset,
+      search,
+      sort: validSorts.includes(sort) ? sort as "rating" | "trophies" | "newest" : "rating",
+    });
+    res.json(result);
+  });
+
+  app.get("/api/community/species", async (_req, res) => {
+    const species = await storage.getDistinctSpeciesWithScores();
+    res.json(species);
+  });
+
+  app.get("/api/community/locations", async (_req, res) => {
+    const locations = await storage.getDistinctLocations();
+    res.json(locations);
+  });
+
+  app.get("/api/community/leaderboard", async (req, res) => {
+    const species = req.query.species as string;
+    if (!species) return res.status(400).json({ message: "species query param required" });
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+    const region = (req.query.region as string) || undefined;
+
+    const result = await storage.getSpeciesLeaderboard({ species, region, limit, offset });
+
+    const top10 = await storage.getTop10ForSpecies(species);
+    const entries = result.entries.map(e => ({
+      ...e,
+      badge: top10.get(e.trophyId) || null,
+    }));
+
+    res.json({ entries, total: result.total });
   });
 
   app.get("/api/community/room/:userId", async (req, res) => {
     const data = await storage.getUserPublic(req.params.userId as string);
     if (!data) return res.status(404).json({ message: "Room not found or is private" });
-    const list = await storage.getPublicTrophies(req.params.userId as string);
+    const rawTrophies = await storage.getPublicTrophies(req.params.userId as string);
     const rating = await storage.getRoomRating(req.params.userId as string);
-    res.json({ ...data, trophies: list, rating });
+
+    const safeTrophies = rawTrophies.map(t => ({
+      id: t.id,
+      species: t.species,
+      name: t.name,
+      date: t.date,
+      location: t.location,
+      score: t.score,
+      gender: t.gender,
+      imageUrl: t.imageUrl,
+      renderImageUrl: t.renderImageUrl,
+      glbUrl: t.glbUrl,
+      glbPreviewUrl: t.glbPreviewUrl,
+      mountType: t.mountType,
+      featured: t.featured,
+      huntNotes: t.huntNotes,
+    }));
+
+    const safeUser = {
+      id: data.user.id,
+      firstName: data.user.firstName,
+      lastName: data.user.lastName,
+      profileImageUrl: data.user.profileImageUrl,
+    };
+
+    const speciesSet = new Set(rawTrophies.map(t => t.species));
+    const badgeMap: Record<string, { rank: number; badge: string } | null> = {};
+    for (const sp of speciesSet) {
+      const top10 = await storage.getTop10ForSpecies(sp);
+      for (const trophy of rawTrophies) {
+        if (trophy.species === sp && top10.has(trophy.id)) {
+          badgeMap[trophy.id] = top10.get(trophy.id)!;
+        }
+      }
+    }
+
+    const trophiesWithBadges = safeTrophies.map(t => ({
+      ...t,
+      badge: badgeMap[t.id] || null,
+    }));
+
+    const safePreferences = {
+      theme: data.preferences?.theme || "lodge",
+    };
+
+    res.json({
+      user: safeUser,
+      preferences: safePreferences,
+      trophies: trophiesWithBadges,
+      rating,
+    });
   });
 
   app.post("/api/community/rate", isAuthenticated, async (req, res) => {
@@ -525,6 +613,8 @@ export async function registerRoutes(
     if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten() });
     const raterId = getUserId(req);
     if (raterId === parsed.data.roomOwnerId) return res.status(400).json({ message: "Cannot rate your own room" });
+    const isPublic = await storage.isRoomPublic(parsed.data.roomOwnerId);
+    if (!isPublic) return res.status(404).json({ message: "Room not found or is private" });
     const result = await storage.rateRoom(raterId, parsed.data);
     res.json(result);
   });
