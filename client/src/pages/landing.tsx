@@ -19,7 +19,6 @@ import {
   Lock,
 } from "lucide-react";
 
-import heroBg from "../assets/hero-bg.png";
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
@@ -182,7 +181,7 @@ export default function LandingPage() {
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden" data-testid="section-hero">
         <div className="absolute inset-0">
           <img
-            src={heroBg}
+            src={themeManor}
             alt="Honor The Hunt"
             className="w-full h-full object-cover"
           />
