@@ -21,7 +21,8 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - **2026-03-09**: All unit toggles and method dropdown also added to trophy-detail edit form
 - **2026-03-09**: `HUNTING_METHODS` constant and `TrophyAnalysis` interface exported from `AddTrophyDialog.tsx`
 - **2026-03-09**: EXIF metadata extraction: photo date & GPS auto-extracted from trophy images using `exifr`, pre-populates date and location fields with "From photo" indicator
-- **2026-03-09**: "Use current location" button: added to LocationSearch component (available on add trophy + edit trophy), requests device GPS, reverse geocodes via Nominatim
+- **2026-03-12**: Google Maps integration restored: replaced Leaflet/OpenStreetMap/Nominatim with Google Maps JavaScript API + Google Places Autocomplete for all maps and location search. Trophy map has terrain/satellite toggle. Maps-config API endpoint serves key securely. Leaflet dependency removed.
+- **2026-03-09**: "Use current location" button: added to LocationSearch component (available on add trophy + edit trophy), requests device GPS, reverse geocodes via Google Maps Geocoder
 - **2026-03-09**: `reverseGeocode()` helper exported from LocationSearch for reuse (EXIF GPS → place name)
 - **2026-03-08**: Dashboard refactored: mobile hero layout fix (shorter 45vh on mobile, responsive text), 6 stat cards in 2x3/3x2 grid (Hunts, Qualifying Trophies, Species, Room Rating, Weapons in Safe, Furthest Shot)
 - **2026-03-08**: Qualifying trophies: compares trophy score vs species threshold from user's scoring system (SCI/RW/B&C) using `parseScoreNumeric()` for fraction support
@@ -79,7 +80,7 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - `/contact` - Contact page with form
 - `/trophies` - Trophy Room (grid view, search/filter, add new)
 - `/trophies/:id` - Trophy Detail (image viewer, hunt details, WhatsApp share, certificate PDF)
-- `/trophies/map` - Map View (interactive Leaflet map with trophy pins)
+- `/trophies/map` - Map View (interactive Google Maps with trophy pins, terrain/satellite toggle)
 - `/safe` - The Safe (weapon management)
 - `/community` - Community (leaderboards, rate rooms)
 - `/profile` - Profile & Settings (theme, about, locations, sharing)
@@ -94,6 +95,7 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - `GET /api/stats`
 - `GET /api/community/rooms`, `GET /api/community/room/:userId`, `POST /api/community/rate`
 - `GET /api/my-room-rating`
+- `GET /api/maps-config` (returns Google Maps API key for authenticated users)
 - Auth: `/api/login`, `/api/logout`, `/api/callback`, `/api/auth/user`
 - Email Auth: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/email-logout`
 - OAuth: `GET /api/auth/google`, `GET /api/auth/apple` (pending credential setup)
