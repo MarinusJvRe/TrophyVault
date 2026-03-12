@@ -150,9 +150,9 @@ const pricingTiers = [
 ];
 
 const showcaseImages = [
-  { src: themeLodge, label: "Classic Lodge", description: "Warm wood and leather ambiance" },
-  { src: themeManor, label: "Safari Manor", description: "African safari luxury" },
-  { src: themeMinimal, label: "Modern Gallery", description: "Clean, contemporary showcase" },
+  { src: themeLodge, label: "Timber Ridge", description: "Rugged timber, warm stone, mountain air." },
+  { src: themeManor, label: "Safari Manor", description: "Thatch, khaki canvas, and luxury leather." },
+  { src: themeMinimal, label: "Alpine Gallery", description: "Concrete, glass, and light." },
 ];
 
 const appScreenshots = [
