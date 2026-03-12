@@ -192,12 +192,12 @@ export default function LandingPage() {
           <img
             src={themeLodge}
             alt="Honor The Hunt"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-[center_35%]"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#111]/80 via-[#111]/70 to-[#111]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#111]/70 via-[#111]/50 to-[#111]" />
         </div>
 
-        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center py-20">
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center pt-40 pb-20">
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
