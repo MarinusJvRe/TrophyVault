@@ -177,7 +177,6 @@ export default function LandingPage() {
           <span className="font-bold">Coming Soon</span> — Honor The Hunt is launching soon. Be the first to know!
         </p>
       </div>
-
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden" data-testid="section-hero">
         <div className="absolute inset-0">
           <img
@@ -194,7 +193,7 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#b87333]/10 border border-[#b87333]/20 mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#b87333]/20 mb-8 font-medium bg-[#b873331a]">
               <Crosshair className="h-3.5 w-3.5 text-[#b87333]" />
               <span className="text-xs text-[#b87333] font-medium tracking-wider uppercase">Your Digital Trophy Room</span>
             </div>
@@ -281,7 +280,6 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </section>
-
       <section className="py-16 px-4 sm:px-6 bg-[#111]" data-testid="section-features-summary">
         <div className="max-w-4xl mx-auto">
           <motion.div
@@ -323,7 +321,6 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </section>
-
       <section className="py-24 px-4 sm:px-6 bg-[#0a0a0a]" data-testid="section-app-preview">
         <div className="max-w-7xl mx-auto">
           <motion.div
@@ -373,7 +370,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
       <section id="feature-details" className="py-24 px-4 sm:px-6 bg-[#111]" data-testid="section-feature-details">
         <div className="max-w-7xl mx-auto">
           <motion.div
@@ -415,7 +411,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
       <section className="py-24 px-4 sm:px-6 bg-[#0d0d0d]" data-testid="section-showcase">
         <div className="max-w-7xl mx-auto">
           <motion.div
@@ -464,7 +459,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
       <section className="py-24 px-4 sm:px-6 bg-[#111]" data-testid="section-cross-device">
         <div className="max-w-5xl mx-auto">
           <motion.div
@@ -497,7 +491,6 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </section>
-
       <section className="py-24 px-4 sm:px-6 bg-[#0d0d0d]" data-testid="section-social-proof">
         <div className="max-w-5xl mx-auto">
           <motion.div
@@ -531,7 +524,6 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </section>
-
       <section className="py-24 px-4 sm:px-6 bg-[#111]" data-testid="section-pricing-summary">
         <div className="max-w-7xl mx-auto">
           <motion.div
@@ -611,7 +603,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
       <section className="py-24 px-4 sm:px-6 bg-[#0d0d0d]" data-testid="section-final-cta">
         <div className="max-w-3xl mx-auto text-center">
           <motion.div
