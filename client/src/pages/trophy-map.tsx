@@ -10,33 +10,36 @@ import type { Trophy } from "@shared/schema";
 
 function buildPopupContent(trophy: Trophy, navigate: (path: string) => void): HTMLDivElement {
   const container = document.createElement("div");
-  container.style.cssText = "min-width:160px;font-family:system-ui,sans-serif;";
+  container.style.cssText = "display:flex;gap:8px;align-items:flex-start;min-width:180px;font-family:system-ui,sans-serif;";
 
   if (trophy.imageUrl) {
     const img = document.createElement("img");
     img.src = trophy.imageUrl;
     img.alt = trophy.species;
-    img.style.cssText = "width:100%;height:80px;object-fit:cover;border-radius:4px;margin-bottom:6px;";
+    img.style.cssText = "width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;";
     container.appendChild(img);
   }
+
+  const info = document.createElement("div");
+  info.style.cssText = "flex:1;min-width:0;";
 
   const speciesEl = document.createElement("div");
   speciesEl.style.cssText = "font-weight:600;font-size:13px;color:#1a1a1a;";
   speciesEl.textContent = trophy.species;
-  container.appendChild(speciesEl);
+  info.appendChild(speciesEl);
 
   if (trophy.name) {
     const nameEl = document.createElement("div");
     nameEl.style.cssText = "font-size:11px;color:#666;margin-top:2px;";
     nameEl.textContent = trophy.name;
-    container.appendChild(nameEl);
+    info.appendChild(nameEl);
   }
 
   if (trophy.location) {
     const locEl = document.createElement("div");
     locEl.style.cssText = "font-size:11px;color:#888;margin-top:2px;";
     locEl.textContent = trophy.location;
-    container.appendChild(locEl);
+    info.appendChild(locEl);
   }
 
   if (trophy.date) {
@@ -44,14 +47,14 @@ function buildPopupContent(trophy: Trophy, navigate: (path: string) => void): HT
     const dateEl = document.createElement("div");
     dateEl.style.cssText = "font-size:11px;color:#888;margin-top:2px;";
     dateEl.textContent = dateStr;
-    container.appendChild(dateEl);
+    info.appendChild(dateEl);
   }
 
   if (trophy.score) {
     const scoreEl = document.createElement("div");
     scoreEl.style.cssText = "font-size:11px;color:#b87333;font-weight:600;margin-top:4px;";
     scoreEl.textContent = `Score: ${trophy.score}`;
-    container.appendChild(scoreEl);
+    info.appendChild(scoreEl);
   }
 
   const link = document.createElement("a");
@@ -62,7 +65,9 @@ function buildPopupContent(trophy: Trophy, navigate: (path: string) => void): HT
     e.preventDefault();
     navigate(`/trophies/${trophy.id}`);
   });
-  container.appendChild(link);
+  info.appendChild(link);
+
+  container.appendChild(info);
 
   return container;
 }
