@@ -192,7 +192,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-          >
+            className="font-semibold">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#b87333]/20 mb-8 bg-[#b873331a] font-semibold">
               <Crosshair className="h-3.5 w-3.5 text-[#b87333]" />
               <span className="text-xs text-[#b87333] font-medium tracking-wider uppercase">Your Digital Trophy Room</span>
