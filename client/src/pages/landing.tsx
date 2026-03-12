@@ -181,7 +181,7 @@ export default function LandingPage() {
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden" data-testid="section-hero">
         <div className="absolute inset-0">
           <img
-            src={themeManor}
+            src={themeLodge}
             alt="Honor The Hunt"
             className="w-full h-full object-cover"
           />
