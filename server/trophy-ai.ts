@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { getThreshold, findClosestSpecies, parseScoreNumeric } from "@shared/scoring-thresholds";
+import { getThreshold, parseScoreNumeric } from "@shared/scoring-thresholds";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -116,14 +116,11 @@ export function calculateTrophyVaultScore(analysis: TrophyAnalysis): number {
     const estimatedLength = low != null && high != null ? (low + high) / 2 : null;
 
     if (estimatedLength != null) {
-      const threshold = findClosestSpecies(analysis.species.common_name);
-      if (threshold) {
-        const sci = threshold.sci;
-        const rw = threshold.rowlandWard;
-        const thresholdVal = parseScoreNumeric(sci || "") || parseScoreNumeric(rw || "");
-        if (thresholdVal && thresholdVal > 0) {
-          thresholdRatio = Math.min(estimatedLength / thresholdVal, 1.5);
-        }
+      const scoringSystem = analysis.trophy_qualification?.scoring_system || "SCI";
+      const systemThreshold = getThreshold(analysis.species.common_name, scoringSystem);
+      const thresholdVal = systemThreshold ? parseScoreNumeric(systemThreshold) : null;
+      if (thresholdVal && thresholdVal > 0) {
+        thresholdRatio = Math.min(estimatedLength / thresholdVal, 1.5);
       }
     }
   }

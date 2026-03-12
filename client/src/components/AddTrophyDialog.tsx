@@ -42,7 +42,6 @@ export interface TrophyAnalysis {
   gender: {
     estimated: "male" | "female" | "unknown";
     confidence: number;
-    indicators?: string;
   };
   photo_quality: {
     score: number;
@@ -51,7 +50,6 @@ export interface TrophyAnalysis {
   };
   mount_recommendation: {
     best: string;
-    reason?: string;
   };
   horn_details: {
     has_horns: boolean;
@@ -72,7 +70,6 @@ export interface TrophyAnalysis {
     notes: string | null;
   };
   trophy_vault_score: number;
-  render_prompt?: string;
 }
 
 export const HUNTING_METHODS = [
