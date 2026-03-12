@@ -185,7 +185,7 @@ export default function LandingPage() {
             alt="Honor The Hunt"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#111]/70 via-[#111]/50 to-[#111]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#111]/80 via-[#111]/70 to-[#111]" />
         </div>
 
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center py-20">
