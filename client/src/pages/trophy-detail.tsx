@@ -36,7 +36,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import type { Trophy, Weapon, ProProfile } from "@shared/schema";
-import { findClosestSpecies } from "@shared/scoring-thresholds";
+import { findClosestSpecies, getThreshold } from "@shared/scoring-thresholds";
 import { HUNTING_METHODS } from "@/components/AddTrophyDialog";
 import TrophyARViewer from "@/components/TrophyARViewer";
 import { useTheme } from "@/lib/theme-context";
@@ -405,6 +405,9 @@ function ViewMode({
   onViewAR: () => void;
 }) {
   const speciesThresholds = findClosestSpecies(trophy.species);
+  const { data: prefs } = useQuery({ queryKey: ["/api/preferences"] });
+  const userScoringSystem = (prefs as any)?.scoringSystem || "SCI";
+  const userMinScore = speciesThresholds ? getThreshold(trophy.species, userScoringSystem) : null;
 
   return (
     <motion.div
@@ -496,6 +499,12 @@ function ViewMode({
               <span className="font-mono text-primary font-semibold" data-testid="text-tv-score">
                 {trophy.score}
               </span>
+            </div>
+          )}
+          {userMinScore && userMinScore !== "n/a" && (
+            <div className="flex justify-between items-center text-sm" data-testid="text-min-qualifying-score">
+              <span className="text-muted-foreground">Min. Qualifying Score ({userScoringSystem})</span>
+              <span className="font-mono font-semibold">{userMinScore}</span>
             </div>
           )}
           
