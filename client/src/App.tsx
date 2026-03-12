@@ -83,6 +83,7 @@ function AuthPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,6 +122,7 @@ function AuthPage() {
         sessionStorage.setItem("isNewUser", "true");
         queryClient.setQueryData(["/api/auth/user"], userData);
         toast({ title: "Account created", description: "Welcome to Honor The Hunt!" });
+        setLocation("/");
       } else {
         const res = await fetch("/api/auth/login", {
           method: "POST",
@@ -139,6 +141,7 @@ function AuthPage() {
         const userData = await res.json();
         if (userData.authToken) setAuthToken(userData.authToken);
         queryClient.setQueryData(["/api/auth/user"], userData);
+        setLocation("/");
       }
     } catch {
       setError("Something went wrong. Please try again.");
