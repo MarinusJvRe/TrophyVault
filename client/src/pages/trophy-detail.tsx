@@ -407,7 +407,7 @@ function ViewMode({
   const speciesThresholds = findClosestSpecies(trophy.species);
   const { data: prefs } = useQuery({ queryKey: ["/api/preferences"] });
   const userScoringSystem = (prefs as any)?.scoringSystem || "SCI";
-  const userMinScore = speciesThresholds ? getThreshold(trophy.species, userScoringSystem) : null;
+  const userMinScore = speciesThresholds ? getThreshold(speciesThresholds.species, userScoringSystem) : null;
 
   return (
     <motion.div

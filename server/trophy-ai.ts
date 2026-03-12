@@ -111,16 +111,17 @@ export function calculateTrophyVaultScore(analysis: TrophyAnalysis): number {
 
   let thresholdRatio = 0.5;
   if (analysis.horn_details?.has_horns && analysis.species?.common_name) {
-    const low = analysis.horn_details.length_range_low;
-    const high = analysis.horn_details.length_range_high;
-    const estimatedLength = low != null && high != null ? (low + high) / 2 : null;
+    const estimatedInches = analysis.horn_details.estimated_length_inches
+      ?? (analysis.horn_details.estimated_length_cm != null
+        ? analysis.horn_details.estimated_length_cm / 2.54
+        : null);
 
-    if (estimatedLength != null) {
+    if (estimatedInches != null) {
       const scoringSystem = analysis.trophy_qualification?.scoring_system || "SCI";
       const systemThreshold = getThreshold(analysis.species.common_name, scoringSystem);
       const thresholdVal = systemThreshold ? parseScoreNumeric(systemThreshold) : null;
       if (thresholdVal && thresholdVal > 0) {
-        thresholdRatio = Math.min(estimatedLength / thresholdVal, 1.5);
+        thresholdRatio = Math.min(estimatedInches / thresholdVal, 1.5);
       }
     }
   }
