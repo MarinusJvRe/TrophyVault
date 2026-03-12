@@ -215,7 +215,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-lg sm:text-xl text-white/70 max-w-2xl mx-auto mb-10 font-light leading-relaxed"
+            className="text-lg sm:text-xl text-white/70 max-w-2xl mx-auto mb-10 leading-relaxed font-normal"
             data-testid="text-hero-subheadline"
           >
             Take your trophies home in your pocket and share it with fellow hunters. AI-powered trophy identification, 3D models, and a stunning virtual trophy room — all in one app.
