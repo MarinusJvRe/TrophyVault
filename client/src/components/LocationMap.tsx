@@ -10,8 +10,10 @@ interface LocationMapProps {
 }
 
 const MAP_TYPES = [
+  { label: "Road", value: "roadmap" },
   { label: "Terrain", value: "terrain" },
   { label: "Satellite", value: "satellite" },
+  { label: "Hybrid", value: "hybrid" },
 ] as const;
 
 export function LocationMap({

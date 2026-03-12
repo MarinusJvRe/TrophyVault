@@ -134,7 +134,13 @@ export default function TrophyMap() {
       });
 
       marker.addListener("click", () => {
-        navigate(`/trophies/${trophy.id}`);
+        if (openInfoWindow === infoWindow) {
+          navigate(`/trophies/${trophy.id}`);
+        } else {
+          if (openInfoWindow) openInfoWindow.close();
+          infoWindow.open({ anchor: marker, map });
+          openInfoWindow = infoWindow;
+        }
       });
 
       bounds.extend(position);
@@ -187,8 +193,10 @@ export default function TrophyMap() {
             </div>
             <div className="flex rounded-md border border-border/50 overflow-hidden" data-testid="map-type-toggle">
               {([
+                { label: "Road", value: "roadmap" },
                 { label: "Terrain", value: "terrain" },
                 { label: "Satellite", value: "satellite" },
+                { label: "Hybrid", value: "hybrid" },
               ] as const).map((opt) => (
                 <button
                   key={opt.value}
