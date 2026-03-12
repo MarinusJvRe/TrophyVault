@@ -1,0 +1,30 @@
+#2 - Google Maps Integration Upgrade
+What & Why
+Replace the current OpenStreetMap/Nominatim-based map and location search with Google Maps JavaScript API (for map tiles and display) and Google Places API (for location search/autocomplete). The current Nominatim geocoding only finds large cities and towns, making it impossible for users to search for specific game farms, ranches, and lodges — which is the primary use case for this hunting/wildlife community app.
+
+Done looks like
+All maps in the app render using Google Maps with satellite/terrain/hybrid view toggle
+Location search uses Google Places Autocomplete and returns specific places like game farms, ranches, lodges, and camps — not just cities
+Trophy map page shows all trophies plotted on Google Maps with the same popup/marker functionality as today
+Location detail maps (trophy detail page) use Google Maps
+The Add Trophy and Edit Trophy forms use Google Places autocomplete for location input
+The Google Maps API key is stored as an environment secret and passed to the frontend safely
+Leaflet dependency can be removed after migration
+Out of scope
+Street View integration
+Directions/routing
+Custom map styling beyond the default Google Maps look
+Changes to any non-map functionality
+Tasks
+Add the Google Maps API key as an environment secret and create a backend endpoint to serve it to the frontend (so the key isn't hardcoded in client code).
+Replace the LocationSearch component — swap Nominatim search with Google Places Autocomplete, keeping the same component interface (value, onChange with location name + lat/lng).
+Replace the LocationMap component — swap Leaflet with a Google Maps embed using the Maps JavaScript API, supporting the same props (lat, lng, location name, height).
+Replace the TrophyMap page — swap Leaflet with Google Maps JavaScript API, preserving custom markers, popups with trophy details/images, auto-fit bounds, and click-to-navigate behavior. Add a map type toggle (road/satellite/terrain).
+Update the trophy detail page to work with the new Google Maps components.
+Remove the Leaflet package dependency.
+Relevant files
+client/src/components/LocationSearch.tsx
+client/src/components/LocationMap.tsx
+client/src/pages/trophy-map.tsx
+client/src/pages/trophy-detail.tsx
+client/src/components/AddTrophyDialog.tsx
