@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerEmailAuthRoutes } from "./auth";
 import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema, insertProProfileSchema, TIER_LIMITS, AI_COSTS, type AccountTier } from "@shared/schema";
-import { analyzeTrophyImage, generateTrophyRender } from "./trophy-ai";
+import { analyzeTrophyImage, generateTrophyRender, buildRenderPrompt } from "./trophy-ai";
 import { generate3DModel } from "./trophy-3d";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { uploadBufferToStorage, uploadFileToStorage } from "./object-storage-helper";
@@ -311,19 +311,11 @@ export async function registerRoutes(
 
       res.json({ imageUrl, renderImageUrl: null, analysis, units, scoringSystem });
 
-      if (analysis.render_prompt) {
+      if (analysis.animal_detected) {
         const renderCheck = await checkTierLimit(userId, "ai_render");
         if (renderCheck.allowed) {
           const theme = prefs?.theme || "lodge";
-          const themeBackgrounds: Record<string, string> = {
-            lodge: "mounted on a dark rustic wooden plaque, warm cabin lighting, dark wood-paneled wall background",
-            manor: "mounted on a rich mahogany plaque, warm golden ambient lighting, dark safari-themed wall background with warm earth tones",
-            minimal: "mounted on a clean light oak plaque, bright studio lighting, clean white wall background",
-          };
-          const themedPrompt = analysis.render_prompt.replace(
-            /dark wooden plaque.*$/i,
-            themeBackgrounds[theme] || themeBackgrounds.lodge
-          );
+          const themedPrompt = buildRenderPrompt(analysis, theme);
           pendingRenders.set(imageUrl, { status: "pending", renderImageUrl: null });
           console.log(`[render] Started background render for ${imageUrl} (theme: ${theme})`);
           generateTrophyRender(themedPrompt)

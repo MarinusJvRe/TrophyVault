@@ -42,7 +42,7 @@ export interface TrophyAnalysis {
   gender: {
     estimated: "male" | "female" | "unknown";
     confidence: number;
-    indicators: string;
+    indicators?: string;
   };
   photo_quality: {
     score: number;
@@ -51,7 +51,7 @@ export interface TrophyAnalysis {
   };
   mount_recommendation: {
     best: string;
-    reason: string;
+    reason?: string;
   };
   horn_details: {
     has_horns: boolean;
@@ -61,6 +61,7 @@ export interface TrophyAnalysis {
     length_range_low: number | null;
     length_range_high: number | null;
     notable_features: string | null;
+    coloring: string | null;
   };
   trophy_qualification: {
     scoring_system: string;
@@ -71,7 +72,7 @@ export interface TrophyAnalysis {
     notes: string | null;
   };
   trophy_vault_score: number;
-  render_prompt: string;
+  render_prompt?: string;
 }
 
 export const HUNTING_METHODS = [
@@ -943,6 +944,28 @@ function FormStep({
               )}
             </div>
             <p className="text-xs text-muted-foreground italic truncate">{analysis.species.scientific_name}</p>
+          </div>
+        </div>
+      )}
+
+      {analysis?.trophy_qualification && (
+        <div className="flex items-center gap-3 mb-4 p-2 bg-card border border-border/40 rounded-lg text-xs" data-testid="trophy-qualification-summary">
+          <div className="flex items-center gap-2 flex-wrap">
+            {analysis.trophy_qualification.likely_qualifies != null && (
+              <span className={`px-2 py-0.5 rounded-full font-medium ${analysis.trophy_qualification.likely_qualifies ? "bg-green-500/10 text-green-500" : "bg-yellow-500/10 text-yellow-500"}`} data-testid="text-qualification-status">
+                {analysis.trophy_qualification.likely_qualifies ? "Likely Qualifies" : "May Not Qualify"}
+              </span>
+            )}
+            {analysis.trophy_qualification.confidence > 0 && (
+              <span className="text-muted-foreground" data-testid="text-qualification-confidence">
+                {Math.round(analysis.trophy_qualification.confidence * 100)}% confidence
+              </span>
+            )}
+            {analysis.trophy_qualification.minimum_qualifying_score && (
+              <span className="text-muted-foreground" data-testid="text-qualification-minimum">
+                Min: {analysis.trophy_qualification.minimum_qualifying_score} ({analysis.trophy_qualification.scoring_system})
+              </span>
+            )}
           </div>
         </div>
       )}

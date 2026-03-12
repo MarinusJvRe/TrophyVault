@@ -1,12 +1,12 @@
 import OpenAI from "openai";
-import { getThreshold, findClosestSpecies } from "@shared/scoring-thresholds";
+import { getThreshold, findClosestSpecies, parseScoreNumeric } from "@shared/scoring-thresholds";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-const SYSTEM_PROMPT = `You are TrophyVault's trophy photo analyzer. Return ONLY valid JSON. No markdown, no code fences.`;
+const SYSTEM_PROMPT = `You are TrophyVault's trophy photo analyzer. Return ONLY valid JSON. No markdown, no code fences. Use your species knowledge to assess trophy qualification accurately.`;
 
 function buildUserPrompt(units: string, scoringSystem: string): string {
   const unitLabel = units === "metric" ? "cm" : "inches";
@@ -24,8 +24,7 @@ JSON schema:
   },
   "gender": {
     "estimated": "male"|"female"|"unknown",
-    "confidence": number (0-1),
-    "indicators": string
+    "confidence": number (0-1)
   },
   "photo_quality": {
     "score": number (1-10),
@@ -33,8 +32,7 @@ JSON schema:
     "suitable_for_3d": boolean
   },
   "mount_recommendation": {
-    "best": "shoulder"|"horns"|"full_body",
-    "reason": string
+    "best": "shoulder"|"horns"|"full_body"
   },
   "horn_details": {
     "has_horns": boolean,
@@ -43,18 +41,16 @@ JSON schema:
     "estimated_length_cm": number|null,
     "length_range_low": number|null (in ${unitLabel}),
     "length_range_high": number|null (in ${unitLabel}),
-    "notable_features": string|null
+    "notable_features": string|null,
+    "coloring": string|null
   },
   "trophy_qualification": {
     "scoring_system": "${scoringSystem}",
-    "minimum_qualifying_score": string|null,
     "estimated_score": string|null,
     "likely_qualifies": boolean|null,
     "confidence": number (0-1),
     "notes": string|null
-  },
-  "trophy_vault_score": number (1-10, overall impressiveness),
-  "render_prompt": string (DALL-E prompt for photorealistic 3D taxidermy shoulder mount render of this animal, include species details, horn/antler description, coloring, dark wooden plaque, studio lighting, isolated on transparent background)
+  }
 }`;
 }
 
@@ -69,7 +65,6 @@ export interface TrophyAnalysis {
   gender: {
     estimated: "male" | "female" | "unknown";
     confidence: number;
-    indicators: string;
   };
   photo_quality: {
     score: number;
@@ -78,7 +73,6 @@ export interface TrophyAnalysis {
   };
   mount_recommendation: {
     best: string;
-    reason: string;
   };
   horn_details: {
     has_horns: boolean;
@@ -88,6 +82,7 @@ export interface TrophyAnalysis {
     length_range_low: number | null;
     length_range_high: number | null;
     notable_features: string | null;
+    coloring: string | null;
   };
   trophy_qualification: {
     scoring_system: string;
@@ -98,7 +93,77 @@ export interface TrophyAnalysis {
     notes: string | null;
   };
   trophy_vault_score: number;
-  render_prompt: string;
+}
+
+const CATEGORY_WEIGHTS: Record<string, number> = {
+  buffalo: 1.3,
+  big_cat: 1.3,
+  deer: 1.1,
+  antelope: 1.0,
+  pig: 0.9,
+  bird: 0.7,
+  fish: 0.7,
+  other: 0.8,
+};
+
+export function calculateTrophyVaultScore(analysis: TrophyAnalysis): number {
+  const categoryWeight = CATEGORY_WEIGHTS[analysis.species?.category] || 1.0;
+
+  let thresholdRatio = 0.5;
+  if (analysis.horn_details?.has_horns && analysis.species?.common_name) {
+    const low = analysis.horn_details.length_range_low;
+    const high = analysis.horn_details.length_range_high;
+    const estimatedLength = low != null && high != null ? (low + high) / 2 : null;
+
+    if (estimatedLength != null) {
+      const threshold = findClosestSpecies(analysis.species.common_name);
+      if (threshold) {
+        const sci = threshold.sci;
+        const rw = threshold.rowlandWard;
+        const thresholdVal = parseScoreNumeric(sci || "") || parseScoreNumeric(rw || "");
+        if (thresholdVal && thresholdVal > 0) {
+          thresholdRatio = Math.min(estimatedLength / thresholdVal, 1.5);
+        }
+      }
+    }
+  }
+
+  const photoQuality = (analysis.photo_quality?.score || 5) / 10;
+  const qualifiesBonus = analysis.trophy_qualification?.likely_qualifies ? 1.5 : 0;
+
+  const rawScore = (thresholdRatio * 4 + photoQuality * 2 + qualifiesBonus + categoryWeight) * 1.1;
+  return Math.max(1, Math.min(10, Math.round(rawScore * 10) / 10));
+}
+
+export function buildRenderPrompt(analysis: TrophyAnalysis, theme: string): string {
+  const species = analysis.species?.common_name || "trophy animal";
+  const gender = analysis.gender?.estimated || "unknown";
+  const hornType = analysis.horn_details?.horn_type || "";
+  const hornLength = analysis.horn_details?.estimated_length_inches
+    ? `approximately ${analysis.horn_details.estimated_length_inches} inches`
+    : "";
+  const features = analysis.horn_details?.notable_features || "";
+  const coloring = analysis.horn_details?.coloring || "";
+
+  const themeBackgrounds: Record<string, string> = {
+    lodge: "mounted on a dark rustic wooden plaque, warm cabin lighting, dark wood-paneled wall background",
+    manor: "mounted on a rich mahogany plaque, warm golden ambient lighting, dark safari-themed wall background with warm earth tones",
+    minimal: "mounted on a clean light oak plaque, bright studio lighting, clean white wall background",
+  };
+
+  const bg = themeBackgrounds[theme] || themeBackgrounds.lodge;
+
+  const parts = [
+    `Photorealistic 3D taxidermy shoulder mount render of a ${gender} ${species}`,
+    hornType ? `with ${hornType} horns` : "",
+    hornLength ? `(${hornLength})` : "",
+    coloring ? `, ${coloring} coloring` : "",
+    features ? `, ${features}` : "",
+    `, ${bg}`,
+    ", studio lighting, isolated on transparent background",
+  ];
+
+  return parts.filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
 }
 
 export async function analyzeTrophyImage(
@@ -121,7 +186,7 @@ export async function analyzeTrophyImage(
             type: "image_url",
             image_url: {
               url: `data:${mimeType};base64,${base64Image}`,
-              detail: "high",
+              detail: "auto",
             },
           },
         ],
@@ -155,6 +220,8 @@ export async function analyzeTrophyImage(
       parsed.trophy_qualification.minimum_qualifying_score = officialThreshold;
     }
   }
+
+  parsed.trophy_vault_score = calculateTrophyVaultScore(parsed);
 
   return parsed;
 }
