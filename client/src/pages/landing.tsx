@@ -228,7 +228,7 @@ export default function LandingPage() {
             transition={{ duration: 0.8, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Link href="/login">
+            <Link href="/login?mode=signup">
               <span
                 className="px-8 py-3.5 bg-[#b87333] hover:bg-[#a0622d] text-white font-medium rounded-lg text-base transition-colors flex items-center gap-2 shadow-lg shadow-[#b87333]/20 cursor-pointer"
                 data-testid="button-hero-cta"
@@ -586,7 +586,7 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/login">
+                <Link href="/login?mode=signup">
                   <span
                     className={`block text-center py-2.5 rounded-lg font-medium text-sm transition-colors cursor-pointer ${
                       tier.highlighted
@@ -629,7 +629,7 @@ export default function LandingPage() {
               Join thousands of hunters who trust Honor The Hunt to document, protect, and share their greatest achievements.
             </motion.p>
             <motion.div variants={fadeUp} custom={3}>
-              <Link href="/login">
+              <Link href="/login?mode=signup">
                 <span
                   className="inline-flex items-center gap-2 px-8 py-3.5 bg-[#b87333] hover:bg-[#a0622d] text-white font-medium rounded-lg text-base transition-colors shadow-lg shadow-[#b87333]/20 cursor-pointer"
                   data-testid="button-final-cta"

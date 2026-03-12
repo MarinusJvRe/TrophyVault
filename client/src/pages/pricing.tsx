@@ -216,7 +216,7 @@ export default function PricingPage() {
                 ))}
               </ul>
 
-              <Link href="/login">
+              <Link href="/login?mode=signup">
                 <span
                   className={`block text-center py-3 rounded-lg font-medium transition-colors cursor-pointer ${
                     tier.highlighted
@@ -311,7 +311,7 @@ export default function PricingPage() {
                     tier.highlighted ? "bg-[#b87333]/5" : ""
                   }`}
                 >
-                  <Link href="/login">
+                  <Link href="/login?mode=signup">
                     <span
                       className={`px-6 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                         tier.highlighted
@@ -373,7 +373,7 @@ export default function PricingPage() {
         <p className="text-white/60 max-w-xl mx-auto mb-8">
           Begin with a free account and upgrade anytime. No credit card required.
         </p>
-        <Link href="/login">
+        <Link href="/login?mode=signup">
           <span
             className="inline-flex items-center gap-2 px-8 py-3.5 bg-[#b87333] hover:bg-[#a0622d] text-white font-medium rounded-lg transition-colors cursor-pointer"
             data-testid="button-pricing-bottom-cta"
