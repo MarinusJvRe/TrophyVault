@@ -3,7 +3,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MapPin, X, Loader2, Navigation } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useGoogleMaps, waitForGoogleMaps } from "@/hooks/use-google-maps";
+
+interface LocationResult {
+  display_name: string;
+  lat: string;
+  lon: string;
+  type: string;
+}
 
 interface LocationSearchProps {
   value: string;
@@ -13,33 +19,22 @@ interface LocationSearchProps {
   placeholder?: string;
 }
 
-export async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  if (!window.google?.maps) {
-    await waitForGoogleMaps();
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`,
+    { headers: { "Accept-Language": "en" } }
+  );
+  if (!response.ok) {
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   }
-  if (window.google?.maps) {
-    try {
-      const geocoder = new google.maps.Geocoder();
-      const result = await geocoder.geocode({ location: { lat, lng } });
-      if (result.results?.[0]) {
-        return formatGoogleAddress(result.results[0]);
-      }
-    } catch {}
+  const data = await response.json();
+  if (data.display_name) {
+    return formatLocationName(data.display_name);
   }
   return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 }
 
-function formatGoogleAddress(result: google.maps.GeocoderResult): string {
-  const components = result.address_components || [];
-  const get = (type: string) => components.find((c) => c.types.includes(type))?.long_name;
-
-  const locality = get("locality") || get("sublocality") || get("administrative_area_level_2");
-  const area = get("administrative_area_level_1");
-  const country = get("country");
-
-  const parts = [locality, area, country].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : result.formatted_address || "";
-}
+export { reverseGeocode };
 
 export function LocationSearch({
   value,
@@ -49,30 +44,17 @@ export function LocationSearch({
   placeholder = "Search for a location...",
 }: LocationSearchProps) {
   const [query, setQuery] = useState(value || "");
-  const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
+  const [results, setResults] = useState<LocationResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
-  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
-  const hiddenDivRef = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
-  const { ready: mapsReady } = useGoogleMaps();
 
   useEffect(() => {
     setQuery(value || "");
   }, [value]);
-
-  useEffect(() => {
-    if (!mapsReady) return;
-    autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
-    if (!hiddenDivRef.current) {
-      hiddenDivRef.current = document.createElement("div");
-    }
-    placesServiceRef.current = new google.maps.places.PlacesService(hiddenDivRef.current);
-  }, [mapsReady]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -81,39 +63,27 @@ export function LocationSearch({
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const searchLocations = useCallback(async (searchQuery: string) => {
-    if (searchQuery.length < 3 || !autocompleteServiceRef.current) {
-      setPredictions([]);
+    if (searchQuery.length < 3) {
+      setResults([]);
       return;
     }
 
     setIsSearching(true);
     try {
-      const result = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve) => {
-        autocompleteServiceRef.current!.getPlacePredictions(
-          {
-            input: searchQuery,
-            types: [],
-          },
-          (preds, status) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && preds) {
-              resolve(preds);
-            } else {
-              resolve([]);
-            }
-          }
-        );
-      });
-      setPredictions(result);
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&addressdetails=1`,
+        { headers: { "Accept-Language": "en" } }
+      );
+      const data: LocationResult[] = await response.json();
+      setResults(data);
       setShowResults(true);
-    } catch {
-      setPredictions([]);
+    } catch (error) {
+      console.error("Location search failed:", error);
+      setResults([]);
     } finally {
       setIsSearching(false);
     }
@@ -125,33 +95,20 @@ export function LocationSearch({
     onChange(val, null, null);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => searchLocations(val), 300);
+    debounceRef.current = setTimeout(() => searchLocations(val), 400);
   };
 
-  const selectPrediction = (prediction: google.maps.places.AutocompletePrediction) => {
-    if (!placesServiceRef.current) return;
-
-    placesServiceRef.current.getDetails(
-      { placeId: prediction.place_id, fields: ["geometry", "name", "formatted_address"] },
-      (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          const name = prediction.structured_formatting?.main_text || place.name || prediction.description;
-          const fullName = prediction.description;
-          const shortName = name.length > 60 ? name.substring(0, 57) + "..." : fullName;
-          setQuery(shortName);
-          setShowResults(false);
-          setPredictions([]);
-          onChange(shortName, lat, lng);
-        }
-      }
-    );
+  const selectLocation = (result: LocationResult) => {
+    const shortName = formatLocationName(result.display_name);
+    setQuery(shortName);
+    setShowResults(false);
+    setResults([]);
+    onChange(shortName, parseFloat(result.lat), parseFloat(result.lon));
   };
 
   const clearLocation = () => {
     setQuery("");
-    setPredictions([]);
+    setResults([]);
     setShowResults(false);
     onChange("", null, null);
   };
@@ -201,7 +158,7 @@ export function LocationSearch({
         <Input
           value={query}
           onChange={handleInputChange}
-          onFocus={() => predictions.length > 0 && setShowResults(true)}
+          onFocus={() => results.length > 0 && setShowResults(true)}
           placeholder={placeholder}
           className="pl-8 pr-8"
           data-testid="input-location-search"
@@ -237,21 +194,18 @@ export function LocationSearch({
         {isGettingLocation ? "Getting location..." : "Use current location"}
       </Button>
 
-      {showResults && predictions.length > 0 && (
+      {showResults && results.length > 0 && (
         <div className="absolute z-50 mt-1 w-full bg-card border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
-          {predictions.map((prediction, i) => (
+          {results.map((result, i) => (
             <button
-              key={prediction.place_id}
+              key={i}
               type="button"
-              onClick={() => selectPrediction(prediction)}
+              onClick={() => selectLocation(result)}
               className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 transition-colors border-b border-border/30 last:border-0 flex items-start gap-2"
               data-testid={`location-result-${i}`}
             >
               <MapPin className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
-              <div className="min-w-0">
-                <div className="text-foreground font-medium text-xs">{prediction.structured_formatting?.main_text}</div>
-                <div className="text-muted-foreground text-xs truncate">{prediction.structured_formatting?.secondary_text}</div>
-              </div>
+              <span className="text-foreground line-clamp-2">{result.display_name}</span>
             </button>
           ))}
         </div>
@@ -265,4 +219,10 @@ export function LocationSearch({
       )}
     </div>
   );
+}
+
+function formatLocationName(fullName: string): string {
+  const parts = fullName.split(", ");
+  if (parts.length <= 3) return fullName;
+  return parts.slice(0, 3).join(", ");
 }

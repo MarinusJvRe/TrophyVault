@@ -27,7 +27,6 @@ import ReactCrop, { type Crop as CropType, centerCrop, makeAspectCrop } from "re
 import "react-image-crop/dist/ReactCrop.css";
 import type { Weapon } from "@shared/schema";
 import { LocationSearch, reverseGeocode } from "@/components/LocationSearch";
-import { useGoogleMaps } from "@/hooks/use-google-maps";
 import { findClosestSpecies } from "@shared/scoring-thresholds";
 import exifr from "exifr";
 
@@ -163,7 +162,6 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const cropImageRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  useGoogleMaps();
 
   const { data: weapons = [] } = useQuery<Weapon[]>({
     queryKey: ["/api/weapons"],

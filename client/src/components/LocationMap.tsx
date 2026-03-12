@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { useGoogleMaps } from "@/hooks/use-google-maps";
+import { useEffect, useRef } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 interface LocationMapProps {
   latitude: number;
@@ -9,11 +10,6 @@ interface LocationMapProps {
   className?: string;
 }
 
-const MAP_TYPES = [
-  { label: "Terrain", value: "terrain" },
-  { label: "Satellite", value: "satellite" },
-] as const;
-
 export function LocationMap({
   latitude,
   longitude,
@@ -22,104 +18,58 @@ export function LocationMap({
   className = "",
 }: LocationMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.Marker | null>(null);
-  const { ready, error } = useGoogleMaps();
-  const [mapType, setMapType] = useState<string>("terrain");
+  const mapInstanceRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
-    if (!ready || !mapRef.current) return;
+    if (!mapRef.current) return;
 
-    const position = { lat: latitude, lng: longitude };
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+    }
 
-    const map = new google.maps.Map(mapRef.current, {
-      center: position,
+    const map = L.map(mapRef.current, {
+      center: [latitude, longitude],
       zoom: 8,
-      disableDefaultUI: true,
-      gestureHandling: "none",
-      mapTypeId: mapType,
+      zoomControl: false,
+      attributionControl: false,
+      scrollWheelZoom: false,
+      dragging: false,
     });
 
-    const marker = new google.maps.Marker({
-      map,
-      position,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 7,
-        fillColor: "#b87333",
-        fillOpacity: 1,
-        strokeColor: "white",
-        strokeWeight: 2,
-      },
-      title: locationName || undefined,
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+    }).addTo(map);
+
+    const icon = L.divIcon({
+      html: `<div style="background:#b87333;width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`,
+      className: "",
+      iconSize: [12, 12],
+      iconAnchor: [6, 6],
     });
 
+    const marker = L.marker([latitude, longitude], { icon }).addTo(map);
     if (locationName) {
-      const contentEl = document.createElement("span");
-      contentEl.style.cssText = "font-size:12px;font-weight:500;";
-      contentEl.textContent = locationName;
-
-      const infoWindow = new google.maps.InfoWindow({ content: contentEl });
-      marker.addListener("click", () => {
-        infoWindow.open({ anchor: marker, map });
-      });
+      const el = document.createElement("span");
+      el.style.fontSize = "12px";
+      el.style.fontWeight = "500";
+      el.textContent = locationName;
+      marker.bindPopup(el);
     }
 
     mapInstanceRef.current = map;
-    markerRef.current = marker;
 
     return () => {
-      if (markerRef.current) {
-        markerRef.current.setMap(null);
-        markerRef.current = null;
-      }
+      map.remove();
       mapInstanceRef.current = null;
     };
-  }, [ready, latitude, longitude, locationName]);
-
-  useEffect(() => {
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.setMapTypeId(mapType);
-    }
-  }, [mapType]);
-
-  if (error) {
-    return (
-      <div
-        style={{ height }}
-        className={`rounded-lg overflow-hidden border border-border/50 flex items-center justify-center bg-muted/20 ${className}`}
-        data-testid="map-location"
-      >
-        <span className="text-xs text-muted-foreground">Map unavailable</span>
-      </div>
-    );
-  }
+  }, [latitude, longitude, locationName]);
 
   return (
-    <div className={`relative ${className}`}>
-      <div
-        ref={mapRef}
-        style={{ height }}
-        className="rounded-lg overflow-hidden border border-border/50"
-        data-testid="map-location"
-      />
-      <div className="absolute top-2 right-2 flex rounded-md border border-border/50 overflow-hidden shadow-sm" data-testid="map-type-toggle-detail">
-        {MAP_TYPES.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            className={`px-2 py-1 text-[10px] font-medium transition-colors ${
-              mapType === opt.value
-                ? "bg-primary text-primary-foreground"
-                : "bg-card/90 text-muted-foreground hover:bg-muted backdrop-blur-sm"
-            }`}
-            onClick={() => setMapType(opt.value)}
-            data-testid={`button-detail-map-type-${opt.value}`}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-    </div>
+    <div
+      ref={mapRef}
+      style={{ height }}
+      className={`rounded-lg overflow-hidden border border-border/50 ${className}`}
+      data-testid="map-location"
+    />
   );
 }

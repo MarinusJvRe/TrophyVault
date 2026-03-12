@@ -15,12 +15,20 @@ import {
   Check,
   Crosshair,
   Star,
+  MapPin,
+  Lock,
 } from "lucide-react";
 
 import heroBg from "../assets/hero-bg.png";
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
+import screenshotDashboard from "../assets/screenshot-dashboard.png";
+import screenshotTrophyRoom from "../assets/screenshot-trophyroom.png";
+import screenshotTrophyDetail from "../assets/screenshot-trophydetail.png";
+import screenshotTimeline from "../assets/screenshot-timeline.png";
+import screenshotMap from "../assets/screenshot-map.png";
+import screenshot3D from "../assets/screenshot-3d.png";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -33,40 +41,60 @@ const fadeUp = {
 
 const features = [
   {
+    id: "ai-upload",
     icon: Brain,
     title: "AI-Powered Trophy Upload",
     description:
       "Effortlessly upload a photo and let our AI instantly identify species, estimate scores, and classify your trophy — no manual guesswork.",
   },
   {
+    id: "3d-ar",
     icon: Box,
     title: "3D Models & AR",
     description:
       "Transform your trophies into stunning 3D models. View them in augmented reality and share immersive experiences.",
   },
   {
+    id: "themes",
     icon: Palette,
     title: "Virtual Trophy Room Themes",
     description:
       "Choose from beautifully crafted room themes — from classic lodge to modern gallery — to showcase your collection.",
   },
   {
+    id: "community",
     icon: Users,
     title: "Community & Leaderboards",
     description:
       "Connect with fellow hunters. Compare collections, rate trophy rooms, and climb the leaderboards.",
   },
   {
+    id: "weapon-safe",
     icon: Shield,
     title: "Weapon Safe",
     description:
       "Digitally catalog your firearms and bows with full specifications, serial numbers, and maintenance logs.",
   },
   {
+    id: "certificates",
     icon: Award,
     title: "Certificates & Records",
     description:
       "Generate certificates for qualifying trophies and use them as proof of hunt records. Track scores across SCI, B&C, and Rowland Ward systems.",
+  },
+  {
+    id: "maps",
+    icon: MapPin,
+    title: "Map Integration & Geo-Tagging",
+    description:
+      "Pin every hunt on an interactive map. Geo-tag your trophies with precise harvest locations and visualize your hunting journey across the globe.",
+  },
+  {
+    id: "privacy",
+    icon: Lock,
+    title: "Public or Private Rooms",
+    description:
+      "Choose to open your trophy room for the community to admire, or keep it private and secure — you're always in control.",
   },
 ];
 
@@ -128,15 +156,23 @@ const showcaseImages = [
   { src: themeMinimal, label: "Modern Gallery", description: "Clean, contemporary showcase" },
 ];
 
+const appScreenshots = [
+  { src: screenshotDashboard, label: "Dashboard", description: "Your hunts at a glance" },
+  { src: screenshotTrophyRoom, label: "Trophy Room", description: "Browse your collection" },
+  { src: screenshotTrophyDetail, label: "Trophy Detail", description: "Every detail captured" },
+  { src: screenshotTimeline, label: "Trophy Timeline", description: "Your hunting journey over time" },
+  { src: screenshotMap, label: "Trophy Map", description: "Geo-tagged hunt locations" },
+  { src: screenshot3D, label: "3D & AR View", description: "Immersive 3D trophy models" },
+];
+
+function scrollToFeatureDetails() {
+  const el = document.getElementById("feature-details");
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 export default function LandingPage() {
   return (
     <MarketingLayout>
-      <div className="bg-[#b87333] text-white text-center py-3 px-4" data-testid="banner-coming-soon">
-        <p className="text-sm font-medium tracking-wide">
-          <span className="font-bold">Coming Soon</span> — Honor The Hunt is launching soon. Be the first to know!
-        </p>
-      </div>
-
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden" data-testid="section-hero">
         <div className="absolute inset-0">
           <img
@@ -204,44 +240,52 @@ export default function LandingPage() {
               </span>
             </Link>
           </motion.div>
+        </div>
+      </section>
+
+      <section className="py-16 px-4 sm:px-6 bg-[#111]" data-testid="section-features-summary">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            className="text-center mb-10"
+          >
+            <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
+              Everything You Need
+            </motion.p>
+            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-features-heading">
+              Built for Hunters, by Hunters
+            </motion.h2>
+          </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.5 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8"
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3"
           >
-            <a
-              href="#"
-              className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl transition-colors"
-              data-testid="button-app-store"
-            >
-              <svg viewBox="0 0 24 24" className="h-7 w-7 text-white fill-current">
-                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-              </svg>
-              <div className="text-left">
-                <div className="text-[10px] text-white/60 leading-none">Download on the</div>
-                <div className="text-sm font-semibold text-white leading-tight">App Store</div>
-              </div>
-            </a>
-            <a
-              href="#"
-              className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl transition-colors"
-              data-testid="button-google-play"
-            >
-              <svg viewBox="0 0 24 24" className="h-7 w-7 text-white fill-current">
-                <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 0 1-.61-.92V2.734a1 1 0 0 1 .609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-1.4l2.585 1.493a1 1 0 0 1 0 1.4l-2.586 1.493-2.537-2.537 2.537-2.85zM5.864 2.658L16.8 8.99l-2.302 2.302-8.634-8.634z"/>
-              </svg>
-              <div className="text-left">
-                <div className="text-[10px] text-white/60 leading-none">Get it on</div>
-                <div className="text-sm font-semibold text-white leading-tight">Google Play</div>
-              </div>
-            </a>
+            {features.map((feature, i) => (
+              <motion.button
+                key={feature.id}
+                variants={fadeUp}
+                custom={i}
+                onClick={() => scrollToFeatureDetails()}
+                className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.03] transition-colors text-left group cursor-pointer"
+                data-testid={`link-feature-${feature.id}`}
+              >
+                <feature.icon className="h-5 w-5 text-[#b87333] shrink-0" />
+                <span className="text-sm text-white/80 group-hover:text-white transition-colors" data-testid={`text-feature-title-${feature.id}`}>
+                  {feature.title}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 text-white/20 group-hover:text-[#b87333] ml-auto shrink-0 transition-colors" />
+              </motion.button>
+            ))}
           </motion.div>
         </div>
       </section>
 
-      <section className="py-24 px-4 sm:px-6 bg-[#111]" data-testid="section-features">
+      <section className="py-24 px-4 sm:px-6 bg-[#0a0a0a]" data-testid="section-app-preview">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial="hidden"
@@ -250,9 +294,59 @@ export default function LandingPage() {
             className="text-center mb-16"
           >
             <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
-              Everything You Need
+              See It In Action
             </motion.p>
-            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-features-heading">
+            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-preview-heading">
+              Your Trophy Room Awaits
+            </motion.h2>
+            <motion.p variants={fadeUp} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
+              Real screenshots from the app. Track your hunts, browse your collection, and explore every detail.
+            </motion.p>
+          </motion.div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6 md:gap-10 max-w-5xl mx-auto justify-items-center">
+            {appScreenshots.map((screen, i) => (
+              <motion.div
+                key={screen.label}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.1 }}
+                variants={fadeUp}
+                custom={i}
+                className="relative group"
+                data-testid={`card-preview-${i}`}
+              >
+                <div className="relative w-full max-w-[220px] rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden border-2 border-white/10 shadow-2xl shadow-black/50 group-hover:border-[#b87333]/30 transition-all duration-500">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 sm:w-20 h-4 sm:h-5 bg-black rounded-b-xl sm:rounded-b-2xl z-10" />
+                  <img
+                    src={screen.src}
+                    alt={screen.label}
+                    className="w-full h-auto"
+                    data-testid={`img-preview-${i}`}
+                  />
+                </div>
+                <div className="text-center mt-3">
+                  <p className="font-serif font-semibold text-xs sm:text-sm" data-testid={`text-preview-label-${i}`}>{screen.label}</p>
+                  <p className="text-white/40 text-[10px] sm:text-xs" data-testid={`text-preview-description-${i}`}>{screen.description}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="feature-details" className="py-24 px-4 sm:px-6 bg-[#111]" data-testid="section-feature-details">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            className="text-center mb-16"
+          >
+            <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
+              Packed With Features
+            </motion.p>
+            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-feature-details-heading">
               Preserve Every Detail of Your Hunt
             </motion.h2>
             <motion.p variants={fadeUp} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
@@ -260,23 +354,23 @@ export default function LandingPage() {
             </motion.p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {features.map((feature, i) => (
               <motion.div
-                key={feature.title}
+                key={feature.id}
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true, amount: 0.2 }}
                 variants={fadeUp}
                 custom={i}
-                className="group p-6 rounded-xl bg-white/[0.02] border border-white/5 hover:border-[#b87333]/20 transition-all duration-300"
-                data-testid={`card-feature-${i}`}
+                className="group p-5 rounded-xl bg-white/[0.02] border border-white/5 hover:border-[#b87333]/20 transition-all duration-300"
+                data-testid={`card-feature-detail-${feature.id}`}
               >
-                <div className="w-12 h-12 rounded-lg bg-[#b87333]/10 flex items-center justify-center mb-4 group-hover:bg-[#b87333]/20 transition-colors">
-                  <feature.icon className="h-6 w-6 text-[#b87333]" />
+                <div className="w-10 h-10 rounded-lg bg-[#b87333]/10 flex items-center justify-center mb-3 group-hover:bg-[#b87333]/20 transition-colors">
+                  <feature.icon className="h-5 w-5 text-[#b87333]" />
                 </div>
-                <h3 className="text-lg font-serif font-semibold mb-2">{feature.title}</h3>
-                <p className="text-white/50 text-sm leading-relaxed">{feature.description}</p>
+                <h3 className="text-sm font-serif font-semibold mb-1.5" data-testid={`text-feature-detail-title-${feature.id}`}>{feature.title}</h3>
+                <p className="text-white/50 text-xs leading-relaxed" data-testid={`text-feature-detail-desc-${feature.id}`}>{feature.description}</p>
               </motion.div>
             ))}
           </div>
