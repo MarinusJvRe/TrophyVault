@@ -119,7 +119,6 @@ export default function TrophyMap() {
           fontSize: "10px",
           fontWeight: "600",
           color: "#1a1a1a",
-          className: "trophy-marker-label",
         },
         title: labelText,
       });
