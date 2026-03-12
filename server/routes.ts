@@ -6,9 +6,15 @@ import { registerEmailAuthRoutes } from "./auth";
 import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema } from "@shared/schema";
 import { analyzeTrophyImage, generateTrophyRender } from "./trophy-ai";
 import { generate3DModel } from "./trophy-3d";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { uploadBufferToStorage, uploadFileToStorage } from "./object-storage-helper";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import os from "os";
+
+const tmpUploadDir = path.join(os.tmpdir(), "hth-uploads");
+if (!fs.existsSync(tmpUploadDir)) fs.mkdirSync(tmpUploadDir, { recursive: true });
 
 const profileUploadDir = path.join(process.cwd(), "uploads", "profiles");
 const trophyUploadDir = path.join(process.cwd(), "uploads", "trophies");
@@ -67,9 +73,10 @@ export async function registerRoutes(
   registerAuthRoutes(app);
   registerEmailAuthRoutes(app);
 
-  // Serve uploaded files
+  // Serve uploaded files (legacy local + Object Storage)
   const express = await import("express");
   app.use("/uploads", express.default.static(path.join(process.cwd(), "uploads")));
+  registerObjectStorageRoutes(app);
 
   // Helper to get user ID from request
   const getUserId = (req: any): string => req.user?.claims?.sub;
@@ -116,8 +123,14 @@ export async function registerRoutes(
 
   app.post("/api/weapons/upload-image", isAuthenticated, weaponUpload.single("image"), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No image file provided" });
-    const imageUrl = `/uploads/weapons/${req.file.filename}`;
-    res.json({ imageUrl });
+    try {
+      const imageUrl = await uploadFileToStorage(req.file.path, req.file.mimetype);
+      res.json({ imageUrl });
+    } catch (err) {
+      console.error("[upload] Object Storage upload failed, using local fallback:", err);
+      const imageUrl = `/uploads/weapons/${req.file.filename}`;
+      res.json({ imageUrl });
+    }
   });
 
   // ========== TROPHIES ==========
@@ -192,23 +205,42 @@ export async function registerRoutes(
   // ========== PROFILE IMAGE UPLOAD ==========
   app.post("/api/profile/upload-image", isAuthenticated, profileUpload.single("image"), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No image file provided" });
-    const imageUrl = `/uploads/profiles/${req.file.filename}`;
-    const prefs = await storage.upsertPreferences(getUserId(req), { profileImageUrl: imageUrl } as any);
-    res.json({ imageUrl, preferences: prefs });
+    try {
+      const imageUrl = await uploadFileToStorage(req.file.path, req.file.mimetype);
+      const prefs = await storage.upsertPreferences(getUserId(req), { profileImageUrl: imageUrl } as any);
+      res.json({ imageUrl, preferences: prefs });
+    } catch (err) {
+      console.error("[upload] Object Storage upload failed, using local fallback:", err);
+      const imageUrl = `/uploads/profiles/${req.file.filename}`;
+      const prefs = await storage.upsertPreferences(getUserId(req), { profileImageUrl: imageUrl } as any);
+      res.json({ imageUrl, preferences: prefs });
+    }
   });
 
   // ========== TROPHY IMAGE UPLOAD ==========
   app.post("/api/trophies/upload-image", isAuthenticated, trophyUpload.single("image"), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No image file provided" });
-    const imageUrl = `/uploads/trophies/${req.file.filename}`;
-    res.json({ imageUrl });
+    try {
+      const imageUrl = await uploadFileToStorage(req.file.path, req.file.mimetype);
+      res.json({ imageUrl });
+    } catch (err) {
+      console.error("[upload] Object Storage upload failed, using local fallback:", err);
+      const imageUrl = `/uploads/trophies/${req.file.filename}`;
+      res.json({ imageUrl });
+    }
   });
 
   // ========== AI TROPHY ANALYSIS ==========
   app.post("/api/trophies/analyze", isAuthenticated, trophyUpload.single("image"), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "No image file provided" });
-      const imageUrl = `/uploads/trophies/${req.file.filename}`;
+      let imageUrl: string;
+      try {
+        imageUrl = await uploadFileToStorage(req.file.path, req.file.mimetype);
+      } catch (err) {
+        console.error("[upload] Object Storage upload failed, using local fallback:", err);
+        imageUrl = `/uploads/trophies/${req.file.filename}`;
+      }
       const fileBuffer = fs.readFileSync(req.file.path);
       const base64 = fileBuffer.toString("base64");
       const prefs = await storage.getPreferences(getUserId(req));
@@ -232,12 +264,18 @@ export async function registerRoutes(
         pendingRenders.set(imageUrl, { status: "pending", renderImageUrl: null });
         console.log(`[render] Started background render for ${imageUrl} (theme: ${theme})`);
         generateTrophyRender(themedPrompt)
-          .then((renderBuffer) => {
+          .then(async (renderBuffer) => {
             if (renderBuffer) {
-              const renderFilename = `render-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
-              const renderPath = path.join(trophyUploadDir, renderFilename);
-              fs.writeFileSync(renderPath, renderBuffer);
-              const renderUrl = `/uploads/trophies/${renderFilename}`;
+              let renderUrl: string;
+              try {
+                renderUrl = await uploadBufferToStorage(renderBuffer, `render-${Date.now()}.png`, "image/png");
+              } catch (err) {
+                console.error("[render] Object Storage upload failed, using local fallback:", err);
+                const renderFilename = `render-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
+                const renderPath = path.join(trophyUploadDir, renderFilename);
+                fs.writeFileSync(renderPath, renderBuffer);
+                renderUrl = `/uploads/trophies/${renderFilename}`;
+              }
               pendingRenders.set(imageUrl, { status: "done", renderImageUrl: renderUrl });
               console.log(`[render] Completed render for ${imageUrl} → ${renderUrl}`);
               storage.patchTrophyRenderByImage(imageUrl, renderUrl).then(() => {
@@ -260,7 +298,17 @@ export async function registerRoutes(
       const mountType = analysis.mount_recommendation?.best || null;
       console.log(`[3d-model] Started background 3D generation for ${imageUrl} (mount: ${mountType})`);
       generate3DModel(req.file!.path, mountType)
-        .then(({ glbUrl, glbPreviewUrl }) => {
+        .then(async ({ glbUrl: localGlbUrl, glbPreviewUrl: localPreviewUrl }) => {
+          let glbUrl = localGlbUrl;
+          let glbPreviewUrl = localPreviewUrl;
+          try {
+            glbUrl = await uploadFileToStorage(path.join(process.cwd(), localGlbUrl));
+            if (localPreviewUrl) {
+              glbPreviewUrl = await uploadFileToStorage(path.join(process.cwd(), localPreviewUrl));
+            }
+          } catch (err) {
+            console.error("[3d-model] Object Storage upload failed, using local paths:", err);
+          }
           pendingModels.set(imageUrl, { status: "done", glbUrl, glbPreviewUrl });
           console.log(`[3d-model] Completed 3D model for ${imageUrl} → ${glbUrl}`);
           storage.patchTrophyGlb(imageUrl, glbUrl, glbPreviewUrl, mountType).then(() => {

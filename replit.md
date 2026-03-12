@@ -21,7 +21,8 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - **2026-03-09**: All unit toggles and method dropdown also added to trophy-detail edit form
 - **2026-03-09**: `HUNTING_METHODS` constant and `TrophyAnalysis` interface exported from `AddTrophyDialog.tsx`
 - **2026-03-09**: EXIF metadata extraction: photo date & GPS auto-extracted from trophy images using `exifr`, pre-populates date and location fields with "From photo" indicator
-- **2026-03-12**: Google Maps integration restored: replaced Leaflet/OpenStreetMap/Nominatim with Google Maps JavaScript API + Google Places Autocomplete for all maps and location search. Trophy map has terrain/satellite toggle. Maps-config API endpoint serves key securely. Leaflet dependency removed.
+- **2026-03-12**: Object Storage migration: all file uploads (trophy images, renders, 3D models, weapon images, profile images) now persist to Replit Object Storage instead of ephemeral local filesystem. Fixes production issue where images disappeared after container restarts (e.g., sign-out/in). Legacy `/uploads` route retained for backward compat; new files served via `/objects/uploads/uuid` paths.
+- **2026-03-12**: Google Maps integration restored: replaced Leaflet/OpenStreetMap/Nominatim with Google Maps JavaScript API + Google Places Autocomplete for all maps and location search. Trophy map has Road/Terrain/Satellite/Hybrid toggle. Maps-config API endpoint serves key securely. Leaflet dependency removed.
 - **2026-03-09**: "Use current location" button: added to LocationSearch component (available on add trophy + edit trophy), requests device GPS, reverse geocodes via Google Maps Geocoder
 - **2026-03-09**: `reverseGeocode()` helper exported from LocationSearch for reuse (EXIF GPS → place name)
 - **2026-03-08**: Dashboard refactored: mobile hero layout fix (shorter 45vh on mobile, responsive text), 6 stat cards in 2x3/3x2 grid (Hunts, Qualifying Trophies, Species, Room Rating, Weapons in Safe, Furthest Shot)
@@ -68,6 +69,7 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - **Frontend**: React + Vite, Wouter routing, TanStack Query, Tailwind CSS, Framer Motion, shadcn/ui
 - **Backend**: Express.js, Drizzle ORM, PostgreSQL (Neon-backed)
 - **Auth**: Multi-provider — Email/Password (bcrypt) + auth token fallback, Replit OIDC (Passport.js), Google OAuth (planned), Apple Sign-In (planned)
+- **Storage**: Replit Object Storage (Google Cloud Storage) for persistent file uploads (images, renders, 3D models); served via `/objects/uploads/` route
 - **AI**: OpenAI GPT-4o vision for trophy analysis + gpt-image-1 for 3D trophy render generation (via Replit AI Integrations); Gemini integration also available
 - **3D/AR**: fal.ai (BiRefNet bg removal + Tripo image-to-3D), gltf-transform + draco3dgltf for GLB compression, Google model-viewer for 3D viewing + AR wall placement
 
