@@ -203,7 +203,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-4xl sm:text-5xl md:text-7xl font-serif font-bold leading-tight mb-6"
+            className="sm:text-5xl md:text-7xl font-serif font-bold mb-6 text-[34px]"
             data-testid="text-hero-headline"
           >
             Preserve your Legacy.
