@@ -1,49 +1,70 @@
 import {
   users, weapons, trophies, userPreferences, roomRatings,
+  proProfiles, referrals, usageLedger,
   type Weapon, type InsertWeapon,
   type Trophy, type InsertTrophy,
   type UserPreferences, type InsertPreferences,
   type RoomRating, type InsertRoomRating,
+  type ProProfile, type InsertProProfile,
+  type UsageLedgerEntry,
+  type Referral,
   type User,
+  AI_COSTS,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, avg, count } from "drizzle-orm";
+import { eq, and, desc, sql, avg, count, gte, or, ilike } from "drizzle-orm";
+import crypto from "crypto";
 
 export interface IStorage {
-  // Weapons
   getWeapons(userId: string): Promise<Weapon[]>;
   getWeapon(id: string, userId: string): Promise<Weapon | undefined>;
   createWeapon(userId: string, weapon: InsertWeapon): Promise<Weapon>;
   updateWeapon(id: string, userId: string, weapon: Partial<InsertWeapon>): Promise<Weapon | undefined>;
   deleteWeapon(id: string, userId: string): Promise<boolean>;
 
-  // Trophies
   getTrophies(userId: string): Promise<Trophy[]>;
   getTrophy(id: string, userId: string): Promise<Trophy | undefined>;
   createTrophy(userId: string, trophy: InsertTrophy): Promise<Trophy>;
   updateTrophy(id: string, userId: string, trophy: Partial<InsertTrophy>): Promise<Trophy | undefined>;
   deleteTrophy(id: string, userId: string): Promise<boolean>;
 
-  // Preferences
   getPreferences(userId: string): Promise<UserPreferences | undefined>;
   upsertPreferences(userId: string, prefs: Partial<InsertPreferences>): Promise<UserPreferences>;
 
-  // Room Ratings
   getRoomRating(roomOwnerId: string): Promise<{ avgScore: number; totalRatings: number }>;
   rateRoom(raterId: string, rating: InsertRoomRating): Promise<RoomRating>;
   getPublicRooms(): Promise<{ userId: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null; theme: string | null; avgScore: number; totalRatings: number; trophyCount: number }[]>;
 
-  // Public trophy room
   getPublicTrophies(userId: string): Promise<Trophy[]>;
   getUserPublic(userId: string): Promise<{ user: User; preferences: UserPreferences | null } | undefined>;
 
-  // Render patching
   patchTrophyRenderByImage(imageUrl: string, renderImageUrl: string): Promise<void>;
   patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null): Promise<void>;
+
+  // Pro profiles
+  getProProfile(userId: string): Promise<ProProfile | undefined>;
+  getProProfileByReferralCode(code: string): Promise<ProProfile | undefined>;
+  createProProfile(userId: string, profile: InsertProProfile): Promise<ProProfile>;
+  updateProProfile(userId: string, profile: Partial<InsertProProfile>): Promise<ProProfile | undefined>;
+  searchProUsers(query: string): Promise<{ userId: string; firstName: string | null; lastName: string | null; businessName: string; entityType: string; profileImageUrl: string | null }[]>;
+
+  // Referrals
+  createReferral(proUserId: string, referralCode: string, referredUserId?: string): Promise<Referral>;
+  getReferralsByProUser(proUserId: string): Promise<Referral[]>;
+  convertReferral(referralId: string, referredUserId: string): Promise<Referral | undefined>;
+  getReferralStats(proUserId: string): Promise<{ totalReferrals: number; convertedReferrals: number; pendingPayout: number }>;
+
+  // Usage ledger
+  logUsage(userId: string, actionType: string, estimatedCost: number, description?: string): Promise<UsageLedgerEntry>;
+  getMonthlyUsage(userId: string): Promise<{ totalCost: number; aiAnalyses: number; models3d: number; renders: number }>;
+  getLifetimeUsageCounts(userId: string): Promise<{ aiAnalyses: number; models3d: number }>;
+
+  // Pro tagging
+  getTrophiesTaggingPro(proUserId: string): Promise<Trophy[]>;
+  getTagStats(proUserId: string): Promise<{ totalTags: number; recentTags: Trophy[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // Weapons
   async getWeapons(userId: string): Promise<Weapon[]> {
     return db.select().from(weapons).where(eq(weapons.userId, userId)).orderBy(desc(weapons.createdAt));
   }
@@ -68,7 +89,6 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // Trophies
   async getTrophies(userId: string): Promise<Trophy[]> {
     return db.select().from(trophies).where(eq(trophies.userId, userId)).orderBy(desc(trophies.createdAt));
   }
@@ -93,7 +113,6 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // Preferences
   async getPreferences(userId: string): Promise<UserPreferences | undefined> {
     const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
     return prefs;
@@ -111,7 +130,6 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  // Room Ratings
   async getRoomRating(roomOwnerId: string): Promise<{ avgScore: number; totalRatings: number }> {
     const [result] = await db
       .select({
@@ -127,7 +145,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async rateRoom(raterId: string, rating: InsertRoomRating): Promise<RoomRating> {
-    // Upsert: one rating per rater per room
     const existing = await db
       .select()
       .from(roomRatings)
@@ -174,7 +191,6 @@ export class DatabaseStorage implements IStorage {
     return rooms;
   }
 
-  // Public trophy room
   async getPublicTrophies(userId: string): Promise<Trophy[]> {
     const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
     if (!prefs || prefs.roomVisibility !== "public") return [];
@@ -198,6 +214,191 @@ export class DatabaseStorage implements IStorage {
     if (glbPreviewUrl) updates.glbPreviewUrl = glbPreviewUrl;
     if (mountType) updates.mountType = mountType;
     await db.update(trophies).set(updates).where(eq(trophies.imageUrl, imageUrl));
+  }
+
+  // Pro profiles
+  async getProProfile(userId: string): Promise<ProProfile | undefined> {
+    const [profile] = await db.select().from(proProfiles).where(eq(proProfiles.userId, userId));
+    return profile;
+  }
+
+  async getProProfileByReferralCode(code: string): Promise<ProProfile | undefined> {
+    const [profile] = await db.select().from(proProfiles).where(eq(proProfiles.referralCode, code));
+    return profile;
+  }
+
+  async createProProfile(userId: string, profile: InsertProProfile): Promise<ProProfile> {
+    const referralCode = crypto.randomBytes(6).toString("hex");
+    const referralLink = `/join?ref=${referralCode}`;
+    const [created] = await db.insert(proProfiles).values({
+      ...profile,
+      userId,
+      referralCode,
+      referralLink,
+    }).returning();
+
+    await this.upsertPreferences(userId, {
+      accountTier: "pro",
+      userType: "professional",
+    } as any);
+
+    return created;
+  }
+
+  async updateProProfile(userId: string, profile: Partial<InsertProProfile>): Promise<ProProfile | undefined> {
+    const [updated] = await db.update(proProfiles).set(profile).where(eq(proProfiles.userId, userId)).returning();
+    return updated;
+  }
+
+  async searchProUsers(query: string): Promise<{ userId: string; firstName: string | null; lastName: string | null; businessName: string; entityType: string; profileImageUrl: string | null }[]> {
+    const searchPattern = `%${query}%`;
+    const profiles = await db.select().from(proProfiles).where(
+      or(
+        ilike(proProfiles.businessName, searchPattern),
+        ilike(proProfiles.businessHandle, searchPattern),
+      )
+    ).limit(10);
+
+    const results = [];
+    for (const profile of profiles) {
+      const [user] = await db.select().from(users).where(eq(users.id, profile.userId));
+      if (user) {
+        results.push({
+          userId: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          businessName: profile.businessName,
+          entityType: profile.entityType,
+          profileImageUrl: user.profileImageUrl,
+        });
+      }
+    }
+
+    if (query.length >= 2) {
+      const userMatches = await db.select().from(users).where(
+        or(
+          ilike(users.firstName, searchPattern),
+          ilike(users.lastName, searchPattern),
+        )
+      ).limit(10);
+
+      for (const user of userMatches) {
+        if (results.some(r => r.userId === user.id)) continue;
+        const [profile] = await db.select().from(proProfiles).where(eq(proProfiles.userId, user.id));
+        if (profile) {
+          results.push({
+            userId: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            businessName: profile.businessName,
+            entityType: profile.entityType,
+            profileImageUrl: user.profileImageUrl,
+          });
+        }
+      }
+    }
+
+    return results.slice(0, 10);
+  }
+
+  // Referrals
+  async createReferral(proUserId: string, referralCode: string, referredUserId?: string): Promise<Referral> {
+    const [created] = await db.insert(referrals).values({
+      proUserId,
+      referralCode,
+      referredUserId: referredUserId || null,
+      status: referredUserId ? "converted" : "pending",
+      convertedAt: referredUserId ? new Date() : null,
+    }).returning();
+    return created;
+  }
+
+  async getReferralsByProUser(proUserId: string): Promise<Referral[]> {
+    return db.select().from(referrals).where(eq(referrals.proUserId, proUserId)).orderBy(desc(referrals.createdAt));
+  }
+
+  async convertReferral(referralId: string, referredUserId: string): Promise<Referral | undefined> {
+    const [updated] = await db.update(referrals).set({
+      referredUserId,
+      status: "converted",
+      convertedAt: new Date(),
+      payoutAmount: 5.00,
+    }).where(eq(referrals.id, referralId)).returning();
+    return updated;
+  }
+
+  async getReferralStats(proUserId: string): Promise<{ totalReferrals: number; convertedReferrals: number; pendingPayout: number }> {
+    const allReferrals = await this.getReferralsByProUser(proUserId);
+    const converted = allReferrals.filter(r => r.status === "converted");
+    const pendingPayout = converted
+      .filter(r => r.payoutStatus === "unpaid")
+      .reduce((sum, r) => sum + (r.payoutAmount || 0), 0);
+    return {
+      totalReferrals: allReferrals.length,
+      convertedReferrals: converted.length,
+      pendingPayout,
+    };
+  }
+
+  // Usage ledger
+  async logUsage(userId: string, actionType: string, estimatedCost: number, description?: string): Promise<UsageLedgerEntry> {
+    const [created] = await db.insert(usageLedger).values({
+      userId,
+      actionType,
+      estimatedCost,
+      description,
+    }).returning();
+    return created;
+  }
+
+  async getMonthlyUsage(userId: string): Promise<{ totalCost: number; aiAnalyses: number; models3d: number; renders: number }> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const entries = await db.select().from(usageLedger).where(
+      and(
+        eq(usageLedger.userId, userId),
+        gte(usageLedger.createdAt, startOfMonth)
+      )
+    );
+
+    let totalCost = 0;
+    let aiAnalyses = 0;
+    let models3d = 0;
+    let renders = 0;
+
+    for (const entry of entries) {
+      totalCost += entry.estimatedCost;
+      if (entry.actionType === "ai_analysis") aiAnalyses++;
+      if (entry.actionType === "3d_model") models3d++;
+      if (entry.actionType === "ai_render") renders++;
+    }
+
+    return { totalCost, aiAnalyses, models3d, renders };
+  }
+
+  async getLifetimeUsageCounts(userId: string): Promise<{ aiAnalyses: number; models3d: number }> {
+    const entries = await db.select().from(usageLedger).where(eq(usageLedger.userId, userId));
+    let aiAnalyses = 0;
+    let models3d = 0;
+    for (const entry of entries) {
+      if (entry.actionType === "ai_analysis") aiAnalyses++;
+      if (entry.actionType === "3d_model") models3d++;
+    }
+    return { aiAnalyses, models3d };
+  }
+
+  // Pro tagging
+  async getTrophiesTaggingPro(proUserId: string): Promise<Trophy[]> {
+    return db.select().from(trophies).where(eq(trophies.taggedProUserId, proUserId)).orderBy(desc(trophies.createdAt));
+  }
+
+  async getTagStats(proUserId: string): Promise<{ totalTags: number; recentTags: Trophy[] }> {
+    const allTags = await this.getTrophiesTaggingPro(proUserId);
+    return {
+      totalTags: allTags.length,
+      recentTags: allTags.slice(0, 10),
+    };
   }
 }
 

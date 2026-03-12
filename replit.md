@@ -4,6 +4,7 @@
 Honor The Hunt is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
+- **2026-03-12**: User tiers & monetization system (Free/Paid/Pro): Extended schema with `proProfiles`, `referrals`, `usageLedger` tables; added `accountTier`, `userType`, `leaderboardVerified`, `onboardingCompleted`, `firstTrophyUploaded`, `credits`, `upgradePromptShown` to userPreferences; added `isAiAnalyzed`, `taggedProUserId` to trophies. Backend tier enforcement middleware (`checkTierLimit`), usage tracking on AI/3D calls. New endpoints: `/api/usage`, `/api/pro/profile`, `/api/pro/search`, `/api/pro/referrals`, `/api/referral/*`, `/api/pro/tags`, `/api/verify-leaderboard`. Redesigned onboarding with Hunter vs Industry Professional fork. New components: UpgradePrompt, UsageBanner, ProTagSearch, ProDashboard page (`/pro`). Profile page shows tier badge, leaderboard verification, Pro dashboard link. Trophy room shows usage banner and first-trophy upgrade prompt. AddTrophyDialog has Pro tag search field. Referral code tracking on registration. Payment integration NOT implemented — upgrade buttons show placeholder.
 - **2026-03-11**: Marketing landing & info pages: unauthenticated visitors now see a premium landing page at `/` with hero, feature highlights, theme showcase, cross-device messaging, social proof stats, pricing summary, and CTA sections. Dedicated `/pricing` page with three-tier comparison table (Free/Paid/Pro). Legal pages at `/terms` and `/privacy`. Contact page at `/contact` with form. Shared `MarketingLayout` component with nav bar (logo, Pricing, Contact, Login/Sign Up) and footer (Terms, Privacy, Contact, copyright). Auth page moved to `/login` route. Authenticated users still see the dashboard at `/`. All public pages accessible to everyone.
 - **2026-03-11**: Renamed app from TrophyVault to "Honor The Hunt" throughout codebase. Updated all user-facing text ("the vault" → "the trophy room"), splash screen now displays "Honor the Hunt" below logo. Trophy room title changed to "The Trophy Room". Certificate generation updated to reflect new branding.
 
@@ -85,8 +86,9 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - `/trophies/map` - Map View (interactive Google Maps with trophy pins, terrain/satellite toggle)
 - `/safe` - The Safe (weapon management)
 - `/community` - Community (leaderboards, rate rooms)
-- `/profile` - Profile & Settings (theme, about, locations, sharing)
-- `/onboarding` - First-time setup (theme + preferences + locations)
+- `/profile` - Profile & Settings (theme, about, locations, sharing, tier badge, leaderboard verification)
+- `/onboarding` - First-time setup (Hunter vs Pro fork → theme → preferences → locations)
+- `/pro` - Pro Dashboard (referral stats, tag stats, copy referral link)
 
 ## API Routes
 - `GET/POST /api/trophies`, `GET/PATCH/DELETE /api/trophies/:id`
@@ -98,6 +100,9 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - `GET /api/community/rooms`, `GET /api/community/room/:userId`, `POST /api/community/rate`
 - `GET /api/my-room-rating`
 - `GET /api/maps-config` (returns Google Maps API key for authenticated users)
+- Tiers: `GET /api/usage` (usage stats), `POST /api/verify-leaderboard`
+- Pro: `POST /api/pro/profile`, `GET /api/pro/search?q=`, `GET /api/pro/referrals`, `GET /api/pro/tags`
+- Referrals: `POST /api/referral/apply`, `GET /api/referral/validate/:code`
 - Auth: `/api/login`, `/api/logout`, `/api/callback`, `/api/auth/user`
 - Email Auth: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/email-logout`
 - OAuth: `GET /api/auth/google`, `GET /api/auth/apple` (pending credential setup)
@@ -105,9 +110,12 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 ## Database Tables
 - `users` (id, email, firstName, lastName, profileImageUrl, passwordHash, authProvider, authProviderId, createdAt, updatedAt)
 - `sessions` (sid, sess, expire)
-- `trophies` (species, name, date, location?, score, method?, weaponId, gender?, shotDistance?, notes, huntNotes, imageUrl, renderImageUrl?, glbUrl?, glbPreviewUrl?, mountType?, featured)
+- `trophies` (species, name, date, location?, score, method?, weaponId, gender?, shotDistance?, notes, huntNotes, imageUrl, renderImageUrl?, glbUrl?, glbPreviewUrl?, mountType?, featured, isAiAnalyzed?, taggedProUserId?)
 - `weapons` (name, type, caliber, make, model, optic, notes, imageUrl)
-- `user_preferences` (theme, pursuit, scoringSystem, units, roomVisibility, huntingLocations[])
+- `user_preferences` (theme, pursuit, scoringSystem, units, roomVisibility, huntingLocations[], accountTier, userType, leaderboardVerified, onboardingCompleted, firstTrophyUploaded, upgradePromptShown, credits)
+- `pro_profiles` (userId, entityType, businessName, handle, location, referralCode, createdAt)
+- `referrals` (proUserId, referralCode, referredUserId, convertedToTier?, createdAt)
+- `usage_ledger` (userId, actionType, cost, metadata?, createdAt)
 - `room_ratings` (roomOwnerId, raterId, score)
 
 ## Logo
@@ -142,6 +150,17 @@ CSS variables update dynamically via ThemeProvider context. HSL format without h
 - Units: Imperial, Metric
 - Hunting Locations: Multi-select
 - Room Visibility: Public/Private
+- Account Tier: free / paid / pro (default: free)
+- User Type: hunter / professional (default: hunter)
+- Leaderboard Verified: boolean (verified via identity proof for leaderboard participation)
+- Credits: numeric balance for future payment integration
+
+## Tier System
+- **Free**: 3 AI analyses (lifetime), 1 3D model (lifetime), 25 manual trophies, $0 budget cap
+- **Paid**: Unlimited AI/3D/manual, $10/month budget cap
+- **Pro**: Unlimited AI/3D/manual, $20/month budget cap, referral system, Pro dashboard, business profile
+- AI costs: analysis=$0.10, 3D model=$0.15, AI render=$0.05
+- Payment integration NOT implemented — upgrade buttons show placeholder message
 
 ## Design Notes
 - Typography: Cinzel (serif headings), DM Sans (body)

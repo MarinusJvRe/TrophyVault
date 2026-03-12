@@ -29,6 +29,7 @@ import type { Weapon } from "@shared/schema";
 import { LocationSearch, reverseGeocode } from "@/components/LocationSearch";
 import { findClosestSpecies } from "@shared/scoring-thresholds";
 import exifr from "exifr";
+import ProTagSearch from "@/components/ProTagSearch";
 
 export interface TrophyAnalysis {
   animal_detected: boolean;
@@ -155,6 +156,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const [glbUrl, setGlbUrl] = useState<string | null>(null);
   const [glbPreviewUrl, setGlbPreviewUrl] = useState<string | null>(null);
   const [modelPollingImageUrl, setModelPollingImageUrl] = useState<string | null>(null);
+  const [taggedProUserId, setTaggedProUserId] = useState<string | null>(null);
   const fileSelectionIdRef = useRef(0);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -248,6 +250,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     setGlbUrl(null);
     setGlbPreviewUrl(null);
     setModelPollingImageUrl(null);
+    setTaggedProUserId(null);
     setDistanceUnit(prefs?.units === "metric" ? "m" : "yards");
     setScoreUnit(prefs?.units === "metric" ? "cm" : '"');
   }, [previewUrl, croppedPreviewUrl, prefs?.units]);
@@ -478,6 +481,8 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
       glbPreviewUrl: glbPreviewUrl,
       mountType: analysis?.mount_recommendation?.best || null,
       featured: false,
+      isAiAnalyzed: !!analysis,
+      taggedProUserId: taggedProUserId || null,
     });
   };
 
@@ -544,6 +549,8 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
               setDistanceUnit={setDistanceUnit}
               scoreUnit={scoreUnit}
               setScoreUnit={setScoreUnit}
+              taggedProUserId={taggedProUserId}
+              setTaggedProUserId={setTaggedProUserId}
             />
           )}
         </AnimatePresence>
@@ -868,6 +875,8 @@ function FormStep({
   setDistanceUnit,
   scoreUnit,
   setScoreUnit,
+  taggedProUserId,
+  setTaggedProUserId,
 }: {
   analysis: TrophyAnalysis | null;
   renderGenerating: boolean;
@@ -893,6 +902,8 @@ function FormStep({
   setDistanceUnit: (v: string) => void;
   scoreUnit: string;
   setScoreUnit: (v: string) => void;
+  taggedProUserId: string | null;
+  setTaggedProUserId: (v: string | null) => void;
 }) {
   const estimatedScore = getEstimatedScoreNumber(analysis);
 
@@ -1107,6 +1118,14 @@ function FormStep({
             placeholder="Details about the trophy itself — horn quality, unique markings, condition..."
             defaultValue={analysis?.horn_details?.notable_features || ""}
             data-testid="input-trophy-notes"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Tagged Pro (Optional)</Label>
+          <ProTagSearch
+            value={taggedProUserId}
+            onChange={(userId) => setTaggedProUserId(userId)}
           />
         </div>
 

@@ -13,12 +13,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import type { Trophy } from "@shared/schema";
+import type { Trophy, UserPreferences } from "@shared/schema";
 import { useTheme } from "@/lib/theme-context";
 import AddTrophyDialog from "@/components/AddTrophyDialog";
 import TrophyARViewer from "@/components/TrophyARViewer";
+import UsageBanner from "@/components/UsageBanner";
+import UpgradePrompt from "@/components/UpgradePrompt";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 import wallLodge from "@/assets/wall-lodge.png";
 import wallManor from "@/assets/wall-manor-texture.png";
@@ -35,12 +38,29 @@ export default function TrophyRoom() {
   const [filterSpecies, setFilterSpecies] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [arTrophy, setArTrophy] = useState<Trophy | null>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const { theme } = useTheme();
   const wallTexture = WALL_TEXTURES[theme] || WALL_TEXTURES.lodge;
 
   const { data: trophies = [], isLoading } = useQuery<Trophy[]>({
     queryKey: ["/api/trophies"],
   });
+
+  const { data: preferences } = useQuery<UserPreferences>({
+    queryKey: ["/api/preferences"],
+  });
+
+  useEffect(() => {
+    if (preferences && preferences.firstTrophyUploaded && !preferences.upgradePromptShown && preferences.accountTier === "free") {
+      const aiTrophies = trophies.filter(t => t.isAiAnalyzed);
+      if (aiTrophies.length === 1) {
+        setShowUpgrade(true);
+        apiRequest("PUT", "/api/preferences", { upgradePromptShown: true }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
+        }).catch(() => {});
+      }
+    }
+  }, [preferences, trophies]);
 
   const filteredTrophies = trophies.filter(t => {
     const matchesSearch = (t.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -122,6 +142,10 @@ export default function TrophyRoom() {
           </div>
         </header>
 
+        <div className="mb-4">
+          <UsageBanner onUpgradeClick={() => setShowUpgrade(true)} />
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
           <motion.div 
             initial={{ opacity: 0 }}
@@ -150,6 +174,13 @@ export default function TrophyRoom() {
       </div>
 
       <AddTrophyDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
+      <UpgradePrompt
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        variant="first-trophy"
+        currentTier={preferences?.accountTier || "free"}
+      />
 
       {arTrophy?.glbUrl && (
         <TrophyARViewer

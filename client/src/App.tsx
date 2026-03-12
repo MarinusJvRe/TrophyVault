@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -21,6 +21,7 @@ import PricingPage from "@/pages/pricing";
 import TermsPage from "@/pages/terms";
 import PrivacyPage from "@/pages/privacy";
 import ContactPage from "@/pages/contact";
+import ProDashboard from "@/pages/pro-dashboard";
 import SplashScreen from "@/components/SplashScreen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,7 @@ function Router() {
         <Route path="/safe">{() => <AnimatedPage><Safe /></AnimatedPage>}</Route>
         <Route path="/community">{() => <AnimatedPage><Community /></AnimatedPage>}</Route>
         <Route path="/profile">{() => <AnimatedPage><Profile /></AnimatedPage>}</Route>
+        <Route path="/pro">{() => <AnimatedPage><ProDashboard /></AnimatedPage>}</Route>
         <Route>{() => <AnimatedPage><NotFound /></AnimatedPage>}</Route>
       </Switch>
     </AnimatePresence>
@@ -104,11 +106,12 @@ function AuthPage() {
           return;
         }
 
+        const referralCode = sessionStorage.getItem("referralCode") || undefined;
         const res = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ email, password, firstName, lastName }),
+          body: JSON.stringify({ email, password, firstName, lastName, referralCode }),
         });
 
         if (!res.ok) {
@@ -380,6 +383,7 @@ function PublicRouter() {
         <Route path="/terms">{() => <TermsPage />}</Route>
         <Route path="/privacy">{() => <PrivacyPage />}</Route>
         <Route path="/contact">{() => <ContactPage />}</Route>
+        <Route path="/join">{() => <AuthPage />}</Route>
         <Route>{() => <LandingPage />}</Route>
       </Switch>
     </AnimatePresence>
@@ -395,8 +399,16 @@ function AuthGate() {
     enabled: !!user && isNewUser,
   });
 
-  const publicPages = ["/pricing", "/terms", "/privacy", "/contact"];
+  const publicPages = ["/pricing", "/terms", "/privacy", "/contact", "/join"];
   const isPublicPage = publicPages.includes(location);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      sessionStorage.setItem("referralCode", ref);
+    }
+  }, []);
 
   if (isPublicPage) {
     return (

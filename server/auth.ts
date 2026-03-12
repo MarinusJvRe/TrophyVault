@@ -5,12 +5,14 @@ import { z } from "zod";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { storage } from "./storage";
 
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
+  referralCode: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -61,7 +63,7 @@ export function registerEmailAuthRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten() });
       }
 
-      const { email, password, firstName, lastName } = parsed.data;
+      const { email, password, firstName, lastName, referralCode } = parsed.data;
 
       const [existing] = await db.select().from(users).where(eq(users.email, email));
       if (existing) {
@@ -82,6 +84,17 @@ export function registerEmailAuthRoutes(app: Express) {
       (req.session as any).authProvider = "email";
 
       await saveSession(req);
+
+      if (referralCode) {
+        try {
+          const proProfile = await storage.getProProfileByReferralCode(referralCode);
+          if (proProfile) {
+            await storage.createReferral(proProfile.userId, referralCode, user.id);
+          }
+        } catch (err) {
+          console.error("Referral tracking error:", err);
+        }
+      }
 
       const authToken = generateAuthToken(user.id);
 

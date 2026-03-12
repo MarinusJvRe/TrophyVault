@@ -1,9 +1,9 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerEmailAuthRoutes } from "./auth";
-import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema } from "@shared/schema";
+import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema, insertProProfileSchema, TIER_LIMITS, AI_COSTS, type AccountTier } from "@shared/schema";
 import { analyzeTrophyImage, generateTrophyRender } from "./trophy-ai";
 import { generate3DModel } from "./trophy-3d";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -65,6 +65,35 @@ const weaponUpload = multer({
   ...imageUploadConfig,
 });
 
+async function checkTierLimit(userId: string, actionType: "ai_analysis" | "3d_model" | "ai_render"): Promise<{ allowed: boolean; reason?: string; tier: AccountTier }> {
+  const prefs = await storage.getPreferences(userId);
+  const tier = (prefs?.accountTier || "free") as AccountTier;
+  const limits = TIER_LIMITS[tier];
+
+  if (tier === "free") {
+    const lifetime = await storage.getLifetimeUsageCounts(userId);
+    if (actionType === "ai_analysis" && lifetime.aiAnalyses >= limits.maxAiAnalyses) {
+      return { allowed: false, reason: `Free tier limit reached: ${limits.maxAiAnalyses} AI analyses. Upgrade to continue.`, tier };
+    }
+    if (actionType === "3d_model" && lifetime.models3d >= limits.max3dModels) {
+      return { allowed: false, reason: `Free tier limit reached: ${limits.max3dModels} 3D model. Upgrade to continue.`, tier };
+    }
+    return { allowed: true, tier };
+  }
+
+  const monthly = await storage.getMonthlyUsage(userId);
+  const actionCost = AI_COSTS[actionType] || 0;
+  if (monthly.totalCost + actionCost > limits.monthlyCostCap) {
+    return {
+      allowed: false,
+      reason: `Monthly budget exhausted ($${monthly.totalCost.toFixed(2)}/$${limits.monthlyCostCap}). Purchase additional credits to continue.`,
+      tier,
+    };
+  }
+
+  return { allowed: true, tier };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -78,7 +107,6 @@ export async function registerRoutes(
   app.use("/uploads", express.default.static(path.join(process.cwd(), "uploads")));
   registerObjectStorageRoutes(app);
 
-  // Helper to get user ID from request
   const getUserId = (req: any): string => req.user?.claims?.sub;
 
   // ========== MAPS CONFIG ==========
@@ -173,12 +201,35 @@ export async function registerRoutes(
   app.post("/api/trophies", isAuthenticated, async (req, res) => {
     const parsed = insertTrophySchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten() });
-    const trophy = await storage.createTrophy(getUserId(req), parsed.data);
+    const userId = getUserId(req);
+
+    const prefs = await storage.getPreferences(userId);
+    const tier = (prefs?.accountTier || "free") as AccountTier;
+    if (tier === "free") {
+      const allTrophies = await storage.getTrophies(userId);
+      const manualTrophies = allTrophies.filter(t => !t.isAiAnalyzed);
+      if (manualTrophies.length >= TIER_LIMITS.free.maxManualTrophies) {
+        return res.status(403).json({ message: `Free tier limit: ${TIER_LIMITS.free.maxManualTrophies} manual trophies. Upgrade to add more.`, tierLimit: true });
+      }
+    }
+
+    const trophy = await storage.createTrophy(userId, parsed.data);
+
+    const currentPrefs = await storage.getPreferences(userId);
+    if (currentPrefs && !currentPrefs.firstTrophyUploaded) {
+      await storage.upsertPreferences(userId, { firstTrophyUploaded: true } as any);
+    }
+
     res.status(201).json(trophy);
   });
 
   app.patch("/api/trophies/:id", isAuthenticated, async (req, res) => {
-    const trophy = await storage.updateTrophy(req.params.id as string, getUserId(req), req.body);
+    const allowedFields = ["species", "name", "date", "location", "latitude", "longitude", "score", "method", "weaponId", "gender", "shotDistance", "notes", "huntNotes", "imageUrl", "renderImageUrl", "glbUrl", "glbPreviewUrl", "mountType", "featured", "taggedProUserId"];
+    const safeBody: Record<string, any> = {};
+    for (const key of allowedFields) {
+      if (key in req.body) safeBody[key] = req.body[key];
+    }
+    const trophy = await storage.updateTrophy(req.params.id as string, getUserId(req), safeBody);
     if (!trophy) return res.status(404).json({ message: "Trophy not found" });
     res.json(trophy);
   });
@@ -198,7 +249,8 @@ export async function registerRoutes(
   app.put("/api/preferences", isAuthenticated, async (req, res) => {
     const parsed = insertPreferencesSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten() });
-    const prefs = await storage.upsertPreferences(getUserId(req), parsed.data);
+    const { accountTier, userType, leaderboardVerified, credits, ...safeData } = parsed.data as any;
+    const prefs = await storage.upsertPreferences(getUserId(req), safeData);
     res.json(prefs);
   });
 
@@ -230,10 +282,17 @@ export async function registerRoutes(
     }
   });
 
-  // ========== AI TROPHY ANALYSIS ==========
+  // ========== AI TROPHY ANALYSIS (with tier enforcement) ==========
   app.post("/api/trophies/analyze", isAuthenticated, trophyUpload.single("image"), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "No image file provided" });
+      const userId = getUserId(req);
+
+      const tierCheck = await checkTierLimit(userId, "ai_analysis");
+      if (!tierCheck.allowed) {
+        return res.status(403).json({ message: tierCheck.reason, tierLimit: true, tier: tierCheck.tier });
+      }
+
       let imageUrl: string;
       try {
         imageUrl = await uploadFileToStorage(req.file.path, req.file.mimetype);
@@ -243,88 +302,208 @@ export async function registerRoutes(
       }
       const fileBuffer = fs.readFileSync(req.file.path);
       const base64 = fileBuffer.toString("base64");
-      const prefs = await storage.getPreferences(getUserId(req));
+      const prefs = await storage.getPreferences(userId);
       const units = prefs?.units || "imperial";
       const scoringSystem = prefs?.scoringSystem || "SCI";
       const analysis = await analyzeTrophyImage(base64, req.file.mimetype, units, scoringSystem);
 
+      await storage.logUsage(userId, "ai_analysis", AI_COSTS.ai_analysis, `Analyzed trophy image: ${imageUrl}`);
+
       res.json({ imageUrl, renderImageUrl: null, analysis, units, scoringSystem });
 
       if (analysis.render_prompt) {
-        const theme = prefs?.theme || "lodge";
-        const themeBackgrounds: Record<string, string> = {
-          lodge: "mounted on a dark rustic wooden plaque, warm cabin lighting, dark wood-paneled wall background",
-          manor: "mounted on a rich mahogany plaque, warm golden ambient lighting, dark safari-themed wall background with warm earth tones",
-          minimal: "mounted on a clean light oak plaque, bright studio lighting, clean white wall background",
-        };
-        const themedPrompt = analysis.render_prompt.replace(
-          /dark wooden plaque.*$/i,
-          themeBackgrounds[theme] || themeBackgrounds.lodge
-        );
-        pendingRenders.set(imageUrl, { status: "pending", renderImageUrl: null });
-        console.log(`[render] Started background render for ${imageUrl} (theme: ${theme})`);
-        generateTrophyRender(themedPrompt)
-          .then(async (renderBuffer) => {
-            if (renderBuffer) {
-              let renderUrl: string;
-              try {
-                renderUrl = await uploadBufferToStorage(renderBuffer, `render-${Date.now()}.png`, "image/png");
-              } catch (err) {
-                console.error("[render] Object Storage upload failed, using local fallback:", err);
-                const renderFilename = `render-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
-                const renderPath = path.join(trophyUploadDir, renderFilename);
-                fs.writeFileSync(renderPath, renderBuffer);
-                renderUrl = `/uploads/trophies/${renderFilename}`;
+        const renderCheck = await checkTierLimit(userId, "ai_render");
+        if (renderCheck.allowed) {
+          const theme = prefs?.theme || "lodge";
+          const themeBackgrounds: Record<string, string> = {
+            lodge: "mounted on a dark rustic wooden plaque, warm cabin lighting, dark wood-paneled wall background",
+            manor: "mounted on a rich mahogany plaque, warm golden ambient lighting, dark safari-themed wall background with warm earth tones",
+            minimal: "mounted on a clean light oak plaque, bright studio lighting, clean white wall background",
+          };
+          const themedPrompt = analysis.render_prompt.replace(
+            /dark wooden plaque.*$/i,
+            themeBackgrounds[theme] || themeBackgrounds.lodge
+          );
+          pendingRenders.set(imageUrl, { status: "pending", renderImageUrl: null });
+          console.log(`[render] Started background render for ${imageUrl} (theme: ${theme})`);
+          generateTrophyRender(themedPrompt)
+            .then(async (renderBuffer) => {
+              if (renderBuffer) {
+                let renderUrl: string;
+                try {
+                  renderUrl = await uploadBufferToStorage(renderBuffer, `render-${Date.now()}.png`, "image/png");
+                } catch (err) {
+                  console.error("[render] Object Storage upload failed, using local fallback:", err);
+                  const renderFilename = `render-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
+                  const renderPath = path.join(trophyUploadDir, renderFilename);
+                  fs.writeFileSync(renderPath, renderBuffer);
+                  renderUrl = `/uploads/trophies/${renderFilename}`;
+                }
+                pendingRenders.set(imageUrl, { status: "done", renderImageUrl: renderUrl });
+                console.log(`[render] Completed render for ${imageUrl} → ${renderUrl}`);
+                await storage.logUsage(userId, "ai_render", AI_COSTS.ai_render, `Rendered trophy: ${imageUrl}`);
+                storage.patchTrophyRenderByImage(imageUrl, renderUrl).then(() => {
+                  console.log(`[render] Auto-patched trophy render for ${imageUrl}`);
+                }).catch((err) => {
+                  console.error("[render] Failed to patch trophy render:", err);
+                });
+              } else {
+                console.error(`[render] Render returned empty for ${imageUrl}`);
+                pendingRenders.set(imageUrl, { status: "failed", renderImageUrl: null });
               }
-              pendingRenders.set(imageUrl, { status: "done", renderImageUrl: renderUrl });
-              console.log(`[render] Completed render for ${imageUrl} → ${renderUrl}`);
-              storage.patchTrophyRenderByImage(imageUrl, renderUrl).then(() => {
-                console.log(`[render] Auto-patched trophy render for ${imageUrl}`);
-              }).catch((err) => {
-                console.error("[render] Failed to patch trophy render:", err);
-              });
-            } else {
-              console.error(`[render] Render returned empty for ${imageUrl}`);
+            })
+            .catch((err) => {
+              console.error(`[render] Render generation failed for ${imageUrl}:`, err);
               pendingRenders.set(imageUrl, { status: "failed", renderImageUrl: null });
-            }
-          })
-          .catch((err) => {
-            console.error(`[render] Render generation failed for ${imageUrl}:`, err);
-            pendingRenders.set(imageUrl, { status: "failed", renderImageUrl: null });
-          });
+            });
+        }
       }
 
-      pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null });
-      const mountType = analysis.mount_recommendation?.best || null;
-      console.log(`[3d-model] Started background 3D generation for ${imageUrl} (mount: ${mountType})`);
-      generate3DModel(req.file!.path, mountType)
-        .then(async ({ glbUrl: localGlbUrl, glbPreviewUrl: localPreviewUrl }) => {
-          let glbUrl = localGlbUrl;
-          let glbPreviewUrl = localPreviewUrl;
-          try {
-            glbUrl = await uploadFileToStorage(path.join(process.cwd(), localGlbUrl));
-            if (localPreviewUrl) {
-              glbPreviewUrl = await uploadFileToStorage(path.join(process.cwd(), localPreviewUrl));
+      const modelCheck = await checkTierLimit(userId, "3d_model");
+      if (modelCheck.allowed) {
+        pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null });
+        const mountType = analysis.mount_recommendation?.best || null;
+        console.log(`[3d-model] Started background 3D generation for ${imageUrl} (mount: ${mountType})`);
+        generate3DModel(req.file!.path, mountType)
+          .then(async ({ glbUrl: localGlbUrl, glbPreviewUrl: localPreviewUrl }) => {
+            let glbUrl = localGlbUrl;
+            let glbPreviewUrl = localPreviewUrl;
+            try {
+              glbUrl = await uploadFileToStorage(path.join(process.cwd(), localGlbUrl));
+              if (localPreviewUrl) {
+                glbPreviewUrl = await uploadFileToStorage(path.join(process.cwd(), localPreviewUrl));
+              }
+            } catch (err) {
+              console.error("[3d-model] Object Storage upload failed, using local paths:", err);
             }
-          } catch (err) {
-            console.error("[3d-model] Object Storage upload failed, using local paths:", err);
-          }
-          pendingModels.set(imageUrl, { status: "done", glbUrl, glbPreviewUrl });
-          console.log(`[3d-model] Completed 3D model for ${imageUrl} → ${glbUrl}`);
-          storage.patchTrophyGlb(imageUrl, glbUrl, glbPreviewUrl, mountType).then(() => {
-            console.log(`[3d-model] Auto-patched trophy GLB for ${imageUrl}`);
-          }).catch((err) => {
-            console.error("[3d-model] Failed to patch trophy GLB:", err);
+            pendingModels.set(imageUrl, { status: "done", glbUrl, glbPreviewUrl });
+            console.log(`[3d-model] Completed 3D model for ${imageUrl} → ${glbUrl}`);
+            await storage.logUsage(userId, "3d_model", AI_COSTS["3d_model"], `3D model for: ${imageUrl}`);
+            storage.patchTrophyGlb(imageUrl, glbUrl, glbPreviewUrl, mountType).then(() => {
+              console.log(`[3d-model] Auto-patched trophy GLB for ${imageUrl}`);
+            }).catch((err) => {
+              console.error("[3d-model] Failed to patch trophy GLB:", err);
+            });
+          })
+          .catch((err) => {
+            console.error(`[3d-model] 3D model generation failed for ${imageUrl}:`, err);
+            pendingModels.set(imageUrl, { status: "failed", glbUrl: null, glbPreviewUrl: null });
           });
-        })
-        .catch((err) => {
-          console.error(`[3d-model] 3D model generation failed for ${imageUrl}:`, err);
-          pendingModels.set(imageUrl, { status: "failed", glbUrl: null, glbPreviewUrl: null });
-        });
+      }
     } catch (error: any) {
       console.error("AI analysis error:", error);
       res.status(500).json({ message: "AI analysis failed", error: error.message });
     }
+  });
+
+  // ========== USAGE & TIER INFO ==========
+  app.get("/api/usage", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const prefs = await storage.getPreferences(userId);
+    const tier = (prefs?.accountTier || "free") as AccountTier;
+    const monthly = await storage.getMonthlyUsage(userId);
+    const lifetime = await storage.getLifetimeUsageCounts(userId);
+    const limits = TIER_LIMITS[tier];
+
+    res.json({
+      tier,
+      monthly,
+      lifetime,
+      limits: {
+        maxAiAnalyses: tier === "free" ? limits.maxAiAnalyses : null,
+        max3dModels: tier === "free" ? limits.max3dModels : null,
+        maxManualTrophies: tier === "free" ? limits.maxManualTrophies : null,
+        monthlyCostCap: limits.monthlyCostCap || null,
+      },
+      remaining: {
+        aiAnalyses: tier === "free" ? Math.max(0, limits.maxAiAnalyses - lifetime.aiAnalyses) : null,
+        models3d: tier === "free" ? Math.max(0, limits.max3dModels - lifetime.models3d) : null,
+        monthlyBudget: tier !== "free" ? Math.max(0, limits.monthlyCostCap - monthly.totalCost) : null,
+      },
+    });
+  });
+
+  // ========== PRO PROFILES ==========
+  app.get("/api/pro/profile", isAuthenticated, async (req, res) => {
+    const profile = await storage.getProProfile(getUserId(req));
+    res.json(profile || null);
+  });
+
+  app.post("/api/pro/profile", isAuthenticated, async (req, res) => {
+    const parsed = insertProProfileSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten() });
+    const userId = getUserId(req);
+    const existing = await storage.getProProfile(userId);
+    if (existing) return res.status(409).json({ message: "Pro profile already exists" });
+    const profile = await storage.createProProfile(userId, parsed.data);
+    res.status(201).json(profile);
+  });
+
+  app.patch("/api/pro/profile", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const profile = await storage.updateProProfile(userId, req.body);
+    if (!profile) return res.status(404).json({ message: "Pro profile not found" });
+    res.json(profile);
+  });
+
+  app.get("/api/pro/search", isAuthenticated, async (req, res) => {
+    const query = (req.query.q as string) || "";
+    if (query.length < 2) return res.json([]);
+    const results = await storage.searchProUsers(query);
+    res.json(results);
+  });
+
+  // ========== REFERRALS ==========
+  app.get("/api/pro/referrals", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const profile = await storage.getProProfile(userId);
+    if (!profile) return res.status(403).json({ message: "Pro profile required" });
+    const referrals = await storage.getReferralsByProUser(userId);
+    const stats = await storage.getReferralStats(userId);
+    res.json({ referrals, stats, referralCode: profile.referralCode, referralLink: profile.referralLink });
+  });
+
+  app.get("/api/referral/validate/:code", async (req, res) => {
+    const profile = await storage.getProProfileByReferralCode(req.params.code as string);
+    if (!profile) return res.status(404).json({ message: "Invalid referral code" });
+    res.json({ valid: true, proUserId: profile.userId, businessName: profile.businessName });
+  });
+
+  app.post("/api/referral/track", async (req, res) => {
+    const { referralCode, referredUserId } = req.body;
+    if (!referralCode) return res.status(400).json({ message: "Referral code required" });
+    const profile = await storage.getProProfileByReferralCode(referralCode);
+    if (!profile) return res.status(404).json({ message: "Invalid referral code" });
+    const referral = await storage.createReferral(profile.userId, referralCode, referredUserId);
+    res.json(referral);
+  });
+
+  // ========== PRO TAG STATS ==========
+  app.get("/api/pro/tags", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const profile = await storage.getProProfile(userId);
+    if (!profile) return res.status(403).json({ message: "Pro profile required" });
+    const stats = await storage.getTagStats(userId);
+    res.json(stats);
+  });
+
+  // ========== LEADERBOARD VERIFICATION ==========
+  app.post("/api/verify-leaderboard", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const prefs = await storage.getPreferences(userId);
+    const tier = (prefs?.accountTier || "free") as AccountTier;
+
+    if (tier === "free") {
+      return res.status(403).json({ message: "Paid or Pro tier required for leaderboard verification" });
+    }
+
+    const { realName, hasProfilePhoto } = req.body;
+    if (!realName || !hasProfilePhoto) {
+      return res.status(400).json({ message: "Real name confirmation and profile photo required" });
+    }
+
+    const updated = await storage.upsertPreferences(userId, { leaderboardVerified: true } as any);
+    res.json({ verified: true, preferences: updated });
   });
 
   // ========== COMMUNITY / ROOM RATINGS ==========

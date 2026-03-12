@@ -35,11 +35,12 @@ import {
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import type { Trophy, Weapon } from "@shared/schema";
+import type { Trophy, Weapon, ProProfile } from "@shared/schema";
 import { findClosestSpecies } from "@shared/scoring-thresholds";
 import { HUNTING_METHODS } from "@/components/AddTrophyDialog";
 import TrophyARViewer from "@/components/TrophyARViewer";
 import { useTheme } from "@/lib/theme-context";
+import { Briefcase } from "lucide-react";
 
 function parseStoredDistance(value: string | null): { num: string; unit: string } {
   if (!value) return { num: "", unit: "yards" };
@@ -482,6 +483,10 @@ function ViewMode({
         )}
       </div>
 
+      {trophy.taggedProUserId && (
+        <TaggedProDisplay proUserId={trophy.taggedProUserId} />
+      )}
+
       <div>
         <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">AI Analysis</h3>
         <div className="p-4 rounded-lg bg-card border border-border/50 space-y-3">
@@ -851,5 +856,48 @@ function TrophyIcon(props: any) {
       <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
       <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
     </svg>
+  );
+}
+
+function TaggedProDisplay({ proUserId }: { proUserId: string }) {
+  const { data: proProfile } = useQuery<{ userId: string; firstName: string | null; lastName: string | null; businessName: string; entityType: string; profileImageUrl: string | null }>({
+    queryKey: ["/api/pro/profile", proUserId],
+    queryFn: async () => {
+      const res = await fetch(`/api/pro/search?q=${encodeURIComponent(proUserId)}`, { credentials: "include" });
+      if (!res.ok) return null;
+      const results = await res.json();
+      return results.find((p: any) => p.userId === proUserId) || null;
+    },
+  });
+
+  const ENTITY_LABELS: Record<string, string> = {
+    outfitter: "Outfitter",
+    professional_hunter: "Professional Hunter",
+    taxidermist: "Taxidermist",
+  };
+
+  const displayName = proProfile
+    ? proProfile.businessName || [proProfile.firstName, proProfile.lastName].filter(Boolean).join(" ") || "Pro User"
+    : "Pro User";
+  const entityLabel = proProfile ? ENTITY_LABELS[proProfile.entityType] || proProfile.entityType : "";
+
+  return (
+    <div data-testid="tagged-pro-section">
+      <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">Tagged Professional</h3>
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+        <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+          <Briefcase className="h-5 w-5 text-amber-500" />
+        </div>
+        <div>
+          <div className="text-sm font-medium text-foreground flex items-center gap-2">
+            {displayName}
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-amber-500/20 text-amber-500 border border-amber-500/30">
+              Pro
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground">{entityLabel || "Tagged on this hunt"}</div>
+        </div>
+      </div>
+    </div>
   );
 }

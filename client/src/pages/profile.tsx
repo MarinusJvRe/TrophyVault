@@ -7,12 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { User, Palette, MapPin, Target, Ruler, Eye, Check, Mountain, Home, Feather, LogOut, Camera, Crown } from "lucide-react";
+import { User, Palette, MapPin, Target, Ruler, Eye, Check, Mountain, Home, Feather, LogOut, Camera, Crown, Zap, Shield, Briefcase, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import type { UserPreferences } from "@shared/schema";
+import { Link } from "wouter";
+import type { UserPreferences, ProProfile } from "@shared/schema";
+import UsageBanner from "@/components/UsageBanner";
+import UpgradePrompt from "@/components/UpgradePrompt";
 
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
@@ -40,15 +43,26 @@ const HUNTING_LOCATIONS = [
 const PURSUITS = ["Big Game", "Plains Game", "Waterfowl", "Alpine"];
 const SCORING_SYSTEMS = ["SCI", "Boone & Crockett", "Rowland Ward"];
 
+const TIER_CONFIG: Record<string, { label: string; color: string; bgColor: string; borderColor: string; icon: any }> = {
+  free: { label: "Free", color: "text-muted-foreground", bgColor: "bg-muted", borderColor: "border-border/40", icon: User },
+  paid: { label: "Paid", color: "text-primary", bgColor: "bg-primary/20", borderColor: "border-primary/30", icon: Zap },
+  pro: { label: "Pro", color: "text-amber-500", bgColor: "bg-amber-500/20", borderColor: "border-amber-500/30", icon: Crown },
+};
+
 export default function Profile() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const { data: preferences, isLoading } = useQuery<UserPreferences>({
     queryKey: ["/api/preferences"],
+  });
+
+  const { data: proProfile } = useQuery<ProProfile>({
+    queryKey: ["/api/pro/profile"],
   });
 
   const [selectedTheme, setSelectedTheme] = useState<"lodge" | "manor" | "minimal">(theme);
@@ -99,6 +113,22 @@ export default function Profile() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to upload photo.", variant: "destructive" });
+    },
+  });
+
+  const verifyMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/verify-leaderboard", {
+        realName: `${user?.firstName} ${user?.lastName}`,
+        hasProfilePhoto: !!(preferences?.profileImageUrl || user?.profileImageUrl),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
+      toast({ title: "Verified", description: "You are now eligible for the leaderboard." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Verification failed.", variant: "destructive" });
     },
   });
 
@@ -162,7 +192,9 @@ export default function Profile() {
   };
 
   const profileImage = preferences?.profileImageUrl || user?.profileImageUrl;
-  const isPremium = preferences?.isPremium || false;
+  const accountTier = preferences?.accountTier || "free";
+  const tierConfig = TIER_CONFIG[accountTier] || TIER_CONFIG.free;
+  const TierIcon = tierConfig.icon;
 
   if (isLoading) {
     return (
@@ -230,12 +262,10 @@ export default function Profile() {
                     </h2>
                     <span className={cn(
                       "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider",
-                      isPremium
-                        ? "bg-amber-500/20 text-amber-500 border border-amber-500/30"
-                        : "bg-muted text-muted-foreground border border-border/40"
+                      tierConfig.bgColor, tierConfig.color, "border", tierConfig.borderColor
                     )} data-testid="badge-membership">
-                      {isPremium && <Crown className="h-2.5 w-2.5" />}
-                      {isPremium ? "Premium" : "Free"}
+                      <TierIcon className="h-2.5 w-2.5" />
+                      {tierConfig.label}
                     </span>
                   </div>
                   <Button
@@ -253,11 +283,113 @@ export default function Profile() {
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground" data-testid="text-profile-email">{user?.email || ""}</p>
+                {accountTier === "free" && (
+                  <button
+                    onClick={() => setShowUpgrade(true)}
+                    className="text-xs text-primary hover:underline mt-1 inline-flex items-center gap-1"
+                    data-testid="button-profile-upgrade"
+                  >
+                    <Zap className="h-3 w-3" /> Upgrade your plan
+                  </button>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
         </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.15, ease: "easeOut" }}
+        >
+          <UsageBanner onUpgradeClick={() => setShowUpgrade(true)} />
+        </motion.div>
+
+        {proProfile && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.17, ease: "easeOut" }}
+          >
+            <Card className="bg-card border-amber-500/20">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Briefcase className="h-5 w-5 text-amber-500 shrink-0" />
+                    <div>
+                      <div className="font-medium text-foreground text-sm">{proProfile.businessName}</div>
+                      <div className="text-xs text-muted-foreground">Pro Dashboard — referrals, tags, and business tools</div>
+                    </div>
+                  </div>
+                  <Link href="/pro">
+                    <Button variant="outline" size="sm" className="gap-1.5 border-amber-500/30 text-amber-500 hover:bg-amber-500/10" data-testid="button-go-pro-dashboard">
+                      Dashboard <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {(accountTier === "paid" || accountTier === "pro") && !preferences?.leaderboardVerified && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.18, ease: "easeOut" }}
+          >
+            <Card className="bg-card border-border/40">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Shield className="h-5 w-5 text-primary shrink-0" />
+                    <div>
+                      <div className="font-medium text-foreground text-sm">Leaderboard Verification</div>
+                      <div className="text-xs text-muted-foreground">
+                        Verify your identity to appear on leaderboards. Confirm your real name and add a profile photo.
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => verifyMutation.mutate()}
+                    disabled={verifyMutation.isPending || !profileImage}
+                    className="gap-1.5"
+                    data-testid="button-verify-leaderboard"
+                  >
+                    {verifyMutation.isPending ? "Verifying..." : "Verify"}
+                  </Button>
+                </div>
+                {!profileImage && (
+                  <p className="text-xs text-amber-500 mt-2 ml-8">Upload a profile photo first to verify.</p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {preferences?.leaderboardVerified && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.18, ease: "easeOut" }}
+          >
+            <Card className="bg-card border-green-500/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <Check className="h-4 w-4 text-green-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-foreground text-sm">Leaderboard Verified</div>
+                    <div className="text-xs text-muted-foreground">Your identity is verified. You can appear on leaderboards.</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -446,6 +578,13 @@ export default function Profile() {
         </motion.div>
 
       </div>
+
+      <UpgradePrompt
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        variant="limit-hit"
+        currentTier={accountTier}
+      />
     </Layout>
   );
 }
