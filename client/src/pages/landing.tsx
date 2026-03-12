@@ -177,6 +177,16 @@ export default function LandingPage() {
           <span className="font-bold">Coming Soon</span> — Honor The Hunt is launching soon. Be the first to know!
         </p>
       </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8 }}
+        className="bg-[#0d0d0d] text-center py-4">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#b87333]/20 bg-[#b873331a] font-semibold">
+          <Crosshair className="h-3.5 w-3.5 text-[#b87333]" />
+          <span className="text-xs text-[#b87333] font-medium tracking-wider uppercase">Your Digital Trophy Room</span>
+        </div>
+      </motion.div>
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden" data-testid="section-hero">
         <div className="absolute inset-0">
           <img
@@ -188,17 +198,6 @@ export default function LandingPage() {
         </div>
 
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center py-20">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="font-semibold">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#b87333]/20 mb-8 bg-[#b873331a] font-semibold">
-              <Crosshair className="h-3.5 w-3.5 text-[#b87333]" />
-              <span className="text-xs text-[#b87333] font-medium tracking-wider uppercase">Your Digital Trophy Room</span>
-            </div>
-          </motion.div>
-
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
