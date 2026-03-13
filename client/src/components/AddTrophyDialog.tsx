@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Upload, Sparkles, Check, AlertTriangle, X, Loader2, Crop, ImageIcon } from "lucide-react";
+import { Camera, Upload, Sparkles, Check, AlertTriangle, X, Loader2, Crop, ImageIcon, Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactCrop, { type Crop as CropType, centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
@@ -147,6 +147,8 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const [locationLng, setLocationLng] = useState<number | null>(null);
   const [exifDate, setExifDate] = useState<string | null>(null);
   const [exifLocationSource, setExifLocationSource] = useState<string | null>(null);
+  const [geoTrigger, setGeoTrigger] = useState(0);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [methodValue, setMethodValue] = useState<string>("");
   const [distanceUnit, setDistanceUnit] = useState<string>("yards");
   const [scoreUnit, setScoreUnit] = useState<string>('"');
@@ -1029,6 +1031,20 @@ function FormStep({
                   <Camera className="h-2.5 w-2.5" /> From photo
                 </span>
               )}
+              <button
+                type="button"
+                onClick={() => setGeoTrigger((t) => t + 1)}
+                disabled={isGettingLocation}
+                className="ml-auto text-primary hover:text-primary/80 disabled:opacity-50"
+                title="Use current location"
+                data-testid="button-use-current-location"
+              >
+                {isGettingLocation ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Navigation className="h-3 w-3" />
+                )}
+              </button>
             </Label>
             <LocationSearch
               value={locationName}
@@ -1041,6 +1057,8 @@ function FormStep({
                 if (loc !== locationName) setExifLocationSource(null);
               }}
               placeholder="Search for a location..."
+              triggerCurrentLocation={geoTrigger}
+              onGettingLocationChange={setIsGettingLocation}
             />
           </div>
         </div>
