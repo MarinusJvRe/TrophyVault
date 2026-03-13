@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Check, ArrowRight, Home, Feather, Mountain, Crosshair, Briefcase, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LocationSearch } from "@/components/LocationSearch";
 
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
@@ -20,9 +21,9 @@ const THEMES = [
 ] as const;
 
 const PRO_ENTITY_TYPES = [
-  { id: "outfitter", label: "Outfitter", description: "Guide hunts and provide outfitting services" },
-  { id: "professional_hunter", label: "Professional Hunter", description: "Licensed professional hunter / PH" },
+  { id: "outfitter_ph", label: "Outfitters and Professional Hunters", description: "Guide hunts, outfitting services, or licensed PH" },
   { id: "taxidermist", label: "Taxidermist", description: "Preserve and mount trophies" },
+  { id: "ranch_game_farm", label: "Ranch or Game Farm", description: "Operate a hunting ranch or game farm" },
 ];
 
 export default function Onboarding() {
@@ -86,7 +87,7 @@ export default function Onboarding() {
         await createProProfileMutation.mutateAsync({
           entityType: proData.entityType,
           businessName: proData.businessName,
-          businessHandle: proData.businessHandle || undefined,
+          businessHandle: proData.businessHandle,
           location: proData.location || undefined,
         });
         proProfileCreated = true;
@@ -254,11 +255,12 @@ export default function Onboarding() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs md:text-sm font-medium text-white/80 uppercase tracking-wider">Handle (optional)</label>
+                    <label className="text-xs md:text-sm font-medium text-white/80 uppercase tracking-wider">Handle</label>
                     <Input
                       value={proData.businessHandle}
                       onChange={(e) => setProData({ ...proData, businessHandle: e.target.value })}
                       placeholder="@yourbusiness"
+                      required
                       className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                       data-testid="input-business-handle"
                     />
@@ -266,12 +268,10 @@ export default function Onboarding() {
 
                   <div className="space-y-2">
                     <label className="text-xs md:text-sm font-medium text-white/80 uppercase tracking-wider">Location</label>
-                    <Input
+                    <LocationSearch
                       value={proData.location}
-                      onChange={(e) => setProData({ ...proData, location: e.target.value })}
+                      onChange={(loc, _lat, _lng) => setProData({ ...proData, location: loc })}
                       placeholder="e.g., Limpopo, South Africa"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
-                      data-testid="input-business-location"
                     />
                   </div>
                 </div>
@@ -284,7 +284,7 @@ export default function Onboarding() {
                 <Button
                   size="lg"
                   onClick={() => setStep(2)}
-                  disabled={!proData.entityType || !proData.businessName}
+                  disabled={!proData.entityType || !proData.businessName || !proData.businessHandle}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 font-serif"
                   data-testid="button-next-step"
                 >
