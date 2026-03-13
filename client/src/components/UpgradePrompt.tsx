@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { X, Sparkles, Zap, Crown, Check } from "lucide-react";
+import { X, Sparkles, Zap, Crown, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trackEvent } from "@/lib/posthog";
+import { useToast } from "@/hooks/use-toast";
 
 interface UpgradePromptProps {
   open: boolean;
@@ -30,6 +33,23 @@ const TIER_FEATURES = {
 };
 
 export default function UpgradePrompt({ open, onClose, variant = "first-trophy", currentTier = "free" }: UpgradePromptProps) {
+  const { toast } = useToast();
+  const upgradeMutation = useMutation({
+    mutationFn: async (tier: string) => {
+      const res = await apiRequest("POST", "/api/upgrade", { tier });
+      return res.json();
+    },
+    onSuccess: (_data, tier) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/usage"] });
+      toast({ title: "Upgrade successful!", description: `You are now on the ${tier === "pro" ? "Pro" : "Paid"} plan.` });
+      onClose();
+    },
+    onError: () => {
+      toast({ title: "Upgrade failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+    },
+  });
+
   if (!open) return null;
 
   const titles: Record<string, { heading: string; sub: string }> = {
@@ -105,8 +125,10 @@ export default function UpgradePrompt({ open, onClose, variant = "first-trophy",
               <Button
                 className="w-full mt-4 bg-primary hover:bg-primary/90 text-primary-foreground text-sm"
                 data-testid="button-upgrade-paid"
-                onClick={() => { trackEvent("tier_upgrade_clicked", { targetTier: "paid", currentTier, variant }); onClose(); }}
+                disabled={upgradeMutation.isPending}
+                onClick={() => { trackEvent("tier_upgrade_clicked", { targetTier: "paid", currentTier, variant }); upgradeMutation.mutate("paid"); }}
               >
+                {upgradeMutation.isPending && upgradeMutation.variables === "paid" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Upgrade to Paid
               </Button>
             </div>
@@ -129,15 +151,17 @@ export default function UpgradePrompt({ open, onClose, variant = "first-trophy",
                 variant="outline"
                 className="w-full mt-4 border-amber-500/30 text-amber-500 hover:bg-amber-500/10 text-sm"
                 data-testid="button-upgrade-pro"
-                onClick={() => { trackEvent("tier_upgrade_clicked", { targetTier: "pro", currentTier, variant }); onClose(); }}
+                disabled={upgradeMutation.isPending}
+                onClick={() => { trackEvent("tier_upgrade_clicked", { targetTier: "pro", currentTier, variant }); upgradeMutation.mutate("pro"); }}
               >
+                {upgradeMutation.isPending && upgradeMutation.variables === "pro" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Upgrade to Pro
               </Button>
             </div>
           </div>
 
           <p className="text-center text-[10px] text-muted-foreground">
-            Payment integration coming soon. Contact us to upgrade your account.
+            Upgrade instantly — payment integration coming soon for billing management.
           </p>
         </motion.div>
       </motion.div>

@@ -242,6 +242,15 @@ export async function registerRoutes(
     res.json(prefs);
   });
 
+  app.post("/api/upgrade", isAuthenticated, async (req, res) => {
+    const { tier } = req.body;
+    if (!tier || !["paid", "pro"].includes(tier)) {
+      return res.status(400).json({ message: "Invalid tier. Must be 'paid' or 'pro'." });
+    }
+    const prefs = await storage.upsertPreferences(getUserId(req), { accountTier: tier } as any);
+    res.json(prefs);
+  });
+
   // ========== PROFILE IMAGE UPLOAD ==========
   app.post("/api/profile/upload-image", isAuthenticated, profileUpload.single("image"), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No image file provided" });
