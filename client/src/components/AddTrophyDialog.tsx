@@ -797,15 +797,15 @@ function AnalyzingStep({ previewUrl }: { previewUrl: string | null }) {
         </DialogTitle>
       </DialogHeader>
 
-      <div className="relative rounded-xl overflow-hidden mb-6 border border-border/40 min-h-[200px]">
+      <div className="relative rounded-xl overflow-hidden mb-6 border border-border/40 aspect-[4/3]">
         {previewUrl && (
           <img
             src={previewUrl}
             alt="Analyzing..."
-            className="w-full max-h-[250px] object-contain bg-black/5"
+            className="absolute inset-0 w-full h-full object-cover"
           />
         )}
-        <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px] flex items-center justify-center min-h-[200px]">
+        <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px] flex items-center justify-center">
           <div className="text-center flex flex-col items-center">
             <div className="mb-3">
               <div className="h-12 w-12 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
