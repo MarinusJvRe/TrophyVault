@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme-context";
 import { useAuth } from "@/hooks/use-auth";
+import { capturePageView, identifyUser } from "@/lib/posthog";
+import type { UserPreferences } from "@shared/schema";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import TrophyRoom from "@/pages/trophy-room";
@@ -52,6 +54,13 @@ function AnimatedPage({ children }: { children: React.ReactNode }) {
       {children}
     </motion.div>
   );
+}
+
+function usePageViewTracking() {
+  const [location] = useLocation();
+  useEffect(() => {
+    capturePageView(location);
+  }, [location]);
 }
 
 function Router() {
@@ -396,9 +405,9 @@ function AuthGate() {
   const { user, isLoading } = useAuth();
   const [location] = useLocation();
   const isNewUser = sessionStorage.getItem("isNewUser") === "true";
-  const { data: preferences, isLoading: prefsLoading } = useQuery({
+  const { data: preferences, isLoading: prefsLoading } = useQuery<UserPreferences>({
     queryKey: ["/api/preferences"],
-    enabled: !!user && isNewUser,
+    enabled: !!user,
   });
 
   const publicPages = ["/pricing", "/terms", "/privacy", "/contact", "/join"];
@@ -411,6 +420,16 @@ function AuthGate() {
       sessionStorage.setItem("referralCode", ref);
     }
   }, []);
+
+  usePageViewTracking();
+
+  useEffect(() => {
+    if (user) {
+      identifyUser(String(user.id), {
+        tier: preferences?.accountTier || "free",
+      });
+    }
+  }, [user, preferences]);
 
   if (isPublicPage) {
     return (

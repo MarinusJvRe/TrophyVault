@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link2, Users, DollarSign, TrendingUp, Tag, Copy, Check, ExternalLink, Briefcase } from "lucide-react";
 import { useState } from "react";
+import { trackEvent } from "@/lib/posthog";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { ProProfile, Trophy } from "@shared/schema";
@@ -37,6 +38,9 @@ export default function ProDashboard() {
     if (referralData?.referralLink) {
       navigator.clipboard.writeText(`${window.location.origin}${referralData.referralLink}`);
       setCopied(true);
+      trackEvent("referral_link_shared", {
+        referralCode: referralData.referralCode,
+      });
       setTimeout(() => setCopied(false), 2000);
     }
   };

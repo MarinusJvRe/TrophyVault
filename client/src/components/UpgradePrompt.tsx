@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { X, Sparkles, Zap, Crown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trackEvent } from "@/lib/posthog";
 
 interface UpgradePromptProps {
   open: boolean;
@@ -104,7 +105,7 @@ export default function UpgradePrompt({ open, onClose, variant = "first-trophy",
               <Button
                 className="w-full mt-4 bg-primary hover:bg-primary/90 text-primary-foreground text-sm"
                 data-testid="button-upgrade-paid"
-                onClick={onClose}
+                onClick={() => { trackEvent("tier_upgrade_clicked", { targetTier: "paid", currentTier, variant }); onClose(); }}
               >
                 Upgrade to Paid
               </Button>
@@ -128,7 +129,7 @@ export default function UpgradePrompt({ open, onClose, variant = "first-trophy",
                 variant="outline"
                 className="w-full mt-4 border-amber-500/30 text-amber-500 hover:bg-amber-500/10 text-sm"
                 data-testid="button-upgrade-pro"
-                onClick={onClose}
+                onClick={() => { trackEvent("tier_upgrade_clicked", { targetTier: "pro", currentTier, variant }); onClose(); }}
               >
                 Upgrade to Pro
               </Button>

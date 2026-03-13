@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { getAuthToken } from "@/lib/auth-token";
+import { trackEvent } from "@/lib/posthog";
 import {
   Dialog,
   DialogContent,
@@ -321,11 +322,16 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const createTrophyMutation = useMutation({
     mutationFn: async (data: any) => {
       await apiRequest("POST", "/api/trophies", data);
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/trophies"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       handleOpenChange(false);
+      trackEvent("trophy_created", {
+        species: variables?.species,
+        hasImage: !!variables?.imageUrl,
+      });
       toast({ title: "Trophy added", description: "Your trophy has been added to your trophy room." });
     },
     onError: (error: Error) => {

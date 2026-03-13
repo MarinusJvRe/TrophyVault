@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useTheme } from "@/lib/theme-context";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { trackEvent } from "@/lib/posthog";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +96,15 @@ export default function Onboarding() {
         console.error("Pro profile creation failed:", err);
       }
     }
+
+    trackEvent("onboarding_completed", {
+      userType: userType === "professional" ? "professional" : "hunter",
+      theme: selectedTheme,
+      pursuit: formData.pursuit,
+      scoringSystem: formData.scoring,
+      units: formData.units,
+      proProfileCreated,
+    });
 
     savePreferencesMutation.mutate({
       theme: selectedTheme,
