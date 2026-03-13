@@ -38,6 +38,7 @@ export const trophies = pgTable("trophies", {
   renderImageUrl: text("render_image_url"),
   glbUrl: text("glb_url"),
   glbPreviewUrl: text("glb_preview_url"),
+  usdzUrl: text("usdz_url"),
   mountType: text("mount_type"),
   latitude: doublePrecision("latitude"),
   longitude: doublePrecision("longitude"),
@@ -194,7 +195,6 @@ export const TIER_LIMITS = {
 export const AI_COSTS = {
   ai_analysis: 0.10,
   "3d_model": 0.15,
-  ai_render: 0.05,
 } as const;
 
 export type AccountTier = "free" | "paid" | "pro";

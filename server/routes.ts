@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerEmailAuthRoutes } from "./auth";
 import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema, insertProProfileSchema, TIER_LIMITS, AI_COSTS, type AccountTier } from "@shared/schema";
-import { analyzeTrophyImage, generateTrophyRender, buildRenderPrompt } from "./trophy-ai";
+import { analyzeTrophyImage } from "./trophy-ai";
 import { generate3DModel } from "./trophy-3d";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { uploadBufferToStorage, uploadFileToStorage } from "./object-storage-helper";
@@ -65,7 +65,7 @@ const weaponUpload = multer({
   ...imageUploadConfig,
 });
 
-async function checkTierLimit(userId: string, actionType: "ai_analysis" | "3d_model" | "ai_render"): Promise<{ allowed: boolean; reason?: string; tier: AccountTier }> {
+async function checkTierLimit(userId: string, actionType: "ai_analysis" | "3d_model"): Promise<{ allowed: boolean; reason?: string; tier: AccountTier }> {
   const prefs = await storage.getPreferences(userId);
   const tier = (prefs?.accountTier || "free") as AccountTier;
   const limits = TIER_LIMITS[tier];
@@ -162,30 +162,18 @@ export async function registerRoutes(
   });
 
   // ========== TROPHIES ==========
-  const pendingRenders = new Map<string, { status: "pending" | "done" | "failed"; renderImageUrl: string | null }>();
-  const pendingModels = new Map<string, { status: "pending" | "done" | "failed"; glbUrl: string | null; glbPreviewUrl: string | null }>();
+  const pendingModels = new Map<string, { status: "pending" | "done" | "failed"; glbUrl: string | null; glbPreviewUrl: string | null; usdzUrl: string | null }>();
 
   app.get("/api/trophies", isAuthenticated, async (req, res) => {
     const list = await storage.getTrophies(getUserId(req));
     res.json(list);
   });
 
-  app.get("/api/trophies/render-status", isAuthenticated, (req, res) => {
-    const imageUrl = req.query.imageUrl as string;
-    if (!imageUrl) return res.status(400).json({ message: "imageUrl query param required" });
-    const entry = pendingRenders.get(imageUrl);
-    if (!entry) return res.json({ status: "unknown", renderImageUrl: null });
-    if (entry.status === "done") {
-      pendingRenders.delete(imageUrl);
-    }
-    res.json(entry);
-  });
-
   app.get("/api/trophies/model-status", isAuthenticated, (req, res) => {
     const imageUrl = req.query.imageUrl as string;
     if (!imageUrl) return res.status(400).json({ message: "imageUrl query param required" });
     const entry = pendingModels.get(imageUrl);
-    if (!entry) return res.json({ status: "unknown", glbUrl: null, glbPreviewUrl: null });
+    if (!entry) return res.json({ status: "unknown", glbUrl: null, glbPreviewUrl: null, usdzUrl: null });
     if (entry.status === "done") {
       pendingModels.delete(imageUrl);
     }
@@ -224,7 +212,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/trophies/:id", isAuthenticated, async (req, res) => {
-    const allowedFields = ["species", "name", "date", "location", "latitude", "longitude", "score", "method", "weaponId", "gender", "shotDistance", "notes", "huntNotes", "imageUrl", "renderImageUrl", "glbUrl", "glbPreviewUrl", "mountType", "featured", "taggedProUserId"];
+    const allowedFields = ["species", "name", "date", "location", "latitude", "longitude", "score", "method", "weaponId", "gender", "shotDistance", "notes", "huntNotes", "imageUrl", "glbUrl", "glbPreviewUrl", "usdzUrl", "mountType", "featured", "taggedProUserId"];
     const safeBody: Record<string, any> = {};
     for (const key of allowedFields) {
       if (key in req.body) safeBody[key] = req.body[key];
@@ -309,55 +297,15 @@ export async function registerRoutes(
 
       await storage.logUsage(userId, "ai_analysis", AI_COSTS.ai_analysis, `Analyzed trophy image: ${imageUrl}`);
 
-      res.json({ imageUrl, renderImageUrl: null, analysis, units, scoringSystem });
-
-      if (analysis.animal_detected) {
-        const renderCheck = await checkTierLimit(userId, "ai_render");
-        if (renderCheck.allowed) {
-          const theme = prefs?.theme || "lodge";
-          const themedPrompt = buildRenderPrompt(analysis, theme);
-          pendingRenders.set(imageUrl, { status: "pending", renderImageUrl: null });
-          console.log(`[render] Started background render for ${imageUrl} (theme: ${theme})`);
-          generateTrophyRender(themedPrompt)
-            .then(async (renderBuffer) => {
-              if (renderBuffer) {
-                let renderUrl: string;
-                try {
-                  renderUrl = await uploadBufferToStorage(renderBuffer, `render-${Date.now()}.png`, "image/png");
-                } catch (err) {
-                  console.error("[render] Object Storage upload failed, using local fallback:", err);
-                  const renderFilename = `render-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
-                  const renderPath = path.join(trophyUploadDir, renderFilename);
-                  fs.writeFileSync(renderPath, renderBuffer);
-                  renderUrl = `/uploads/trophies/${renderFilename}`;
-                }
-                pendingRenders.set(imageUrl, { status: "done", renderImageUrl: renderUrl });
-                console.log(`[render] Completed render for ${imageUrl} → ${renderUrl}`);
-                await storage.logUsage(userId, "ai_render", AI_COSTS.ai_render, `Rendered trophy: ${imageUrl}`);
-                storage.patchTrophyRenderByImage(imageUrl, renderUrl).then(() => {
-                  console.log(`[render] Auto-patched trophy render for ${imageUrl}`);
-                }).catch((err) => {
-                  console.error("[render] Failed to patch trophy render:", err);
-                });
-              } else {
-                console.error(`[render] Render returned empty for ${imageUrl}`);
-                pendingRenders.set(imageUrl, { status: "failed", renderImageUrl: null });
-              }
-            })
-            .catch((err) => {
-              console.error(`[render] Render generation failed for ${imageUrl}:`, err);
-              pendingRenders.set(imageUrl, { status: "failed", renderImageUrl: null });
-            });
-        }
-      }
+      res.json({ imageUrl, analysis, units, scoringSystem });
 
       const modelCheck = await checkTierLimit(userId, "3d_model");
       if (modelCheck.allowed) {
-        pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null });
+        pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null, usdzUrl: null });
         const mountType = analysis.mount_recommendation?.best || null;
         console.log(`[3d-model] Started background 3D generation for ${imageUrl} (mount: ${mountType})`);
-        generate3DModel(req.file!.path, mountType)
-          .then(async ({ glbUrl: localGlbUrl, glbPreviewUrl: localPreviewUrl }) => {
+        generate3DModel(req.file!.path, mountType, analysis)
+          .then(async ({ glbUrl: localGlbUrl, glbPreviewUrl: localPreviewUrl, usdzUrl: localUsdzUrl }) => {
             let glbUrl = localGlbUrl;
             let glbPreviewUrl = localPreviewUrl;
             try {
@@ -368,10 +316,10 @@ export async function registerRoutes(
             } catch (err) {
               console.error("[3d-model] Object Storage upload failed, using local paths:", err);
             }
-            pendingModels.set(imageUrl, { status: "done", glbUrl, glbPreviewUrl });
+            pendingModels.set(imageUrl, { status: "done", glbUrl, glbPreviewUrl, usdzUrl: localUsdzUrl });
             console.log(`[3d-model] Completed 3D model for ${imageUrl} → ${glbUrl}`);
             await storage.logUsage(userId, "3d_model", AI_COSTS["3d_model"], `3D model for: ${imageUrl}`);
-            storage.patchTrophyGlb(imageUrl, glbUrl, glbPreviewUrl, mountType).then(() => {
+            storage.patchTrophyGlb(imageUrl, glbUrl, glbPreviewUrl, mountType, localUsdzUrl).then(() => {
               console.log(`[3d-model] Auto-patched trophy GLB for ${imageUrl}`);
             }).catch((err) => {
               console.error("[3d-model] Failed to patch trophy GLB:", err);
@@ -379,7 +327,7 @@ export async function registerRoutes(
           })
           .catch((err) => {
             console.error(`[3d-model] 3D model generation failed for ${imageUrl}:`, err);
-            pendingModels.set(imageUrl, { status: "failed", glbUrl: null, glbPreviewUrl: null });
+            pendingModels.set(imageUrl, { status: "failed", glbUrl: null, glbPreviewUrl: null, usdzUrl: null });
           });
       }
     } catch (error: any) {
@@ -557,9 +505,9 @@ export async function registerRoutes(
       score: t.score,
       gender: t.gender,
       imageUrl: t.imageUrl,
-      renderImageUrl: t.renderImageUrl,
       glbUrl: t.glbUrl,
       glbPreviewUrl: t.glbPreviewUrl,
+      usdzUrl: t.usdzUrl,
       mountType: t.mountType,
       featured: t.featured,
       huntNotes: t.huntNotes,

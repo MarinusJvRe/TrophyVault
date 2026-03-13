@@ -32,6 +32,13 @@ import { findClosestSpecies } from "@shared/scoring-thresholds";
 import exifr from "exifr";
 import ProTagSearch from "@/components/ProTagSearch";
 
+interface CropBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface TrophyAnalysis {
   animal_detected: boolean;
   species: {
@@ -52,6 +59,9 @@ export interface TrophyAnalysis {
   mount_recommendation: {
     best: string;
   };
+  bounding_box: CropBox;
+  shoulder_crop: CropBox | null;
+  visibility: "full" | "partial" | "obscured";
   horn_details: {
     has_horns: boolean;
     horn_type: string | null;
@@ -140,7 +150,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const [crop, setCrop] = useState<CropType>();
   const [analysis, setAnalysis] = useState<TrophyAnalysis | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
-  const [renderImageUrl, setRenderImageUrl] = useState<string | null>(null);
+  const [usdzUrl, setUsdzUrl] = useState<string | null>(null);
   const [weaponId, setWeaponId] = useState<string>("");
   const [analysisUnits, setAnalysisUnits] = useState<string>("imperial");
   const [locationName, setLocationName] = useState<string>("");
@@ -153,7 +163,6 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   const [methodValue, setMethodValue] = useState<string>("");
   const [distanceUnit, setDistanceUnit] = useState<string>("yards");
   const [scoreUnit, setScoreUnit] = useState<string>('"');
-  const [renderPollingImageUrl, setRenderPollingImageUrl] = useState<string | null>(null);
   const [glbUrl, setGlbUrl] = useState<string | null>(null);
   const [glbPreviewUrl, setGlbPreviewUrl] = useState<string | null>(null);
   const [modelPollingImageUrl, setModelPollingImageUrl] = useState<string | null>(null);
@@ -185,27 +194,6 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
   }, [prefs?.units]);
 
   useEffect(() => {
-    if (!renderPollingImageUrl || renderImageUrl) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/trophies/render-status?imageUrl=${encodeURIComponent(renderPollingImageUrl)}`, {
-          credentials: "include",
-          headers: getAuthHeaders(),
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.status === "done" && data.renderImageUrl) {
-          setRenderImageUrl(data.renderImageUrl);
-          setRenderPollingImageUrl(null);
-        } else if (data.status === "failed") {
-          setRenderPollingImageUrl(null);
-        }
-      } catch {}
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [renderPollingImageUrl, renderImageUrl]);
-
-  useEffect(() => {
     if (!modelPollingImageUrl || glbUrl) return;
     const interval = setInterval(async () => {
       try {
@@ -218,6 +206,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
         if (data.status === "done" && data.glbUrl) {
           setGlbUrl(data.glbUrl);
           setGlbPreviewUrl(data.glbPreviewUrl || null);
+          setUsdzUrl(data.usdzUrl || null);
           setModelPollingImageUrl(null);
         } else if (data.status === "failed") {
           setModelPollingImageUrl(null);
@@ -238,7 +227,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     setCrop(undefined);
     setAnalysis(null);
     setUploadedImageUrl(null);
-    setRenderImageUrl(null);
+    setUsdzUrl(null);
     setWeaponId("");
     setAnalysisUnits(prefs?.units || "imperial");
     setLocationName("");
@@ -247,7 +236,6 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
     setExifDate(null);
     setExifLocationSource(null);
     setMethodValue("");
-    setRenderPollingImageUrl(null);
     setGlbUrl(null);
     setGlbPreviewUrl(null);
     setModelPollingImageUrl(null);
@@ -276,14 +264,12 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
         const err = await res.json().catch(() => ({ message: "Analysis failed" }));
         throw new Error(err.message || "Analysis failed");
       }
-      return res.json() as Promise<{ imageUrl: string; renderImageUrl: string | null; analysis: TrophyAnalysis; units: string; scoringSystem: string }>;
+      return res.json() as Promise<{ imageUrl: string; analysis: TrophyAnalysis; units: string; scoringSystem: string }>;
     },
     onSuccess: (data) => {
       setAnalysis(data.analysis);
       setUploadedImageUrl(data.imageUrl);
-      setRenderImageUrl(data.renderImageUrl || null);
       setAnalysisUnits(data.units || "imperial");
-      setRenderPollingImageUrl(data.imageUrl);
       setModelPollingImageUrl(data.imageUrl);
       setStep("form");
     },
@@ -482,9 +468,9 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
       notes: (formData.get("notes") as string) || null,
       huntNotes: (formData.get("huntNotes") as string) || null,
       imageUrl: uploadedImageUrl,
-      renderImageUrl: renderImageUrl,
       glbUrl: glbUrl,
       glbPreviewUrl: glbPreviewUrl,
+      usdzUrl: usdzUrl,
       mountType: analysis?.mount_recommendation?.best || null,
       featured: false,
       isAiAnalyzed: !!analysis,
@@ -532,7 +518,7 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
             <FormStep
               key="form"
               analysis={analysis}
-              renderGenerating={!!renderPollingImageUrl}
+              renderGenerating={!!modelPollingImageUrl}
               previewUrl={getPreviewToShow()}
               weaponId={weaponId}
               setWeaponId={setWeaponId}
@@ -924,10 +910,44 @@ function FormStep({
         <DialogTitle className="font-serif text-xl">Trophy Details</DialogTitle>
       </DialogHeader>
 
-      {renderGenerating && (
+      {renderGenerating && previewUrl && (
+        <div className="mb-4 rounded-lg overflow-hidden border border-border/40" data-testid="instant-preview-composite">
+          <div className="relative w-full aspect-[4/3] bg-gradient-to-b from-amber-950/90 via-amber-900/80 to-amber-950/90"
+            style={{
+              backgroundImage: "repeating-linear-gradient(90deg, transparent, transparent 48px, rgba(0,0,0,0.08) 48px, rgba(0,0,0,0.08) 50px), repeating-linear-gradient(0deg, transparent, transparent 48px, rgba(0,0,0,0.05) 48px, rgba(0,0,0,0.05) 50px)",
+            }}
+          >
+            <div className="absolute inset-0 flex items-center justify-center p-6">
+              <div className="relative w-2/3 max-w-[200px] aspect-square">
+                <div className="absolute inset-0 rounded-lg shadow-2xl"
+                  style={{
+                    background: "linear-gradient(145deg, #5a3a1a 0%, #3d2510 50%, #2a1a0c 100%)",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.08)",
+                  }}
+                />
+                <div className="absolute inset-[8%] rounded overflow-hidden shadow-inner">
+                  <img
+                    src={previewUrl}
+                    alt="Trophy preview"
+                    className="w-full h-full object-cover"
+                    style={{ filter: "contrast(1.05) saturate(1.1)" }}
+                    data-testid="img-instant-preview"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-2">
+              <Loader2 className="h-3 w-3 text-amber-200/60 animate-spin" />
+              <span className="text-[10px] text-amber-200/60 font-medium tracking-wide uppercase">Generating 3D model</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {renderGenerating && !previewUrl && (
         <div className="flex items-center gap-2 mb-4 p-2 bg-primary/5 border border-primary/20 rounded-lg">
           <Loader2 className="h-3.5 w-3.5 text-primary animate-spin shrink-0" />
-          <span className="text-xs text-primary/80">Generating 3D mount render...</span>
+          <span className="text-xs text-primary/80">Generating 3D model...</span>
         </div>
       )}
 

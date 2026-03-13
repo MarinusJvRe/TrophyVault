@@ -62,7 +62,7 @@ export interface IStorage {
       numericScore: number;
       location: string | null;
       imageUrl: string | null;
-      renderImageUrl: string | null;
+      glbPreviewUrl: string | null;
       date: string;
       userId: string;
       firstName: string | null;
@@ -78,8 +78,7 @@ export interface IStorage {
 
   getTop10ForSpecies(species: string): Promise<Map<string, { rank: number; badge: "gold" | "silver" | "bronze" | "top10" }>>;
 
-  patchTrophyRenderByImage(imageUrl: string, renderImageUrl: string): Promise<void>;
-  patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null): Promise<void>;
+  patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null, usdzUrl?: string | null): Promise<void>;
 
   // Pro profiles
   getProProfile(userId: string): Promise<ProProfile | undefined>;
@@ -373,7 +372,7 @@ export class DatabaseStorage implements IStorage {
         numericScore: numericScoreExpr,
         location: trophies.location,
         imageUrl: trophies.imageUrl,
-        renderImageUrl: trophies.renderImageUrl,
+        glbPreviewUrl: trophies.glbPreviewUrl,
         date: trophies.date,
         userId: trophies.userId,
         firstName: users.firstName,
@@ -456,14 +455,11 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async patchTrophyRenderByImage(imageUrl: string, renderImageUrl: string): Promise<void> {
-    await db.update(trophies).set({ renderImageUrl }).where(eq(trophies.imageUrl, imageUrl));
-  }
-
-  async patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null): Promise<void> {
+  async patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null, usdzUrl?: string | null): Promise<void> {
     const updates: Record<string, any> = { glbUrl };
     if (glbPreviewUrl) updates.glbPreviewUrl = glbPreviewUrl;
     if (mountType) updates.mountType = mountType;
+    if (usdzUrl) updates.usdzUrl = usdzUrl;
     await db.update(trophies).set(updates).where(eq(trophies.imageUrl, imageUrl));
   }
 
@@ -622,10 +618,9 @@ export class DatabaseStorage implements IStorage {
       totalCost += entry.estimatedCost;
       if (entry.actionType === "ai_analysis") aiAnalyses++;
       if (entry.actionType === "3d_model") models3d++;
-      if (entry.actionType === "ai_render") renders++;
     }
 
-    return { totalCost, aiAnalyses, models3d, renders };
+    return { totalCost, aiAnalyses, models3d, renders: 0 };
   }
 
   async getLifetimeUsageCounts(userId: string): Promise<{ aiAnalyses: number; models3d: number }> {

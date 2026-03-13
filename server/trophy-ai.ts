@@ -13,6 +13,13 @@ function buildUserPrompt(units: string, scoringSystem: string): string {
 
   return `Analyze this hunting trophy photo. Focus on the most prominent game animal. Measurements in ${unitLabel}. Evaluate against ${scoringSystem}.
 
+IMPORTANT bounding_box rules:
+- The bounding_box must tightly surround ONLY the trophy animal (or its head/horns/antlers).
+- NEVER include people, hunters, weapons, rifles, or any non-animal objects in the bounding_box.
+- If the animal is partially obscured by a person, crop tightly to the visible animal parts only.
+
+shoulder_crop: If the recommended mount is "shoulder", provide a tighter crop box around the animal's head, neck, and shoulder area. Otherwise set to null.
+
 JSON schema:
 {
   "animal_detected": boolean,
@@ -34,6 +41,19 @@ JSON schema:
   "mount_recommendation": {
     "best": "shoulder"|"horns"|"full_body"
   },
+  "bounding_box": {
+    "x": number (0-1, normalized left edge),
+    "y": number (0-1, normalized top edge),
+    "w": number (0-1, normalized width),
+    "h": number (0-1, normalized height)
+  },
+  "shoulder_crop": {
+    "x": number (0-1),
+    "y": number (0-1),
+    "w": number (0-1),
+    "h": number (0-1)
+  } | null,
+  "visibility": "full"|"partial"|"obscured",
   "horn_details": {
     "has_horns": boolean,
     "horn_type": "spiral"|"lyre"|"straight"|"curved"|"antler"|"boss"|null,
@@ -52,6 +72,13 @@ JSON schema:
     "notes": string|null
   }
 }`;
+}
+
+export interface CropBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export interface TrophyAnalysis {
@@ -74,6 +101,9 @@ export interface TrophyAnalysis {
   mount_recommendation: {
     best: string;
   };
+  bounding_box: CropBox;
+  shoulder_crop: CropBox | null;
+  visibility: "full" | "partial" | "obscured";
   horn_details: {
     has_horns: boolean;
     horn_type: string | null;
@@ -131,37 +161,6 @@ export function calculateTrophyVaultScore(analysis: TrophyAnalysis): number {
 
   const rawScore = (thresholdRatio * 4 + photoQuality * 2 + qualifiesBonus + categoryWeight) * 1.1;
   return Math.max(1, Math.min(10, Math.round(rawScore * 10) / 10));
-}
-
-export function buildRenderPrompt(analysis: TrophyAnalysis, theme: string): string {
-  const species = analysis.species?.common_name || "trophy animal";
-  const gender = analysis.gender?.estimated || "unknown";
-  const hornType = analysis.horn_details?.horn_type || "";
-  const hornLength = analysis.horn_details?.estimated_length_inches
-    ? `approximately ${analysis.horn_details.estimated_length_inches} inches`
-    : "";
-  const features = analysis.horn_details?.notable_features || "";
-  const coloring = analysis.horn_details?.coloring || "";
-
-  const themeBackgrounds: Record<string, string> = {
-    lodge: "mounted on a dark rustic wooden plaque, warm cabin lighting, dark wood-paneled wall background",
-    manor: "mounted on a rich mahogany plaque, warm golden ambient lighting, dark safari-themed wall background with warm earth tones",
-    minimal: "mounted on a clean light oak plaque, bright studio lighting, clean white wall background",
-  };
-
-  const bg = themeBackgrounds[theme] || themeBackgrounds.lodge;
-
-  const parts = [
-    `Photorealistic 3D taxidermy shoulder mount render of a ${gender} ${species}`,
-    hornType ? `with ${hornType} horns` : "",
-    hornLength ? `(${hornLength})` : "",
-    coloring ? `, ${coloring} coloring` : "",
-    features ? `, ${features}` : "",
-    `, ${bg}`,
-    ", studio lighting, isolated on transparent background",
-  ];
-
-  return parts.filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
 }
 
 export async function analyzeTrophyImage(
@@ -222,19 +221,4 @@ export async function analyzeTrophyImage(
   parsed.trophy_vault_score = calculateTrophyVaultScore(parsed);
 
   return parsed;
-}
-
-export async function generateTrophyRender(renderPrompt: string): Promise<Buffer | null> {
-  try {
-    const { generateImageBuffer } = await import("./replit_integrations/image/client");
-    const buffer = await generateImageBuffer(renderPrompt, "1024x1024");
-    if (!buffer || buffer.length === 0) {
-      console.error("Render generation returned empty image data");
-      return null;
-    }
-    return buffer;
-  } catch (error) {
-    console.error("Render generation failed:", error);
-    return null;
-  }
 }
