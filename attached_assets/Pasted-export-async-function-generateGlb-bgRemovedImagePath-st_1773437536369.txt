@@ -1,0 +1,57 @@
+export async function generateGlb(bgRemovedImagePath: string, species: string): Promise<{
+  glbPath: string;
+  previewPath: string | null;
+  usdzUrl: string | null;
+}> {
+  console.log("[3d-model] Generating 3D model via Meshy v6...");
+
+  const imageBuffer = fs.readFileSync(bgRemovedImagePath);
+  const blob = new Blob([imageBuffer], { type: "image/png" });
+  const file = new File([blob], "trophy-nobg.png", { type: "image/png" });
+  const uploadedUrl = await fal.storage.upload(file);
+
+  const result = await fal.subscribe("fal-ai/meshy/v6/image-to-3d", {
+    input: {
+      image_url: uploadedUrl,
+      topology: "triangle",
+      target_polycount: 30000,
+      symmetry_mode: "auto",
+      should_remesh: true,
+      should_texture: true,
+      enable_pbr: true,
+      texture_prompt: `Taxidermy shoulder mount of a ${species}. Realistic animal fur and skin textures, natural coloring, museum-quality preservation. Wooden shield mounting plaque at the base.`,
+      enable_safety_checker: false,
+    },
+    logs: true,
+    onQueueUpdate: (update) => {
+      if (update.status === "IN_PROGRESS") {
+        const logs = (update as any).logs;
+        if (logs) logs.map((l: any) => l.message).forEach((m: string) => console.log("[3d-model] Meshy:", m));
+      }
+    },
+  });
+
+  const resultData = result.data as any;
+
+  // Primary GLB
+  const glbUrl = resultData?.model_glb?.url;
+  if (!glbUrl) throw new Error("Meshy returned no GLB model URL");
+
+  const glbFilename = `model-${Date.now()}-${Math.random().toString(36).slice(2)}.glb`;
+  const glbPath = path.join(trophyUploadDir, glbFilename);
+  await downloadFile(glbUrl, glbPath);
+
+  // Thumbnail → use as 2D trophy room tile
+  let previewPath: string | null = null;
+  const thumbnailUrl = resultData?.thumbnail?.url;
+  if (thumbnailUrl) {
+    const previewFilename = `preview-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
+    previewPath = path.join(trophyUploadDir, previewFilename);
+    await downloadFile(thumbnailUrl, previewPath);
+  }
+
+  // USDZ for AR Quick Look (iOS) — Meshy provides this for free
+  const usdzUrl = resultData?.model_urls?.usdz?.url || null;
+
+  return { glbPath, previewPath, usdzUrl };
+}
