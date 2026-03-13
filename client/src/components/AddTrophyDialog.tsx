@@ -543,6 +543,10 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
               setScoreUnit={setScoreUnit}
               taggedProUserId={taggedProUserId}
               setTaggedProUserId={setTaggedProUserId}
+              geoTrigger={geoTrigger}
+              setGeoTrigger={setGeoTrigger}
+              isGettingLocation={isGettingLocation}
+              setIsGettingLocation={setIsGettingLocation}
             />
           )}
         </AnimatePresence>
@@ -869,6 +873,10 @@ function FormStep({
   setScoreUnit,
   taggedProUserId,
   setTaggedProUserId,
+  geoTrigger,
+  setGeoTrigger,
+  isGettingLocation,
+  setIsGettingLocation,
 }: {
   analysis: TrophyAnalysis | null;
   renderGenerating: boolean;
@@ -896,6 +904,10 @@ function FormStep({
   setScoreUnit: (v: string) => void;
   taggedProUserId: string | null;
   setTaggedProUserId: (v: string | null) => void;
+  geoTrigger: number;
+  setGeoTrigger: React.Dispatch<React.SetStateAction<number>>;
+  isGettingLocation: boolean;
+  setIsGettingLocation: (v: boolean) => void;
 }) {
   const estimatedScore = getEstimatedScoreNumber(analysis);
 
