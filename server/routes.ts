@@ -635,6 +635,25 @@ export async function registerRoutes(
       }
     });
 
+    const accountTier = prefs?.accountTier || "free";
+
+    const leaderboardBadges: { species: string; rank: number; badge: "gold" | "silver" | "bronze" | "top10" }[] = [];
+    const speciesList = Array.from(uniqueSpecies);
+    for (const species of speciesList) {
+      const top10 = await storage.getTop10ForSpecies(species);
+      const userTrophiesForSpecies = allTrophies.filter(t => t.species === species);
+      let bestEntry: { rank: number; badge: "gold" | "silver" | "bronze" | "top10" } | null = null;
+      for (const t of userTrophiesForSpecies) {
+        const entry = top10.get(t.id);
+        if (entry && (bestEntry === null || entry.rank < bestEntry.rank)) {
+          bestEntry = entry;
+        }
+      }
+      if (bestEntry) {
+        leaderboardBadges.push({ species, rank: bestEntry.rank, badge: bestEntry.badge });
+      }
+    }
+
     res.json({
       totalHunts: allTrophies.length,
       qualifyingTrophies: qualifyingCount,
@@ -648,6 +667,8 @@ export async function registerRoutes(
       weaponCount: allWeapons.length,
       furthestShot,
       furthestShotSpecies,
+      accountTier,
+      leaderboardBadges,
     });
   });
 

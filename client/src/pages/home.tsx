@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Trophy, MapPin, Calendar, Activity, Star, Crosshair, Shield } from "lucide-react";
+import { ArrowRight, Trophy, MapPin, Calendar, Activity, Star, Crosshair, Shield, Crown, Zap, User, Award } from "lucide-react";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,12 @@ import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
 import themeMinimal from "../assets/theme-minimal.png";
 import trophyVaultLogo from "@assets/honor_hunt_logo_v2.png";
+
+interface LeaderboardBadge {
+  species: string;
+  rank: number;
+  badge: "gold" | "silver" | "bronze" | "top10";
+}
 
 interface Stats {
   totalHunts: number;
@@ -27,6 +33,8 @@ interface Stats {
   weaponCount: number;
   furthestShot: string | null;
   furthestShotSpecies: string | null;
+  accountTier: "free" | "paid" | "pro";
+  leaderboardBadges: LeaderboardBadge[];
 }
 
 export default function Home() {
@@ -126,7 +134,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 md:px-12 mt-4 md:-mt-10 relative z-30 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">
+        <div className="max-w-7xl mx-auto px-4 md:px-12 mt-4 md:-mt-10 relative z-30 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
           <StatCard 
             icon={Activity} 
             label="Hunts" 
@@ -168,6 +176,14 @@ export default function Home() {
             value={stats?.furthestShot || "—"} 
             subtext={stats?.furthestShotSpecies || "No shots recorded"} 
             delay={0.35}
+          />
+          <AccountTierCard
+            tier={stats?.accountTier || "free"}
+            delay={0.4}
+          />
+          <LeaderboardBadgesCard
+            badges={stats?.leaderboardBadges || []}
+            delay={0.45}
           />
         </div>
 
@@ -327,6 +343,105 @@ function RatingCard({ rating, source, ratingCount, roomVisibility, delay }: { ra
             </div>
             <div className="p-2 md:p-3 bg-primary/10 rounded-lg ml-2 shrink-0">
               <Star className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+const TIER_CONFIG: Record<string, { label: string; color: string; bgColor: string; borderColor: string; icon: any }> = {
+  free: { label: "Free", color: "text-muted-foreground", bgColor: "bg-muted", borderColor: "border-border/40", icon: User },
+  paid: { label: "Paid", color: "text-primary", bgColor: "bg-primary/20", borderColor: "border-primary/30", icon: Zap },
+  pro: { label: "Pro", color: "text-amber-500", bgColor: "bg-amber-500/20", borderColor: "border-amber-500/30", icon: Crown },
+};
+
+function AccountTierCard({ tier, delay }: { tier: string; delay: number }) {
+  const config = TIER_CONFIG[tier] || TIER_CONFIG.free;
+  const TierIcon = config.icon;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.5 }}
+    >
+      <Card className="bg-card/90 backdrop-blur-xl border-border/10 shadow-2xl h-full">
+        <CardContent className="p-4 md:p-5">
+          <div className="flex items-start justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="text-muted-foreground text-[10px] md:text-xs font-medium uppercase tracking-wider">Account Tier</p>
+              <h3 className={`text-xl md:text-2xl font-serif font-bold mt-1 ${config.color}`} data-testid="text-stat-account-tier">{config.label}</h3>
+              {tier === "free" ? (
+                <Link href="/profile">
+                  <span className="text-[10px] md:text-xs text-primary hover:text-primary/80 mt-0.5 inline-flex items-center gap-0.5 cursor-pointer" data-testid="link-upgrade">
+                    Upgrade <ArrowRight className="h-3 w-3" />
+                  </span>
+                </Link>
+              ) : (
+                <p className="text-[10px] md:text-xs text-primary mt-0.5" data-testid="text-active-membership">Active membership</p>
+              )}
+            </div>
+            <div className={`p-2 md:p-3 ${config.bgColor} rounded-lg ml-2 shrink-0`}>
+              <TierIcon className={`h-4 w-4 md:h-5 md:w-5 ${config.color}`} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+function LeaderboardBadgesCard({ badges, delay }: { badges: LeaderboardBadge[]; delay: number }) {
+  const badgeColors = {
+    gold: "bg-yellow-500/20 text-yellow-500 border-yellow-500/40",
+    silver: "bg-gray-400/20 text-gray-400 border-gray-400/40",
+    bronze: "bg-amber-700/20 text-amber-700 border-amber-700/40",
+    top10: "bg-primary/20 text-primary border-primary/40",
+  };
+
+  const sorted = [...badges].sort((a, b) => a.rank - b.rank);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.5 }}
+    >
+      <Card className="bg-card/90 backdrop-blur-xl border-border/10 shadow-2xl h-full">
+        <CardContent className="p-4 md:p-5">
+          <div className="flex items-start justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="text-muted-foreground text-[10px] md:text-xs font-medium uppercase tracking-wider">Leaderboard</p>
+              {sorted.length > 0 ? (
+                <>
+                  <div className="flex flex-wrap gap-1.5 mt-2" data-testid="leaderboard-badges-list">
+                    {sorted.map((b, i) => {
+                      const colorClass = badgeColors[b.badge] || badgeColors.top10;
+                      return (
+                        <div
+                          key={`${b.species}-${b.rank}`}
+                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-bold ${colorClass}`}
+                          data-testid={`badge-rank-${b.rank}-${i}`}
+                        >
+                          <Trophy className="h-2.5 w-2.5" />
+                          #{b.rank} {b.species}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] md:text-xs text-primary mt-1" data-testid="text-rankings-count">{sorted.length} {sorted.length === 1 ? "ranking" : "rankings"} earned</p>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-sm md:text-base font-serif mt-1 text-muted-foreground" data-testid="text-no-rankings">No rankings yet</h3>
+                  <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">Upload trophies and go public to compete</p>
+                </>
+              )}
+            </div>
+            <div className="p-2 md:p-3 bg-primary/10 rounded-lg ml-2 shrink-0">
+              <Award className="h-4 w-4 md:h-5 md:w-5 text-primary" />
             </div>
           </div>
         </CardContent>
