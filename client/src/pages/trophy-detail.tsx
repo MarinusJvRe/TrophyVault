@@ -2,14 +2,13 @@ import Layout from "@/components/Layout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { 
   ArrowLeft, Share2, Target, MapPin, 
-  Calendar, BadgeCheck, Camera, MessageCircle, Crosshair, Sword, Trash2, Pencil, AlertTriangle, Check, Loader2, X, Star, Box
+  Calendar, BadgeCheck, Camera, MessageCircle, Crosshair, Sword, Trash2, Pencil, AlertTriangle, Check, Loader2, X, Star, Box, Copy, Download, Award, Link as LinkIcon
 } from "lucide-react";
 import { LocationMap } from "@/components/LocationMap";
 import { LocationSearch } from "@/components/LocationSearch";
-import { generateTrophyCertificate } from "@/components/TrophyCertificate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +31,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +46,7 @@ import { HUNTING_METHODS } from "@/components/AddTrophyDialog";
 import TrophyARViewer from "@/components/TrophyARViewer";
 import { useTheme } from "@/lib/theme-context";
 import { Briefcase } from "lucide-react";
+import { generateProofOfHunt } from "@/lib/proof-of-hunt";
 
 function parseStoredDistance(value: string | null): { num: string; unit: string } {
   if (!value) return { num: "", unit: "yards" };
@@ -223,15 +229,21 @@ export default function TrophyDetail() {
     );
   }
 
-  const handleShare = () => {
-    const text = `Check out my ${trophy.species} trophy on Honor The Hunt! Score: ${trophy.score}.`;
-    const url = `https://trophyvault.app/t/${trophy.id}`;
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text + " " + url)}`;
+  const shareText = `Check out my ${trophy.species} trophy on Honor The Hunt! Score: ${trophy.score}.`;
+  const shareUrl = `https://honorthehunt.ai/t/${trophy.id}`;
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast({ title: "Link copied", description: "Trophy link copied to clipboard." });
+    } catch {
+      toast({ title: "Could not copy", description: "Please copy this URL manually: " + shareUrl, variant: "destructive" });
+    }
+  };
+
+  const handleShareWhatsApp = () => {
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText + " " + shareUrl)}`;
     window.open(whatsappUrl, '_blank');
-    toast({
-      title: "Opening WhatsApp",
-      description: "Preparing your trophy snapshot for sharing...",
-    });
   };
 
   return (
@@ -267,16 +279,31 @@ export default function TrophyDetail() {
                       className={trophy?.featured ? "text-primary hover:text-primary/80 hover:bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10"}
                       disabled={starMutation.isPending}
                       data-testid="button-star"
+                      title={trophy?.featured ? "Unfeature" : "Feature"}
                     >
                       <Star className={`h-4 w-4 ${trophy?.featured ? "fill-primary" : ""}`} />
                     </Button>
-                    <Button onClick={handleShare} variant="ghost" size="icon" className="text-muted-foreground hover:text-green-500 hover:bg-green-500/10" data-testid="button-share">
-                      <Share2 className="h-4 w-4" />
-                    </Button>
-                    <Button onClick={handleStartEdit} variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10" data-testid="button-edit">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10" data-testid="button-share" title="Share">
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-[160px]">
+                        <DropdownMenuItem onClick={handleCopyLink} data-testid="menu-copy-link">
+                          <LinkIcon className="h-4 w-4 mr-2" />
+                          Copy Link
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleShareWhatsApp} data-testid="menu-share-whatsapp">
+                          <MessageCircle className="h-4 w-4 mr-2" />
+                          Share to WhatsApp
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button onClick={handleStartEdit} variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10" data-testid="button-edit" title="Edit">
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button onClick={() => setDeleteDialogOpen(true)} variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" data-testid="button-delete">
+                    <Button onClick={() => setDeleteDialogOpen(true)} variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" data-testid="button-delete" title="Delete">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </>
@@ -295,7 +322,7 @@ export default function TrophyDetail() {
                   <img 
                     src={trophy.imageUrl} 
                     alt={trophy.species}
-                    className="w-full max-h-[50vh] object-contain bg-black/10"
+                    className="w-full aspect-[4/3] object-cover"
                     data-testid="img-trophy-photo"
                   />
                 ) : (
@@ -344,8 +371,14 @@ export default function TrophyDetail() {
               <ViewMode
                 trophy={trophy}
                 weapon={weapon}
-                onShare={handleShare}
-                onCertificate={() => generateTrophyCertificate(trophy, weapon)}
+                onProofOfHunt={async () => {
+                  try {
+                    await generateProofOfHunt(trophy, weapon);
+                    toast({ title: "Proof of Hunt generated", description: "Your image has been downloaded." });
+                  } catch {
+                    toast({ title: "Generation failed", description: "Could not generate the image. Please try again.", variant: "destructive" });
+                  }
+                }}
                 onViewAR={() => setShowAR(true)}
               />
             )}
@@ -394,14 +427,12 @@ export default function TrophyDetail() {
 function ViewMode({
   trophy,
   weapon,
-  onShare,
-  onCertificate,
+  onProofOfHunt,
   onViewAR,
 }: {
   trophy: Trophy;
   weapon: Weapon | null | undefined;
-  onShare: () => void;
-  onCertificate: () => void;
+  onProofOfHunt: () => void;
   onViewAR: () => void;
 }) {
   const speciesThresholds = findClosestSpecies(trophy.species);
@@ -554,11 +585,8 @@ function ViewMode({
       )}
 
       <div className="pt-4 border-t border-border/50 space-y-3">
-        <Button onClick={onShare} className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 font-medium" data-testid="button-share-whatsapp">
-          <MessageCircle className="h-4 w-4" /> Share on WhatsApp
-        </Button>
-        <Button onClick={onCertificate} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-serif" data-testid="button-certificate">
-          Generate Certificate
+        <Button onClick={onProofOfHunt} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-serif flex items-center gap-2" data-testid="button-proof-of-hunt">
+          <Award className="h-4 w-4" /> Generate Proof of Hunt
         </Button>
         {trophy.glbUrl && (
           <Button onClick={onViewAR} className="w-full bg-[#b87333] hover:bg-[#a0622a] text-white flex items-center gap-2 font-serif" data-testid="button-view-ar-detail">
@@ -882,6 +910,8 @@ function TaggedProDisplay({ proUserId }: { proUserId: string }) {
   const ENTITY_LABELS: Record<string, string> = {
     outfitter: "Outfitter",
     professional_hunter: "Professional Hunter",
+    outfitter_ph: "Outfitter / PH",
+    ranch_game_farm: "Ranch / Game Farm",
     taxidermist: "Taxidermist",
   };
 

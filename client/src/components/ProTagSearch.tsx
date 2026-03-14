@@ -21,6 +21,8 @@ interface ProTagSearchProps {
 const ENTITY_LABELS: Record<string, string> = {
   outfitter: "Outfitter",
   professional_hunter: "PH",
+  outfitter_ph: "Outfitter / PH",
+  ranch_game_farm: "Ranch / Game Farm",
   taxidermist: "Taxidermist",
 };
 
