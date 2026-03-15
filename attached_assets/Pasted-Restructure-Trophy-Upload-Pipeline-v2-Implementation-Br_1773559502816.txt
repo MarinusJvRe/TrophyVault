@@ -1,0 +1,362 @@
+Restructure Trophy Upload Pipeline v2 — Implementation Brief
+Summary
+Replace the current 4-call pipeline with a new 4-call pipeline that produces dramatically better quality through intelligent image preparation:
+New pipeline:
+GPT-4o vision analysis (enhanced with bounding box)
+Smart crop + BiRefNet BG removal (isolate the animal)
+GPT-image-1 image-to-image transformation (repose into front-facing shoulder mount)
+Meshy v6 3D generation (using the mount-ready image)
+Key insight: The original photo — animal lying on the ground, hunter kneeling behind it, shot at random angle — can never produce a good wall-mount 3D model through cropping alone. We need AI to repose the animal into a front-facing shoulder mount while preserving its specific features (horn shape, colouring, markings). GPT-image-1 with the actual animal photo as input does this.
+CALL 1: Enhanced Vision Analysis (GPT-4o)
+Same GPT-4o vision call as current, same cost. Enhance the prompt and schema.
+Update system prompt to:
+You are TrophyVault's trophy photo analyzer. Return ONLY valid JSON. No markdown, no code fences.
+Your analysis will be used to crop the image for 3D model generation, so bounding box accuracy is critical.
+Add these fields to the existing JSON schema (keep ALL current fields except remove render_prompt):
+{
+  "bounding_box": {
+    "description": "Normalized 0-1 coordinates of the ANIMAL ONLY in the image. Exclude people, weapons, vehicles.",
+    "x_min": "number 0-1",
+    "y_min": "number 0-1, must include top of horns/antlers",
+    "x_max": "number 0-1",
+    "y_max": "number 0-1"
+  },
+  "shoulder_crop": {
+    "description": "Tighter crop for shoulder mount: head + neck + upper shoulders. Include full horn/antler length and spread.",
+    "x_min": "number 0-1",
+    "y_min": "number 0-1",
+    "x_max": "number 0-1",
+    "y_max": "number 0-1"
+  },
+  "visibility": {
+    "head_visible": "boolean",
+    "horns_visible": "boolean",
+    "body_visible": "boolean",
+    "occlusion_percent": "number 0-100",
+    "occluded_by": "string or null"
+  },
+  "animal_description": {
+    "description": "Detailed visual description of THIS SPECIFIC animal for image generation. Be extremely specific.",
+    "coat_color": "string — exact colors and patterns, e.g. 'greyish-brown body with 6-8 thin white vertical torso stripes, white chevron between eyes'",
+    "horn_description": "string — exact shape, length, color, spiral count, spread, e.g. 'long spiral horns with 2.5 turns, ivory-colored tips, dark ridged base, wide V-spread approximately 1.2x head width'",
+    "distinctive_features": "string — scars, mane, beard, ear shape, anything unique to THIS individual animal",
+    "face_details": "string — face markings, eye area, nose, mouth coloring"
+  }
+}
+Add this to the user prompt:
+CRITICAL BOUNDING BOX RULES:
+- bounding_box must tightly wrap ONLY the animal — exclude any people, weapons, vehicles, dogs completely.
+- shoulder_crop covers from top of horns/antlers to mid-chest. Include full horn spread width.
+- If animal is lying with a hunter behind it, shoulder_crop frames just head/neck/shoulders excluding the hunter.
+
+CRITICAL ANIMAL DESCRIPTION RULES:
+- animal_description must describe THIS EXACT animal's appearance in precise detail.
+- Focus especially on horn/antler shape, coat color/pattern, and any unique markings.
+- This description will be used to generate a mounted trophy image, so accuracy to the actual animal is essential.
+- Do NOT give generic species descriptions. Describe what you SEE in this specific photo.
+Remove render_prompt entirely — we build our own prompt using the structured animal_description.
+STEP 2: Smart Crop (server-side, free, instant)
+After Call 1 returns, crop the original image using shoulder_crop coordinates.
+import sharp from 'sharp';
+
+async function smartCropForMount(
+  imagePath: string,
+  shoulderCrop: { x_min: number; y_min: number; x_max: number; y_max: number }
+): Promise<string> {
+  const metadata = await sharp(imagePath).metadata();
+  const w = metadata.width!;
+  const h = metadata.height!;
+
+  // 15% padding around crop region
+  const pad = 0.15;
+  const left = Math.max(0, Math.floor((shoulderCrop.x_min - pad) * w));
+  const top = Math.max(0, Math.floor((shoulderCrop.y_min - pad) * h));
+  const right = Math.min(w, Math.ceil((shoulderCrop.x_max + pad) * w));
+  const bottom = Math.min(h, Math.ceil((shoulderCrop.y_max + pad) * h));
+
+  const croppedFilename = `cropped-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
+  const croppedPath = path.join(trophyUploadDir, croppedFilename);
+
+  await sharp(imagePath)
+    .extract({ left, top, width: right - left, height: bottom - top })
+    .png()
+    .toFile(croppedPath);
+
+  return croppedPath;
+}
+Fallback: If shoulder_crop is missing, skip crop and use full image.
+CALL 2: Background Removal (BiRefNet — on cropped image)
+No changes to BiRefNet call. Just pass the cropped image instead of original:
+const croppedPath = await smartCropForMount(localImagePath, analysis.shoulder_crop);
+const noBgPath = await removeBackground(croppedPath);
+Same cost (~$0.01-0.02), but cleaner result since input is tighter.
+CALL 3: Image-to-Image Mount Transformation (GPT-image-1) ★ KEY NEW STEP
+This is the critical quality improvement. Send the cropped, bg-removed animal photo TO GPT-image-1 as an image input, with a prompt that instructs it to repose the animal into a front-facing shoulder mount while preserving its exact features.
+This is NOT the old DALL-E text-only call. The old call described "a kudu with spiral horns" and got a generic kudu. This call sends the actual photo and says "repose THIS animal."
+import OpenAI from "openai";
+import fs from "fs";
+
+const openai = new OpenAI();
+
+async function generateMountImage(
+  bgRemovedImagePath: string,
+  animalDescription: {
+    coat_color: string;
+    horn_description: string;
+    distinctive_features: string;
+    face_details: string;
+  },
+  speciesName: string,
+  roomTheme: string // "lodge" | "manor" | "minimal"
+): Promise<string> {
+  console.log("[mount-image] Generating mount reference image via GPT-image-1...");
+
+  // Read the bg-removed image as base64
+  const imageBuffer = fs.readFileSync(bgRemovedImagePath);
+  const base64Image = imageBuffer.toString("base64");
+  const dataUri = `data:image/png;base64,${base64Image}`;
+
+  // Build theme-specific background
+  const themeBackgrounds: Record<string, string> = {
+    lodge: "mounted on a dark rustic wooden shield plaque, warm amber lighting, dark wood-paneled wall",
+    manor: "mounted on a rich mahogany shield plaque, warm golden ambient lighting, dark green wall",
+    minimal: "mounted on a clean light oak shield plaque, bright studio lighting, clean white wall",
+  };
+  const bgDescription = themeBackgrounds[roomTheme] || themeBackgrounds.lodge;
+
+  const prompt = `Using the attached photo as your EXACT reference, create a photorealistic taxidermy shoulder mount trophy.
+
+CRITICAL — MATCH THE REFERENCE ANIMAL EXACTLY:
+- Horn/antler shape: ${animalDescription.horn_description}
+- Coat: ${animalDescription.coat_color}
+- Face: ${animalDescription.face_details}
+- Distinctive features: ${animalDescription.distinctive_features}
+
+POSE AND COMPOSITION:
+- Front-facing head, turned very slightly to the left (classic trophy pose)
+- Show head, full neck, and upper shoulders only (shoulder mount cut)
+- ${bgDescription}
+- Professional taxidermy quality — alert expression, eyes looking slightly to the side
+- The horns/antlers must match the exact shape, curvature, length, and coloring from the reference photo
+- Centered composition, single trophy, no other objects
+
+Species: ${speciesName}
+Style: Photorealistic, museum-quality taxidermy, dramatic but natural lighting`;
+
+  const response = await openai.images.generate({
+    model: "gpt-image-1",
+    prompt: prompt,
+    n: 1,
+    size: "1024x1024",
+    // Pass the reference image — GPT-image-1 uses it as visual guidance
+    // Note: Check OpenAI's current API for image input method.
+    // If gpt-image-1 supports image input via the images.edit endpoint instead:
+  });
+
+  // IMPORTANT: gpt-image-1 image-guided generation may require using
+  // the images.edit endpoint with the bg-removed image as the input image.
+  // If images.generate doesn't accept reference images, use this instead:
+  //
+  // const response = await openai.images.edit({
+  //   model: "gpt-image-1",
+  //   image: fs.createReadStream(bgRemovedImagePath),
+  //   prompt: prompt,
+  //   n: 1,
+  //   size: "1024x1024",
+  // });
+
+  const imageUrl = response.data[0]?.url || response.data[0]?.b64_json;
+  if (!imageUrl) throw new Error("GPT-image-1 returned no image");
+
+  // Download and save
+  const mountFilename = `mount-render-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
+  const mountPath = path.join(trophyUploadDir, mountFilename);
+
+  if (response.data[0]?.b64_json) {
+    // If response is base64
+    const buf = Buffer.from(response.data[0].b64_json, "base64");
+    fs.writeFileSync(mountPath, buf);
+  } else {
+    // If response is URL
+    await downloadFile(imageUrl, mountPath);
+  }
+
+  console.log("[mount-image] Mount reference image generated:", mountFilename);
+  return mountPath;
+}
+Why this works: GPT-image-1 with image input doesn't hallucinate a random animal — it uses the provided photo as visual reference. The detailed animal_description from Call 1 reinforces the specific features in text. The prompt forces it into a standard shoulder-mount composition regardless of the original photo angle.
+This image serves TWO purposes:
+2D trophy room tile — it's the rendered mount shown in the gallery grid
+3D model input — it's a clean, front-facing, properly posed image perfect for Meshy
+CALL 4: 3D Generation (Meshy v6 — using the mount image)
+Feed the GPT-image-1 mount image (NOT the original photo) to Meshy. This image is ideal 3D input: front-facing, clean background, proper pose, consistent lighting.
+export async function generateGlb(
+  mountImagePath: string,
+  species: string
+): Promise<{
+  glbPath: string;
+  previewPath: string | null;
+  usdzUrl: string | null;
+}> {
+  console.log("[3d-model] Generating 3D model via Meshy v6...");
+
+  const imageBuffer = fs.readFileSync(mountImagePath);
+  const blob = new Blob([imageBuffer], { type: "image/png" });
+  const file = new File([blob], "trophy-mount.png", { type: "image/png" });
+  const uploadedUrl = await fal.storage.upload(file);
+
+  const result = await fal.subscribe("fal-ai/meshy/v6/image-to-3d", {
+    input: {
+      image_url: uploadedUrl,
+      topology: "triangle",
+      target_polycount: 30000,
+      symmetry_mode: "auto",
+      should_remesh: true,
+      should_texture: true,
+      enable_pbr: true,
+      texture_prompt: `Taxidermy shoulder mount of a ${species}. Realistic animal fur and skin textures, natural coloring, museum-quality preservation. Polished wooden shield mounting plaque.`,
+      enable_safety_checker: false,
+    },
+    logs: true,
+    onQueueUpdate: (update) => {
+      if (update.status === "IN_PROGRESS") {
+        const logs = (update as any).logs;
+        if (logs) logs.map((l: any) => l.message).forEach((m: string) => console.log("[3d-model] Meshy:", m));
+      }
+    },
+  });
+
+  const resultData = result.data as any;
+
+  const glbUrl = resultData?.model_glb?.url;
+  if (!glbUrl) throw new Error("Meshy returned no GLB model URL");
+
+  const glbFilename = `model-${Date.now()}-${Math.random().toString(36).slice(2)}.glb`;
+  const glbPath = path.join(trophyUploadDir, glbFilename);
+  await downloadFile(glbUrl, glbPath);
+
+  // Thumbnail as fallback preview
+  let previewPath: string | null = null;
+  const thumbnailUrl = resultData?.thumbnail?.url;
+  if (thumbnailUrl) {
+    const previewFilename = `preview-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
+    previewPath = path.join(trophyUploadDir, previewFilename);
+    await downloadFile(thumbnailUrl, previewPath);
+  }
+
+  // USDZ for iOS AR Quick Look — free from Meshy
+  const usdzUrl = resultData?.model_urls?.usdz?.url || null;
+
+  return { glbPath, previewPath, usdzUrl };
+}
+UPDATED ORCHESTRATOR
+export async function generate3DModel(
+  localImagePath: string,
+  mountType: string | null,
+  visionAnalysis: any,
+  roomTheme: string
+): Promise<{
+  glbUrl: string;
+  glbPreviewUrl: string | null;   // Meshy thumbnail
+  mountRenderUrl: string | null;  // GPT-image-1 render (2D tile)
+  usdzUrl: string | null;        // iOS AR
+}> {
+  const species = visionAnalysis?.species?.common_name || "game animal";
+  const animalDesc = visionAnalysis?.animal_description || {};
+
+  // Step 1: Smart crop
+  let imageForProcessing = localImagePath;
+  if (visionAnalysis?.shoulder_crop) {
+    imageForProcessing = await smartCropForMount(localImagePath, visionAnalysis.shoulder_crop);
+  }
+
+  // Step 2: Background removal on cropped image
+  const noBgPath = await removeBackground(imageForProcessing);
+
+  // Step 3: Generate mount reference image (repose + style)
+  const mountImagePath = await generateMountImage(noBgPath, animalDesc, species, roomTheme);
+
+  // Step 4: 3D generation from mount image
+  const { glbPath, previewPath, usdzUrl } = await generateGlb(mountImagePath, species);
+
+  // Step 5: Draco compression
+  const compressedFilename = `model-compressed-${Date.now()}-${Math.random().toString(36).slice(2)}.glb`;
+  const compressedPath = path.join(trophyUploadDir, compressedFilename);
+  await compressGlb(glbPath, compressedPath);
+
+  // Cleanup temp files
+  const tempFiles = [imageForProcessing, noBgPath, glbPath].filter(
+    f => f !== localImagePath && f !== compressedPath && fs.existsSync(f)
+  );
+  tempFiles.forEach(f => fs.unlinkSync(f));
+
+  const glbUrl = `/uploads/trophies/${compressedFilename}`;
+  const glbPreviewUrl = previewPath ? `/uploads/trophies/${path.basename(previewPath)}` : null;
+  const mountRenderUrl = `/uploads/trophies/${path.basename(mountImagePath)}`;
+
+  return { glbUrl, glbPreviewUrl, mountRenderUrl, usdzUrl };
+}
+IMPORTANT: Update the route handler / caller to:
+Pass visionAnalysis from Call 1 into generate3DModel
+Pass roomTheme from user settings
+Store mountRenderUrl as the 2D trophy room tile (replaces old DALL-E render)
+Store usdzUrl for AR support
+USER EXPERIENCE FLOW
+While the pipeline runs (~45-100s total), show the user a progress sequence:
+Instantly — Show the original uploaded photo with a "Analyzing..." overlay
+After Call 1 (~3-5s) — Show species name, horn details, quality score. "Greater Kudu identified! Preparing your trophy..."
+After Calls 2+3 (~15-25s) — Show the GPT-image-1 mount render. This IS the 2D tile. User sees their animal mounted on a wall. "Looking good! Now building your 3D model..."
+After Call 4 (~30-90s) — Swap to the interactive 3D viewer. Done.
+The user sees meaningful progress at each stage, and the mount render at step 3 is already impressive enough to feel like the result is "almost done."
+COST PER TROPHY
+Step
+Cost
+Time
+Vision analysis (GPT-4o)
+~$0.02-0.04
+~3-5s
+Smart crop
+Free
+<1s
+BG removal (BiRefNet)
+~$0.01-0.02
+~2-3s
+Mount image (GPT-image-1)
+~$0.04-0.08
+~10-15s
+3D generation (Meshy v6)
+~$0.08-0.15
+~30-90s
+Draco compression
+Free
+~5s
+Total
+~$0.15-0.29
+~50-120s
+Similar cost to current pipeline but every output is dramatically better and all three deliverables (metadata, 2D tile, 3D model) are consistent because they flow from the same source.
+WHAT TO REMOVE
+Remove the old DALL-E render call that used text-only render_prompt
+Remove render_prompt from vision JSON schema
+Remove the room-theme regex replacement logic — theme is now built into the new prompt
+Update trophy room tile to use mountRenderUrl instead of old DALL-E URL
+Update trophy DB to add usdzUrl column and mountRenderUrl column
+FREE vs PREMIUM USER SPLIT
+Free users: Get Call 1 (vision analysis) + Call 3 (mount render image) only. They see the 2D mounted trophy tile. No 3D, no AR. Cost: ~$0.07-0.12 per trophy.
+Premium users: Get the full pipeline including 3D model + AR. Cost: ~$0.15-0.29 per trophy.
+This means free users still get an impressive result (a photorealistic mounted trophy image of their actual animal) while costing you less than half of a premium conversion.
+MIGRATION CHECKLIST
+[ ] Add sharp dependency if not present
+[ ] Add bounding_box, shoulder_crop, visibility, animal_description to vision schema
+[ ] Remove render_prompt from vision schema
+[ ] Add crop instructions to vision user prompt
+[ ] Create smartCropForMount function
+[ ] Create generateMountImage function (GPT-image-1 with image input)
+[ ] Replace generateGlb with Meshy v6 version
+[ ] Update generate3DModel to accept visionAnalysis and roomTheme
+[ ] Update route handler to pass new parameters
+[ ] Remove old DALL-E text-only render call and regex theme logic
+[ ] Update trophy room tile to use mountRenderUrl
+[ ] Add usdzUrl and mountRenderUrl to trophy DB schema
+[ ] Update progress UI to show mount render at step 3
+[ ] Test GPT-image-1 image input method (images.generate vs images.edit endpoint)
+[ ] Test with 10+ real hunting photos across species and angles
