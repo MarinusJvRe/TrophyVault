@@ -226,9 +226,9 @@ export default function PublicRoom() {
                 data-testid={`card-public-trophy-${trophy.id}`}
               >
                 <div className="absolute inset-0">
-                  {(trophy.glbPreviewUrl || trophy.imageUrl) ? (
+                  {(trophy.renderImageUrl || trophy.glbPreviewUrl || trophy.imageUrl) ? (
                     <img
-                      src={trophy.glbPreviewUrl || trophy.imageUrl}
+                      src={trophy.renderImageUrl || trophy.glbPreviewUrl || trophy.imageUrl}
                       alt={trophy.species}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
@@ -314,10 +314,10 @@ function TrophyDetailModal({ trophy, onClose }: { trophy: any; onClose: () => vo
         </div>
 
         <div className="p-4 space-y-4">
-          {(trophy.glbPreviewUrl || trophy.imageUrl) && (
+          {(trophy.renderImageUrl || trophy.glbPreviewUrl || trophy.imageUrl) && (
             <div className="rounded-lg overflow-hidden border border-border/30">
               <img
-                src={trophy.glbPreviewUrl || trophy.imageUrl}
+                src={trophy.renderImageUrl || trophy.glbPreviewUrl || trophy.imageUrl}
                 alt={trophy.species}
                 className="w-full max-h-[40vh] object-contain bg-black/10"
                 data-testid="img-modal-trophy"

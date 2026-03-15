@@ -306,9 +306,9 @@ export default function Community() {
                                   {entry.rank}
                                 </div>
 
-                                {(entry.glbPreviewUrl || entry.imageUrl) && (
+                                {(entry.renderImageUrl || entry.glbPreviewUrl || entry.imageUrl) && (
                                   <div className="h-10 w-10 rounded overflow-hidden border border-border/30 shrink-0">
-                                    <img src={entry.glbPreviewUrl || entry.imageUrl} alt={entry.species} className="w-full h-full object-cover" />
+                                    <img src={entry.renderImageUrl || entry.glbPreviewUrl || entry.imageUrl} alt={entry.species} className="w-full h-full object-cover" />
                                   </div>
                                 )}
 

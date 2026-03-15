@@ -5,7 +5,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { registerEmailAuthRoutes } from "./auth";
 import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema, insertProProfileSchema, TIER_LIMITS, AI_COSTS, type AccountTier } from "@shared/schema";
 import { analyzeTrophyImage } from "./trophy-ai";
-import { generate3DModel } from "./trophy-3d";
+import { generate3DModel, generateMountImageOnly } from "./trophy-3d";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { uploadBufferToStorage, uploadFileToStorage } from "./object-storage-helper";
 import multer from "multer";
@@ -162,7 +162,7 @@ export async function registerRoutes(
   });
 
   // ========== TROPHIES ==========
-  const pendingModels = new Map<string, { status: "pending" | "done" | "failed"; glbUrl: string | null; glbPreviewUrl: string | null; usdzUrl: string | null }>();
+  const pendingModels = new Map<string, { status: "pending" | "done" | "failed"; glbUrl: string | null; glbPreviewUrl: string | null; usdzUrl: string | null; mountRenderUrl: string | null }>();
 
   app.get("/api/trophies", isAuthenticated, async (req, res) => {
     const list = await storage.getTrophies(getUserId(req));
@@ -173,7 +173,7 @@ export async function registerRoutes(
     const imageUrl = req.query.imageUrl as string;
     if (!imageUrl) return res.status(400).json({ message: "imageUrl query param required" });
     const entry = pendingModels.get(imageUrl);
-    if (!entry) return res.json({ status: "unknown", glbUrl: null, glbPreviewUrl: null, usdzUrl: null });
+    if (!entry) return res.json({ status: "unknown", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: null });
     if (entry.status === "done") {
       pendingModels.delete(imageUrl);
     }
@@ -308,35 +308,77 @@ export async function registerRoutes(
 
       res.json({ imageUrl, analysis, units, scoringSystem });
 
-      const modelCheck = await checkTierLimit(userId, "3d_model");
-      if (modelCheck.allowed) {
-        pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null, usdzUrl: null });
-        const mountType = analysis.mount_recommendation?.best || null;
-        console.log(`[3d-model] Started background 3D generation for ${imageUrl} (mount: ${mountType})`);
-        generate3DModel(req.file!.path, mountType, analysis)
-          .then(async ({ glbUrl: localGlbUrl, glbPreviewUrl: localPreviewUrl, usdzUrl: localUsdzUrl }) => {
-            let glbUrl = localGlbUrl;
-            let glbPreviewUrl = localPreviewUrl;
-            try {
-              glbUrl = await uploadFileToStorage(path.join(process.cwd(), localGlbUrl));
-              if (localPreviewUrl) {
-                glbPreviewUrl = await uploadFileToStorage(path.join(process.cwd(), localPreviewUrl));
+      const roomTheme = prefs?.theme || "lodge";
+      const mountType = analysis.mount_recommendation?.best || null;
+      const accountTier = prefs?.accountTier || "free";
+      const isPaidTier = accountTier === "paid" || accountTier === "pro";
+
+      if (isPaidTier) {
+        const modelCheck = await checkTierLimit(userId, "3d_model");
+        if (modelCheck.allowed) {
+          pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: null });
+          console.log(`[3d-model] Started background 3D generation for ${imageUrl} (mount: ${mountType}, theme: ${roomTheme}, tier: ${accountTier})`);
+          generate3DModel(req.file!.path, mountType, analysis, roomTheme, (localMountUrl) => {
+            uploadFileToStorage(path.join(process.cwd(), localMountUrl))
+              .then((uploadedMountUrl) => {
+                pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: uploadedMountUrl });
+              })
+              .catch(() => {
+                pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: localMountUrl });
+              });
+          })
+            .then(async ({ glbUrl: localGlbUrl, glbPreviewUrl: localPreviewUrl, usdzUrl: localUsdzUrl, mountRenderUrl: localMountRenderUrl }) => {
+              let glbUrl = localGlbUrl;
+              let glbPreviewUrl = localPreviewUrl;
+              let mountRenderUrl = localMountRenderUrl;
+              try {
+                glbUrl = await uploadFileToStorage(path.join(process.cwd(), localGlbUrl));
+                if (localPreviewUrl) {
+                  glbPreviewUrl = await uploadFileToStorage(path.join(process.cwd(), localPreviewUrl));
+                }
+                if (localMountRenderUrl) {
+                  mountRenderUrl = await uploadFileToStorage(path.join(process.cwd(), localMountRenderUrl));
+                }
+              } catch (err) {
+                console.error("[3d-model] Object Storage upload failed, using local paths:", err);
               }
-            } catch (err) {
-              console.error("[3d-model] Object Storage upload failed, using local paths:", err);
-            }
-            pendingModels.set(imageUrl, { status: "done", glbUrl, glbPreviewUrl, usdzUrl: localUsdzUrl });
-            console.log(`[3d-model] Completed 3D model for ${imageUrl} → ${glbUrl}`);
-            await storage.logUsage(userId, "3d_model", AI_COSTS["3d_model"], `3D model for: ${imageUrl}`);
-            storage.patchTrophyGlb(imageUrl, glbUrl, glbPreviewUrl, mountType, localUsdzUrl).then(() => {
-              console.log(`[3d-model] Auto-patched trophy GLB for ${imageUrl}`);
-            }).catch((err) => {
-              console.error("[3d-model] Failed to patch trophy GLB:", err);
+              pendingModels.set(imageUrl, { status: "done", glbUrl, glbPreviewUrl, usdzUrl: localUsdzUrl, mountRenderUrl });
+              console.log(`[3d-model] Completed 3D model for ${imageUrl} → ${glbUrl}`);
+              await storage.logUsage(userId, "3d_model", AI_COSTS["3d_model"], `3D model for: ${imageUrl}`);
+              storage.patchTrophyGlb(imageUrl, glbUrl, glbPreviewUrl, mountType, localUsdzUrl, mountRenderUrl).then(() => {
+                console.log(`[3d-model] Auto-patched trophy GLB for ${imageUrl}`);
+              }).catch((err) => {
+                console.error("[3d-model] Failed to patch trophy GLB:", err);
+              });
+            })
+            .catch((err) => {
+              console.error(`[3d-model] 3D model generation failed for ${imageUrl}:`, err);
+              pendingModels.set(imageUrl, { status: "failed", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: null });
             });
+        }
+      } else {
+        pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: null });
+        console.log(`[mount-image] Free user: generating mount render only for ${imageUrl} (theme: ${roomTheme})`);
+        generateMountImageOnly(req.file!.path, analysis, roomTheme)
+          .then(async ({ mountRenderUrl: localMountRenderUrl }) => {
+            let mountRenderUrl = localMountRenderUrl;
+            if (localMountRenderUrl) {
+              try {
+                mountRenderUrl = await uploadFileToStorage(path.join(process.cwd(), localMountRenderUrl));
+              } catch (err) {
+                console.error("[mount-image] Object Storage upload failed, using local path:", err);
+              }
+              storage.patchTrophyRenderImage(imageUrl, mountRenderUrl!).then(() => {
+                console.log(`[mount-image] Auto-patched trophy render image for ${imageUrl}`);
+              }).catch((err) => {
+                console.error("[mount-image] Failed to patch trophy render image:", err);
+              });
+            }
+            pendingModels.set(imageUrl, { status: "done", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl });
           })
           .catch((err) => {
-            console.error(`[3d-model] 3D model generation failed for ${imageUrl}:`, err);
-            pendingModels.set(imageUrl, { status: "failed", glbUrl: null, glbPreviewUrl: null, usdzUrl: null });
+            console.error(`[mount-image] Mount image generation failed for ${imageUrl}:`, err);
+            pendingModels.set(imageUrl, { status: "failed", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: null });
           });
       }
     } catch (error: any) {

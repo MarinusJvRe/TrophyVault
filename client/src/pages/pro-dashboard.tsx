@@ -167,7 +167,7 @@ export default function ProDashboard() {
                   {tagData.recentTags.map((trophy) => (
                     <div key={trophy.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/20 border border-border/20" data-testid={`tag-trophy-${trophy.id}`}>
                       {trophy.imageUrl && (
-                        <img src={trophy.glbPreviewUrl || trophy.imageUrl} alt={trophy.species} className="h-10 w-10 rounded object-cover" />
+                        <img src={trophy.renderImageUrl || trophy.glbPreviewUrl || trophy.imageUrl} alt={trophy.species} className="h-10 w-10 rounded object-cover" />
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">{trophy.species}</div>

@@ -2,7 +2,8 @@ import { fal } from "@fal-ai/client";
 import fs from "fs";
 import path from "path";
 import https from "https";
-import type { TrophyAnalysis, CropBox } from "./trophy-ai";
+import type { TrophyAnalysis, CropBox, AnimalDescription } from "./trophy-ai";
+import { openai } from "./replit_integrations/image/client";
 
 fal.config({
   credentials: process.env.FAL_KEY,
@@ -64,12 +65,14 @@ export async function smartCropForMount(
   const imgW = metadata.width!;
   const imgH = metadata.height!;
 
-  const padW = cropBox.w * padding;
-  const padH = cropBox.h * padding;
-  const x = Math.max(0, cropBox.x - padW);
-  const y = Math.max(0, cropBox.y - padH);
-  const w = Math.min(1 - x, cropBox.w + padW * 2);
-  const h = Math.min(1 - y, cropBox.h + padH * 2);
+  const boxW = cropBox.x_max - cropBox.x_min;
+  const boxH = cropBox.y_max - cropBox.y_min;
+  const padW = boxW * padding;
+  const padH = boxH * padding;
+  const x = Math.max(0, cropBox.x_min - padW);
+  const y = Math.max(0, cropBox.y_min - padH);
+  const w = Math.min(1 - x, boxW + padW * 2);
+  const h = Math.min(1 - y, boxH + padH * 2);
 
   const left = Math.round(x * imgW);
   const top = Math.round(y * imgH);
@@ -124,6 +127,53 @@ export async function removeBackground(localImagePath: string): Promise<string> 
   await downloadFile(bgRemovedUrl, noBgPath);
   console.log("[3d-model] Background removed:", noBgFilename);
   return noBgPath;
+}
+
+const THEME_BACKGROUNDS: Record<string, string> = {
+  lodge: "mounted on a rich dark oak shield plaque against a warm rustic log cabin wall with warm amber lighting",
+  manor: "mounted on an ornate carved mahogany shield plaque against a refined dark wood-paneled study wall with soft warm sconce lighting",
+  minimal: "mounted on a clean modern light oak shield plaque against a crisp white gallery wall with subtle directional lighting",
+};
+
+export async function generateMountImage(
+  bgRemovedImagePath: string,
+  animalDescription: AnimalDescription,
+  species: string,
+  roomTheme: string
+): Promise<string> {
+  console.log(`[mount-image] Generating mount image for ${species} (theme: ${roomTheme})...`);
+
+  const bgDescription = THEME_BACKGROUNDS[roomTheme] || THEME_BACKGROUNDS.lodge;
+
+  const descParts: string[] = [];
+  if (animalDescription.coat_color) descParts.push(`coat/hide: ${animalDescription.coat_color}`);
+  if (animalDescription.horn_description) descParts.push(`horns/antlers: ${animalDescription.horn_description}`);
+  if (animalDescription.distinctive_features) descParts.push(`distinctive features: ${animalDescription.distinctive_features}`);
+  if (animalDescription.face_details) descParts.push(`face: ${animalDescription.face_details}`);
+  const animalDetails = descParts.length > 0 ? descParts.join("; ") : species;
+
+  const prompt = `Transform this animal photo into a professional front-facing taxidermy shoulder mount. The animal is a ${species} with these specific features: ${animalDetails}. Repose the animal to face directly forward, showing head, neck, and upper shoulders symmetrically as a classic wall-mount trophy. Preserve the exact coloring, markings, horn/antler shape, and facial features of this specific animal. The mount should be ${bgDescription}. Photorealistic taxidermy quality, dramatic museum lighting, sharp detail.`;
+
+  const imageStream = fs.createReadStream(bgRemovedImagePath);
+
+  const response = await openai.images.edit({
+    model: "gpt-image-1",
+    image: imageStream,
+    prompt,
+    size: "1024x1024",
+  });
+
+  const resultBase64 = (response.data && response.data[0]?.b64_json) ?? "";
+  if (!resultBase64) {
+    throw new Error("GPT-image-1 returned no image data");
+  }
+
+  const mountFilename = `mount-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
+  const mountPath = path.join(trophyUploadDir, mountFilename);
+  fs.writeFileSync(mountPath, Buffer.from(resultBase64, "base64"));
+
+  console.log(`[mount-image] Mount image generated: ${mountFilename}`);
+  return mountPath;
 }
 
 export async function generateGlb(
@@ -220,8 +270,10 @@ export async function compressGlb(inputPath: string, outputPath: string): Promis
 export async function generate3DModel(
   localImagePath: string,
   mountType: string | null,
-  visionAnalysis?: TrophyAnalysis
-): Promise<{ glbUrl: string; glbPreviewUrl: string | null; usdzUrl: string | null }> {
+  visionAnalysis?: TrophyAnalysis,
+  roomTheme: string = "lodge",
+  onMountReady?: (mountRenderUrl: string) => void
+): Promise<{ glbUrl: string; glbPreviewUrl: string | null; usdzUrl: string | null; mountRenderUrl: string | null }> {
   let imageForBgRemoval = localImagePath;
   let croppedPath: string | null = null;
 
@@ -236,8 +288,23 @@ export async function generate3DModel(
 
   const noBgPath = await removeBackground(imageForBgRemoval);
 
+  let mountImagePath: string | null = null;
+  let mountRenderUrl: string | null = null;
   const species = visionAnalysis?.species?.common_name || "";
-  const { glbPath, previewPath, usdzUrl } = await generateGlb(noBgPath, species);
+
+  if (visionAnalysis?.animal_description) {
+    try {
+      mountImagePath = await generateMountImage(noBgPath, visionAnalysis.animal_description, species, roomTheme);
+      mountRenderUrl = `/uploads/trophies/${path.basename(mountImagePath)}`;
+      console.log(`[3d-model] Mount render ready: ${mountRenderUrl}`);
+      if (onMountReady) onMountReady(mountRenderUrl);
+    } catch (err) {
+      console.error("[mount-image] Mount image generation failed, using bg-removed image for 3D:", err);
+    }
+  }
+
+  const imageFor3D = mountImagePath || noBgPath;
+  const { glbPath, previewPath, usdzUrl } = await generateGlb(imageFor3D, species);
 
   const compressedFilename = `model-compressed-${Date.now()}-${Math.random().toString(36).slice(2)}.glb`;
   const compressedPath = path.join(trophyUploadDir, compressedFilename);
@@ -250,6 +317,43 @@ export async function generate3DModel(
   const glbUrl = `/uploads/trophies/${compressedFilename}`;
   const glbPreviewUrl = previewPath ? `/uploads/trophies/${path.basename(previewPath)}` : null;
 
-  console.log(`[3d-model] Pipeline complete: GLB=${glbUrl}, Preview=${glbPreviewUrl}, USDZ=${usdzUrl ? "yes" : "none"}, Mount=${mountType}`);
-  return { glbUrl, glbPreviewUrl, usdzUrl };
+  console.log(`[3d-model] Pipeline complete: GLB=${glbUrl}, Preview=${glbPreviewUrl}, USDZ=${usdzUrl ? "yes" : "none"}, Mount=${mountType}, MountRender=${mountRenderUrl ? "yes" : "none"}`);
+  return { glbUrl, glbPreviewUrl, usdzUrl, mountRenderUrl };
+}
+
+export async function generateMountImageOnly(
+  localImagePath: string,
+  visionAnalysis: TrophyAnalysis,
+  roomTheme: string = "lodge"
+): Promise<{ mountRenderUrl: string | null }> {
+  let imageForBgRemoval = localImagePath;
+  let croppedPath: string | null = null;
+
+  if (visionAnalysis.shoulder_crop) {
+    try {
+      croppedPath = await smartCropForMount(localImagePath, visionAnalysis.shoulder_crop);
+      imageForBgRemoval = croppedPath;
+    } catch (err) {
+      console.warn("[3d-model] Smart crop failed, using full image:", err);
+    }
+  }
+
+  const noBgPath = await removeBackground(imageForBgRemoval);
+
+  let mountRenderUrl: string | null = null;
+  const species = visionAnalysis.species?.common_name || "";
+
+  if (visionAnalysis.animal_description) {
+    try {
+      const mountImagePath = await generateMountImage(noBgPath, visionAnalysis.animal_description, species, roomTheme);
+      mountRenderUrl = `/uploads/trophies/${path.basename(mountImagePath)}`;
+    } catch (err) {
+      console.error("[mount-image] Mount image generation failed:", err);
+    }
+  }
+
+  if (croppedPath && fs.existsSync(croppedPath)) fs.unlinkSync(croppedPath);
+  if (fs.existsSync(noBgPath)) fs.unlinkSync(noBgPath);
+
+  return { mountRenderUrl };
 }

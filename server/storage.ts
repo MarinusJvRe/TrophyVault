@@ -78,7 +78,8 @@ export interface IStorage {
 
   getTop10ForSpecies(species: string): Promise<Map<string, { rank: number; badge: "gold" | "silver" | "bronze" | "top10" }>>;
 
-  patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null, usdzUrl?: string | null): Promise<void>;
+  patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null, usdzUrl?: string | null, renderImageUrl?: string | null): Promise<void>;
+  patchTrophyRenderImage(imageUrl: string, renderImageUrl: string): Promise<void>;
 
   // Pro profiles
   getProProfile(userId: string): Promise<ProProfile | undefined>;
@@ -455,12 +456,17 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null, usdzUrl?: string | null): Promise<void> {
+  async patchTrophyGlb(imageUrl: string, glbUrl: string, glbPreviewUrl: string | null, mountType: string | null, usdzUrl?: string | null, renderImageUrl?: string | null): Promise<void> {
     const updates: Record<string, any> = { glbUrl };
     if (glbPreviewUrl) updates.glbPreviewUrl = glbPreviewUrl;
     if (mountType) updates.mountType = mountType;
     if (usdzUrl) updates.usdzUrl = usdzUrl;
+    if (renderImageUrl) updates.renderImageUrl = renderImageUrl;
     await db.update(trophies).set(updates).where(eq(trophies.imageUrl, imageUrl));
+  }
+
+  async patchTrophyRenderImage(imageUrl: string, renderImageUrl: string): Promise<void> {
+    await db.update(trophies).set({ renderImageUrl }).where(eq(trophies.imageUrl, imageUrl));
   }
 
   // Pro profiles

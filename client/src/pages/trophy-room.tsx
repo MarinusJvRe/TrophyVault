@@ -196,7 +196,7 @@ export default function TrophyRoom() {
 }
 
 function WallMountCard({ trophy, index, onViewAR }: { trophy: Trophy, index: number, onViewAR: (e: React.MouseEvent) => void }) {
-  const displayImage = trophy.glbPreviewUrl || trophy.imageUrl;
+  const displayImage = trophy.renderImageUrl || trophy.glbPreviewUrl || trophy.imageUrl;
   
   return (
     <motion.div

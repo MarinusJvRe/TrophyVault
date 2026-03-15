@@ -14,11 +14,24 @@ function buildUserPrompt(units: string, scoringSystem: string): string {
   return `Analyze this hunting trophy photo. Focus on the most prominent game animal. Measurements in ${unitLabel}. Evaluate against ${scoringSystem}.
 
 IMPORTANT bounding_box rules:
+- All coordinate boxes use normalized values (0-1) with x_min, y_min, x_max, y_max format.
+- x_min/y_min is the top-left corner, x_max/y_max is the bottom-right corner.
 - The bounding_box must tightly surround ONLY the trophy animal (or its head/horns/antlers).
+- ALWAYS include the full top of the horns/antlers within the bounding_box — do not crop them off.
 - NEVER include people, hunters, weapons, rifles, or any non-animal objects in the bounding_box.
 - If the animal is partially obscured by a person, crop tightly to the visible animal parts only.
 
-shoulder_crop: If the recommended mount is "shoulder", provide a tighter crop box around the animal's head, neck, and shoulder area. Otherwise set to null.
+shoulder_crop rules:
+- If the recommended mount is "shoulder", provide a tighter crop box around the animal's head, neck, and shoulder area using the same x_min/y_min/x_max/y_max format. Otherwise set to null.
+- The shoulder_crop MUST include the full top of the horns/antlers — never clip them.
+- The shoulder_crop MUST NOT include hunters, people, or non-animal objects.
+
+animal_description rules:
+- Describe this SPECIFIC animal in rich detail to enable accurate artistic reproduction.
+- coat_color: exact color and pattern (e.g. "dark chocolate brown with lighter tan underbelly and black facial stripe")
+- horn_description: shape, curve, length, texture, color of this animal's horns/antlers (null if none)
+- distinctive_features: unique markings, scars, mane, beard, ear shape, body build
+- face_details: eye color/shape, nose, mouth, facial hair, expression
 
 JSON schema:
 {
@@ -42,18 +55,31 @@ JSON schema:
     "best": "shoulder"|"horns"|"full_body"
   },
   "bounding_box": {
-    "x": number (0-1, normalized left edge),
-    "y": number (0-1, normalized top edge),
-    "w": number (0-1, normalized width),
-    "h": number (0-1, normalized height)
+    "x_min": number (0-1, normalized left edge),
+    "y_min": number (0-1, normalized top edge),
+    "x_max": number (0-1, normalized right edge),
+    "y_max": number (0-1, normalized bottom edge)
   },
   "shoulder_crop": {
-    "x": number (0-1),
-    "y": number (0-1),
-    "w": number (0-1),
-    "h": number (0-1)
+    "x_min": number (0-1),
+    "y_min": number (0-1),
+    "x_max": number (0-1),
+    "y_max": number (0-1)
   } | null,
-  "visibility": "full"|"partial"|"obscured",
+  "visibility": {
+    "overall": "full"|"partial"|"obscured",
+    "head_visible": boolean,
+    "horns_visible": boolean,
+    "body_visible": boolean,
+    "occlusion_percent": number (0-100),
+    "occluded_by": string|null
+  },
+  "animal_description": {
+    "coat_color": string,
+    "horn_description": string|null,
+    "distinctive_features": string,
+    "face_details": string
+  },
   "horn_details": {
     "has_horns": boolean,
     "horn_type": "spiral"|"lyre"|"straight"|"curved"|"antler"|"boss"|null,
@@ -75,10 +101,26 @@ JSON schema:
 }
 
 export interface CropBox {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+  x_min: number;
+  y_min: number;
+  x_max: number;
+  y_max: number;
+}
+
+export interface AnimalDescription {
+  coat_color: string;
+  horn_description: string | null;
+  distinctive_features: string;
+  face_details: string;
+}
+
+export interface VisibilityInfo {
+  overall: "full" | "partial" | "obscured";
+  head_visible: boolean;
+  horns_visible: boolean;
+  body_visible: boolean;
+  occlusion_percent: number;
+  occluded_by: string | null;
 }
 
 export interface TrophyAnalysis {
@@ -103,7 +145,8 @@ export interface TrophyAnalysis {
   };
   bounding_box: CropBox;
   shoulder_crop: CropBox | null;
-  visibility: "full" | "partial" | "obscured";
+  visibility: VisibilityInfo;
+  animal_description: AnimalDescription;
   horn_details: {
     has_horns: boolean;
     horn_type: string | null;
@@ -189,7 +232,7 @@ export async function analyzeTrophyImage(
         ],
       },
     ],
-    max_tokens: 1500,
+    max_tokens: 2000,
     temperature: 0.2,
   });
 
@@ -209,6 +252,26 @@ export async function analyzeTrophyImage(
       hd.length_range_high = hd[highKey];
       delete hd[highKey];
     }
+  }
+
+  if (typeof parsed.visibility === "string") {
+    parsed.visibility = {
+      overall: parsed.visibility,
+      head_visible: true,
+      horns_visible: parsed.horn_details?.has_horns ?? false,
+      body_visible: parsed.visibility === "full",
+      occlusion_percent: parsed.visibility === "full" ? 0 : parsed.visibility === "partial" ? 30 : 60,
+      occluded_by: null,
+    };
+  }
+
+  if (!parsed.animal_description) {
+    parsed.animal_description = {
+      coat_color: parsed.horn_details?.coloring || "unknown",
+      horn_description: parsed.horn_details?.notable_features || null,
+      distinctive_features: "",
+      face_details: "",
+    };
   }
 
   if (parsed.species?.common_name && parsed.trophy_qualification) {
