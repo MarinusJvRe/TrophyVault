@@ -99,6 +99,32 @@ function AuthPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
+  const { data: providers } = useQuery<{ google: boolean; apple: boolean }>({
+    queryKey: ["/api/auth/providers"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/providers");
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 30,
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthError = params.get("error");
+    if (oauthError) {
+      const messages: Record<string, string> = {
+        invalid_state: "Authentication session expired. Please try again.",
+        token_exchange_failed: "Failed to complete sign-in. Please try again.",
+        userinfo_failed: "Could not retrieve your account info. Please try again.",
+        no_email: "No email address was provided. Please use an account with an email.",
+        no_token: "No authentication token received. Please try again.",
+        oauth_failed: "Sign-in failed. Please try again.",
+      };
+      setError(messages[oauthError] || "Sign-in failed. Please try again.");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -210,36 +236,44 @@ function AuthPage() {
             </motion.div>
           </AnimatePresence>
 
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full bg-white text-gray-800 border-white/20 hover:bg-white/90 font-medium py-5"
-              onClick={() => window.location.href = "/api/auth/google"}
-              data-testid="button-google-signin"
-            >
-              <Chrome className="h-5 w-5 mr-2" />
-              Continue with Google
-            </Button>
+          {(providers?.google || providers?.apple) && (
+            <>
+              <div className="space-y-3">
+                {providers?.google && (
+                  <Button
+                    variant="outline"
+                    className="w-full bg-white text-gray-800 border-white/20 hover:bg-white/90 font-medium py-5"
+                    onClick={() => window.location.href = "/api/auth/google"}
+                    data-testid="button-google-signin"
+                  >
+                    <Chrome className="h-5 w-5 mr-2" />
+                    Continue with Google
+                  </Button>
+                )}
 
-            <Button
-              variant="outline"
-              className="w-full bg-black text-white border-white/20 hover:bg-black/80 font-medium py-5"
-              onClick={() => window.location.href = "/api/auth/apple"}
-              data-testid="button-apple-signin"
-            >
-              <Apple className="h-5 w-5 mr-2" />
-              Continue with Apple
-            </Button>
-          </div>
+                {providers?.apple && (
+                  <Button
+                    variant="outline"
+                    className="w-full bg-black text-white border-white/20 hover:bg-black/80 font-medium py-5"
+                    onClick={() => window.location.href = "/api/auth/apple"}
+                    data-testid="button-apple-signin"
+                  >
+                    <Apple className="h-5 w-5 mr-2" />
+                    Continue with Apple
+                  </Button>
+                )}
+              </div>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-[#1a1a1a] px-3 text-white/40 uppercase tracking-wider">or</span>
-            </div>
-          </div>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/10" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-[#1a1a1a] px-3 text-white/40 uppercase tracking-wider">or</span>
+                </div>
+              </div>
+            </>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === "signup" && (
@@ -418,6 +452,23 @@ function AuthGate() {
     const ref = params.get("ref");
     if (ref) {
       sessionStorage.setItem("referralCode", ref);
+    }
+
+    const oauthSuccess = params.get("oauth");
+    if (oauthSuccess === "success") {
+      if (params.get("newUser") === "true") {
+        sessionStorage.setItem("isNewUser", "true");
+      }
+      window.history.replaceState({}, "", window.location.pathname);
+      fetch("/api/auth/token", { method: "POST", credentials: "include" })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.authToken) setAuthToken(data.authToken);
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        })
+        .catch(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        });
     }
   }, []);
 

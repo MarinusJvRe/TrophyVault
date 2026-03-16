@@ -134,7 +134,7 @@ export async function setupAuth(app: Express) {
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const session = req.session as any;
-  if (session?.userId && session?.authProvider === "email") {
+  if (session?.userId && ["email", "google", "apple"].includes(session?.authProvider)) {
     const { db } = await import("../../db");
     const { users } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
