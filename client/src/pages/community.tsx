@@ -23,6 +23,43 @@ import { Link } from "wouter";
 const ROOMS_PAGE_SIZE = 10;
 const LEADERBOARD_PAGE_SIZE = 20;
 
+interface PublicRoom {
+  userId: string;
+  firstName: string | null;
+  lastName: string | null;
+  profileImageUrl: string | null;
+  theme: string | null;
+  pursuit: string | null;
+  huntingLocations: string[] | null;
+  avgScore: number;
+  totalRatings: number;
+  trophyCount: number;
+  createdAt: string | null;
+}
+
+interface RoomDetailData {
+  user: { id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null };
+  preferences: Record<string, unknown> | null;
+  trophies: { id: string; species: string; name: string; score: string | null; location: string | null; imageUrl: string | null }[];
+  rating: { avgScore: number; totalRatings: number };
+}
+
+interface LeaderboardEntry {
+  trophyId: string;
+  trophyName: string;
+  species: string;
+  score: string;
+  rank: number;
+  location: string | null;
+  imageUrl: string | null;
+  glbPreviewUrl: string | null;
+  renderImageUrl: string | null;
+  userId: string;
+  firstName: string | null;
+  lastName: string | null;
+  badge?: { rank: number; badge: string } | null;
+}
+
 function RankBadge({ badge }: { badge: { rank: number; badge: string } }) {
   const colors = {
     gold: "bg-yellow-500/20 text-yellow-500 border-yellow-500/40",
@@ -40,12 +77,12 @@ function RankBadge({ badge }: { badge: { rank: number; badge: string } }) {
   );
 }
 
-function RoomDetailPanel({ room, rooms, onSelectIndex }: { room: any; rooms: any[]; onSelectIndex: (i: number) => void }) {
+function RoomDetailPanel({ room, rooms, onSelectIndex }: { room: PublicRoom; rooms: PublicRoom[]; onSelectIndex: (i: number) => void }) {
   const name = room.firstName ? `${room.firstName} ${room.lastName || ""}`.trim() : `User ${room.userId?.slice(0, 6)}`;
   const regions = room.huntingLocations?.filter(Boolean) ?? [];
   const pursuit = room.pursuit;
 
-  const { data: roomData } = useQuery<any>({
+  const { data: roomData } = useQuery<RoomDetailData | null>({
     queryKey: ["/api/community/room", room.userId],
     queryFn: async () => {
       const res = await fetch(`/api/community/room/${room.userId}`);
@@ -69,7 +106,7 @@ function RoomDetailPanel({ room, rooms, onSelectIndex }: { room: any; rooms: any
   })();
 
   const touchStartX = useRef(0);
-  const currentIndex = rooms.findIndex((r: any) => r.userId === room.userId);
+  const currentIndex = rooms.findIndex((r) => r.userId === room.userId);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -187,6 +224,7 @@ export default function Community() {
   const [roomPage, setRoomPage] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedRoomIndex, setSelectedRoomIndex] = useState(0);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [selectedSpecies, setSelectedSpecies] = useState<string>("");
   const [selectedRegion, setSelectedRegion] = useState<string>("");
@@ -196,14 +234,14 @@ export default function Community() {
     setRoomSearch(value);
     setRoomPage(0);
     setSelectedRoomIndex(0);
-    clearTimeout((window as any).__communitySearchTimeout);
-    (window as any).__communitySearchTimeout = setTimeout(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
       setDebouncedSearch(value);
     }, 300);
   };
 
   const roomsQueryKey = ["/api/community/rooms", `?limit=${ROOMS_PAGE_SIZE}&offset=${roomPage * ROOMS_PAGE_SIZE}&sort=${roomSort}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`];
-  const { data: roomsData, isLoading: roomsLoading } = useQuery<{ rooms: any[]; total: number }>({
+  const { data: roomsData, isLoading: roomsLoading } = useQuery<{ rooms: PublicRoom[]; total: number }>({
     queryKey: roomsQueryKey,
   });
 
@@ -229,7 +267,7 @@ export default function Community() {
     ? ["/api/community/leaderboard", `?species=${encodeURIComponent(selectedSpecies)}&limit=${LEADERBOARD_PAGE_SIZE}&offset=${leaderboardPage * LEADERBOARD_PAGE_SIZE}${selectedRegion ? `&region=${encodeURIComponent(selectedRegion)}` : ""}`]
     : null;
 
-  const { data: leaderboardData, isLoading: leaderboardLoading } = useQuery<{ entries: any[]; total: number }>({
+  const { data: leaderboardData, isLoading: leaderboardLoading } = useQuery<{ entries: LeaderboardEntry[]; total: number }>({
     queryKey: leaderboardQueryKey!,
     enabled: !!selectedSpecies,
   });
@@ -315,7 +353,7 @@ export default function Community() {
                     </div>
 
                     <div className="divide-y divide-border/20">
-                      {rooms.map((room: any, i: number) => {
+                      {rooms.map((room, i) => {
                         const name = room.firstName ? `${room.firstName} ${room.lastName || ""}`.trim() : `User ${room.userId?.slice(0, 6)}`;
                         const regions = room.huntingLocations?.filter(Boolean) ?? [];
                         const isSelected = i === selectedRoomIndex;
@@ -507,7 +545,7 @@ export default function Community() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {leaderboardEntries.map((entry: any, i: number) => {
+                      {leaderboardEntries.map((entry, i) => {
                         const entryName = entry.firstName ? `${entry.firstName} ${entry.lastName || ""}`.trim() : `User ${entry.userId?.slice(0, 6)}`;
                         return (
                           <motion.div
