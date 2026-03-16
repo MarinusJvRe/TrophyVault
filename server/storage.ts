@@ -39,9 +39,9 @@ export interface IStorage {
     limit?: number;
     offset?: number;
     search?: string;
-    sort?: "rating" | "trophies" | "newest";
+    sort?: "rating" | "trophies" | "newest" | "ratings";
   }): Promise<{
-    rooms: { userId: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null; theme: string | null; avgScore: number; totalRatings: number; trophyCount: number; createdAt: Date | null }[];
+    rooms: { userId: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null; theme: string | null; pursuit: string | null; huntingLocations: string[] | null; avgScore: number; totalRatings: number; trophyCount: number; createdAt: Date | null }[];
     total: number;
   }>;
 
@@ -224,7 +224,7 @@ export class DatabaseStorage implements IStorage {
     limit?: number;
     offset?: number;
     search?: string;
-    sort?: "rating" | "trophies" | "newest";
+    sort?: "rating" | "trophies" | "newest" | "ratings";
   }): Promise<{
     rooms: any[];
     total: number;
@@ -278,6 +278,8 @@ export class DatabaseStorage implements IStorage {
       orderClause = sql`COALESCE(${trophyCountSq.cnt}, 0) DESC`;
     } else if (sort === "newest") {
       orderClause = sql`${users.createdAt} DESC NULLS LAST`;
+    } else if (sort === "ratings") {
+      orderClause = sql`COALESCE(${ratingSq.totalRatings}, 0) DESC`;
     } else {
       orderClause = sql`COALESCE(${ratingSq.avgScore}, '0') DESC`;
     }
@@ -289,6 +291,8 @@ export class DatabaseStorage implements IStorage {
         lastName: users.lastName,
         profileImageUrl: users.profileImageUrl,
         theme: userPreferences.theme,
+        pursuit: userPreferences.pursuit,
+        huntingLocations: userPreferences.huntingLocations,
         createdAt: users.createdAt,
         avgScore: ratingSq.avgScore,
         totalRatings: ratingSq.totalRatings,
@@ -309,6 +313,8 @@ export class DatabaseStorage implements IStorage {
       lastName: r.lastName,
       profileImageUrl: r.profileImageUrl,
       theme: r.theme,
+      pursuit: r.pursuit,
+      huntingLocations: r.huntingLocations,
       createdAt: r.createdAt,
       avgScore: r.avgScore ? parseFloat(r.avgScore as string) : 0,
       totalRatings: r.totalRatings ?? 0,

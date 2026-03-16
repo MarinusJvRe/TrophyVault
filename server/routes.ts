@@ -503,12 +503,12 @@ export async function registerRoutes(
     const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
     const search = (req.query.search as string) || undefined;
     const sort = (req.query.sort as string) || "rating";
-    const validSorts = ["rating", "trophies", "newest"];
+    const validSorts = ["rating", "trophies", "newest", "ratings"];
     const result = await storage.getPublicRooms({
       limit,
       offset,
       search,
-      sort: validSorts.includes(sort) ? sort as "rating" | "trophies" | "newest" : "rating",
+      sort: validSorts.includes(sort) ? sort as "rating" | "trophies" | "newest" | "ratings" : "rating",
     });
     res.json(result);
   });
