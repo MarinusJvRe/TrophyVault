@@ -50,7 +50,7 @@ const TIER_CONFIG: Record<string, { label: string; color: string; bgColor: strin
 };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -273,11 +273,7 @@ export default function Profile() {
                     variant="outline"
                     className="gap-1.5 border-border/40 text-muted-foreground hover:text-destructive hover:border-destructive/50"
                     data-testid="button-profile-logout"
-                    onClick={() => {
-                      fetch("/api/auth/email-logout", { method: "POST", credentials: "include" })
-                        .then(r => { if (r.ok) window.location.href = "/"; else window.location.href = "/api/logout"; })
-                        .catch(() => window.location.href = "/api/logout");
-                    }}
+                    onClick={() => logout()}
                   >
                     <LogOut className="h-3.5 w-3.5" /> Sign Out
                   </Button>

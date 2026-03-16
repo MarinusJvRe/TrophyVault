@@ -25,7 +25,7 @@ function isNavActive(location: string, item: typeof navItems[0]) {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const bgImage = theme === "manor" ? themeManor 
                  : theme === "minimal" ? themeMinimal 
@@ -103,11 +103,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
            </Link>
            
            <button
-             onClick={() => {
-               fetch("/api/auth/email-logout", { method: "POST", credentials: "include" })
-                 .then(r => { if (r.ok) window.location.href = "/"; else window.location.href = "/api/logout"; })
-                 .catch(() => window.location.href = "/api/logout");
-             }}
+             onClick={() => logout()}
              className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
              data-testid="button-logout"
            >

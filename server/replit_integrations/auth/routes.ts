@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
+import { invalidateAuthToken, invalidateUserTokens } from "../../auth";
 
 export function registerAuthRoutes(app: Express): void {
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
@@ -20,6 +21,14 @@ export function registerAuthRoutes(app: Express): void {
   });
 
   app.post("/api/auth/email-logout", (req, res) => {
+    const authToken = req.headers["x-auth-token"] as string;
+    if (authToken) {
+      invalidateAuthToken(authToken);
+    }
+    const session = req.session as any;
+    if (session?.userId) {
+      invalidateUserTokens(session.userId);
+    }
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ message: "Logout failed" });

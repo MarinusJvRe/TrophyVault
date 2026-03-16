@@ -39,6 +39,16 @@ export function validateAuthToken(token: string): string | null {
   return entry.userId;
 }
 
+export function invalidateAuthToken(token: string): void {
+  authTokens.delete(token);
+}
+
+export function invalidateUserTokens(userId: string): void {
+  authTokens.forEach((entry, token) => {
+    if (entry.userId === userId) authTokens.delete(token);
+  });
+}
+
 setInterval(() => {
   const now = Date.now();
   authTokens.forEach((entry, token) => {

@@ -25,12 +25,17 @@ async function fetchUser(): Promise<User | null> {
 }
 
 async function logout(): Promise<void> {
+  const token = getAuthToken();
   clearAuthToken();
+  sessionStorage.clear();
   resetUser();
+  const headers: Record<string, string> = {};
+  if (token) headers["X-Auth-Token"] = token;
   try {
     const res = await fetch("/api/auth/email-logout", {
       method: "POST",
       credentials: "include",
+      headers,
     });
     if (res.ok) {
       window.location.href = "/";
