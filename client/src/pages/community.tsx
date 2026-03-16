@@ -45,6 +45,29 @@ function RoomDetailPanel({ room, rooms, onSelectIndex }: { room: any; rooms: any
   const regions = room.huntingLocations?.filter(Boolean) ?? [];
   const pursuit = room.pursuit;
 
+  const { data: roomData } = useQuery<any>({
+    queryKey: ["/api/community/room", room.userId],
+    queryFn: async () => {
+      const res = await fetch(`/api/community/room/${room.userId}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!room.userId,
+  });
+
+  const speciesHighlights = (() => {
+    const trophyList = roomData?.trophies;
+    if (!trophyList || trophyList.length === 0) return [];
+    const counts: Record<string, number> = {};
+    for (const t of trophyList) {
+      if (t.species) counts[t.species] = (counts[t.species] || 0) + 1;
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([species, count]) => ({ species, count }));
+  })();
+
   const touchStartX = useRef(0);
   const currentIndex = rooms.findIndex((r: any) => r.userId === room.userId);
 
@@ -55,10 +78,10 @@ function RoomDetailPanel({ room, rooms, onSelectIndex }: { room: any; rooms: any
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     const diff = touchStartX.current - e.changedTouches[0].clientX;
     if (Math.abs(diff) > 50) {
-      if (diff > 0 && currentIndex < rooms.length - 1) {
-        onSelectIndex(currentIndex + 1);
-      } else if (diff < 0 && currentIndex > 0) {
-        onSelectIndex(currentIndex - 1);
+      if (diff > 0) {
+        onSelectIndex(currentIndex < rooms.length - 1 ? currentIndex + 1 : 0);
+      } else if (diff < 0) {
+        onSelectIndex(currentIndex > 0 ? currentIndex - 1 : rooms.length - 1);
       }
     }
   }, [currentIndex, rooms.length, onSelectIndex]);
@@ -116,6 +139,20 @@ function RoomDetailPanel({ room, rooms, onSelectIndex }: { room: any; rooms: any
                     </div>
                   )}
                 </div>
+
+                {speciesHighlights.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border/20">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Top Species</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {speciesHighlights.map(({ species, count }) => (
+                        <Badge key={species} variant="secondary" className="text-[10px] gap-1 bg-muted/80">
+                          <TrophyIcon className="h-2.5 w-2.5" />
+                          {species} ({count})
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -268,12 +305,13 @@ export default function Community() {
 
                 <Card className="bg-card border-border/40">
                   <CardContent className="p-0">
-                    <div className="hidden md:grid grid-cols-[2.5fr_1.5fr_1fr_1fr_0.8fr] gap-2 px-4 py-2.5 border-b border-border/30 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="hidden md:grid grid-cols-[2.5fr_1.5fr_1fr_0.8fr_0.6fr_0.6fr] gap-2 px-4 py-2.5 border-b border-border/30 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                       <div>Hunter</div>
                       <div>Regions</div>
                       <div>Pursuit</div>
                       <div className="text-center">Trophies</div>
-                      <div className="text-right">Rating</div>
+                      <div className="text-center">Rating</div>
+                      <div className="text-right"># Ratings</div>
                     </div>
 
                     <div className="divide-y divide-border/20">
@@ -291,7 +329,7 @@ export default function Community() {
                           >
                             <div
                               className={cn(
-                                "flex flex-col md:grid md:grid-cols-[2.5fr_1.5fr_1fr_1fr_0.8fr] gap-1 md:gap-2 px-4 py-3 cursor-pointer transition-all",
+                                "flex flex-col md:grid md:grid-cols-[2.5fr_1.5fr_1fr_0.8fr_0.6fr_0.6fr] gap-1 md:gap-2 px-4 py-3 cursor-pointer transition-all",
                                 isSelected
                                   ? "bg-primary/8 border-l-2 border-l-primary"
                                   : "hover:bg-muted/50 border-l-2 border-l-transparent"
@@ -338,16 +376,19 @@ export default function Community() {
                                 </Badge>
                               </div>
 
-                              <div className="hidden md:flex items-center justify-end gap-1">
+                              <div className="hidden md:flex items-center justify-center gap-1">
                                 {room.avgScore > 0 ? (
                                   <>
                                     <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                                     <span className="text-xs font-semibold">{Number(room.avgScore).toFixed(1)}</span>
-                                    <span className="text-[10px] text-muted-foreground">({room.totalRatings})</span>
                                   </>
                                 ) : (
                                   <span className="text-[10px] text-muted-foreground/50">—</span>
                                 )}
+                              </div>
+
+                              <div className="hidden md:flex items-center justify-end">
+                                <span className="text-xs text-muted-foreground">{room.totalRatings || 0}</span>
                               </div>
 
                               <div className="flex md:hidden items-center gap-3 text-xs text-muted-foreground pl-11">
@@ -387,8 +428,7 @@ export default function Community() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setRoomPage(p => Math.max(0, p - 1))}
-                      disabled={roomPage === 0}
+                      onClick={() => setRoomPage(p => p === 0 ? totalRoomPages - 1 : p - 1)}
                       data-testid="button-rooms-prev"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -399,8 +439,7 @@ export default function Community() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setRoomPage(p => Math.min(totalRoomPages - 1, p + 1))}
-                      disabled={roomPage >= totalRoomPages - 1}
+                      onClick={() => setRoomPage(p => p >= totalRoomPages - 1 ? 0 : p + 1)}
                       data-testid="button-rooms-next"
                     >
                       <ChevronRight className="h-4 w-4" />
