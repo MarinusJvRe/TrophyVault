@@ -56,3 +56,6 @@ integrations = ["javascript_log_in_with_replit:2.0.0", "github:1.0.0", "javascri
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 180000
+
+[objectStorage]
+defaultBucketID = "replit-objstore-30e6aaae-fb43-44fb-8c1b-520c6281a519"

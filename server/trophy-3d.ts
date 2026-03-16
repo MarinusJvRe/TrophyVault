@@ -154,11 +154,16 @@ export async function generateMountImage(
 
   const prompt = `Transform this animal photo into a professional front-facing taxidermy shoulder mount. The animal is a ${species} with these specific features: ${animalDetails}. Repose the animal to face directly forward, showing head, neck, and upper shoulders symmetrically as a classic wall-mount trophy. Preserve the exact coloring, markings, horn/antler shape, and facial features of this specific animal. The mount should be ${bgDescription}. Photorealistic taxidermy quality, dramatic museum lighting, sharp detail.`;
 
-  const imageStream = fs.createReadStream(bgRemovedImagePath);
+  const imageBuffer = fs.readFileSync(bgRemovedImagePath);
+  const imageFile = new File(
+    [imageBuffer],
+    path.basename(bgRemovedImagePath),
+    { type: "image/png" }
+  );
 
   const response = await openai.images.edit({
     model: "gpt-image-1",
-    image: imageStream,
+    image: imageFile,
     prompt,
     size: "1024x1024",
   });
