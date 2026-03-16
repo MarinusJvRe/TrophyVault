@@ -429,7 +429,7 @@ export default function Community() {
                                 <span className="text-xs text-muted-foreground">{room.totalRatings || 0}</span>
                               </div>
 
-                              <div className="flex md:hidden items-center gap-3 text-xs text-muted-foreground pl-11">
+                              <div className="flex md:hidden items-center gap-3 text-xs text-muted-foreground pl-11 flex-wrap">
                                 {room.pursuit && (
                                   <span className="flex items-center gap-1">
                                     <Crosshair className="h-3 w-3" />
@@ -443,7 +443,7 @@ export default function Community() {
                                 {room.avgScore > 0 && (
                                   <span className="flex items-center gap-1">
                                     <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                                    {Number(room.avgScore).toFixed(1)}
+                                    {Number(room.avgScore).toFixed(1)} ({room.totalRatings})
                                   </span>
                                 )}
                                 {regions.length > 0 && (
