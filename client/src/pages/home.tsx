@@ -1,13 +1,13 @@
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Trophy, MapPin, Calendar, Activity, Star, Crosshair, Shield, Crown, Zap, User, Award } from "lucide-react";
+import { ArrowRight, Trophy, MapPin, Calendar, Activity, Star, Crosshair, Shield, Award, Users } from "lucide-react";
 import { Link } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/hooks/use-auth";
 import type { Trophy as TrophyType } from "@shared/schema";
+import CommunityFeed from "@/components/CommunityFeed";
 
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
@@ -49,7 +49,10 @@ export default function Home() {
     queryKey: ["/api/stats"],
   });
 
-  const featuredTrophy = trophies.find(t => t.featured) || null;
+  const sortedByUpload = [...trophies].sort((a, b) =>
+    new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime()
+  );
+  const featuredTrophy = trophies.find(t => t.featured) || sortedByUpload[0] || null;
 
   const currentHero = theme === "manor" ? themeManor 
                      : theme === "minimal" ? themeMinimal 
@@ -71,26 +74,31 @@ export default function Home() {
     : stats?.scoringSystem === "Boone & Crockett" ? "B&C" 
     : "SCI";
 
-  const sortedTrophies = [...trophies].sort((a, b) => 
-    new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  const badges = stats?.leaderboardBadges || [];
+  const hasBadges = badges.length > 0;
+  const sortedBadges = [...badges].sort((a, b) => a.rank - b.rank);
 
-  const groupedByYear: Record<string, TrophyType[]> = {};
-  sortedTrophies.forEach(t => {
-    const year = new Date(t.date).getFullYear().toString();
-    if (!groupedByYear[year]) groupedByYear[year] = [];
-    groupedByYear[year].push(t);
-  });
+  const badgeColors: Record<string, string> = {
+    gold: "text-yellow-500",
+    silver: "text-gray-400",
+    bronze: "text-amber-700",
+    top10: "text-primary",
+  };
 
-  // Sort years in descending order (latest first), and sort trophies within each year by date descending
-  const sortedYears = Object.keys(groupedByYear)
-    .sort((a, b) => parseInt(b) - parseInt(a))
-    .map(year => ({
-      year,
-      trophies: groupedByYear[year].sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      )
-    }));
+  const roomRating = stats?.roomRating;
+  const roomRatingSource = stats?.roomRatingSource ?? "none";
+  const roomRatingCount = stats?.roomRatingCount ?? 0;
+  const isPrivate = (stats?.roomVisibility ?? "private") === "private";
+
+  let ratingValue = "—";
+  let ratingSubtext = "Unrated · Private";
+  if (!isPrivate && roomRating !== null && roomRating !== undefined && roomRatingSource === "community") {
+    ratingValue = roomRating.toFixed(1);
+    ratingSubtext = `${roomRatingCount} ${roomRatingCount === 1 ? "rating" : "ratings"}`;
+  } else if (!isPrivate) {
+    ratingValue = "—";
+    ratingSubtext = "No ratings yet";
+  }
 
   return (
     <Layout>
@@ -134,57 +142,45 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 md:px-12 mt-4 md:-mt-10 relative z-30 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
-          <StatCard 
-            icon={Activity} 
-            label="Hunts" 
-            value={String(stats?.totalHunts ?? 0).padStart(2, "0")} 
-            subtext="Total animals recorded" 
-            delay={0.1}
-          />
-          <StatCard 
-            icon={Trophy} 
-            label="Qualifying Trophies" 
-            value={String(stats?.qualifyingTrophies ?? 0).padStart(2, "0")} 
-            subtext={`Meeting ${scoringLabel} minimums`} 
-            delay={0.15}
-          />
-          <StatCard 
-            icon={MapPin} 
-            label="Species Collected" 
-            value={String(stats?.speciesCollected ?? 0).padStart(2, "0")} 
-            subtext={stats?.recentSpecies ? `Last: ${stats.recentSpecies}` : "No species yet"} 
-            delay={0.2}
-          />
-          <RatingCard
-            rating={stats?.roomRating ?? null}
-            source={stats?.roomRatingSource ?? "none"}
-            ratingCount={stats?.roomRatingCount ?? 0}
-            roomVisibility={stats?.roomVisibility ?? "private"}
-            delay={0.25}
-          />
-          <StatCard 
-            icon={Shield} 
-            label="Weapons in Safe" 
-            value={String(stats?.weaponCount ?? 0).padStart(2, "0")} 
-            subtext="Firearms & bows" 
-            delay={0.3}
-          />
-          <StatCard 
-            icon={Crosshair} 
-            label="Furthest Shot" 
-            value={stats?.furthestShot || "—"} 
-            subtext={stats?.furthestShotSpecies || "No shots recorded"} 
-            delay={0.35}
-          />
-          <AccountTierCard
-            tier={stats?.accountTier || "free"}
-            delay={0.4}
-          />
-          <LeaderboardBadgesCard
-            badges={stats?.leaderboardBadges || []}
-            delay={0.45}
-          />
+        {hasBadges && (
+          <div className="max-w-7xl mx-auto px-4 md:px-12 mt-4 md:-mt-6 relative z-30">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.4 }}
+              className="flex flex-wrap items-center gap-3 justify-center"
+            >
+              {sortedBadges.map((b, i) => {
+                const color = badgeColors[b.badge] || badgeColors.top10;
+                return (
+                  <div
+                    key={`${b.species}-${b.rank}`}
+                    className="flex items-center gap-1.5"
+                    data-testid={`medal-badge-${b.rank}-${i}`}
+                  >
+                    <Award className={`h-7 w-7 md:h-9 md:w-9 ${color}`} />
+                    <span className={`text-xs md:text-sm font-bold ${color}`}>#{b.rank} {b.species}</span>
+                  </div>
+                );
+              })}
+            </motion.div>
+          </div>
+        )}
+
+        <div className="max-w-7xl mx-auto px-4 md:px-12 mt-6 relative z-30">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.4 }}
+            className="space-y-1.5"
+          >
+            <CompactStat icon={Activity} label="Hunts" value={String(stats?.totalHunts ?? 0)} subtext="Total animals recorded" />
+            <CompactStat icon={Trophy} label="Qualifying Trophies" value={String(stats?.qualifyingTrophies ?? 0)} subtext={`Meeting ${scoringLabel} minimums`} />
+            <CompactStat icon={MapPin} label="Species Collected" value={String(stats?.speciesCollected ?? 0)} subtext={stats?.recentSpecies ? `Last: ${stats.recentSpecies}` : "No species yet"} />
+            <CompactStat icon={Star} label="Room Rating" value={ratingValue} subtext={ratingSubtext} />
+            <CompactStat icon={Shield} label="Weapons in Safe" value={String(stats?.weaponCount ?? 0)} subtext="Firearms & bows" />
+            <CompactStat icon={Crosshair} label="Furthest Shot" value={stats?.furthestShot || "—"} subtext={stats?.furthestShotSpecies || "No shots recorded"} />
+          </motion.div>
         </div>
 
         {featuredTrophy && (
@@ -220,40 +216,19 @@ export default function Home() {
           >
             <div className="flex justify-between items-end mb-6">
               <div>
-                <h2 className="text-xl md:text-2xl font-serif font-bold text-foreground">Trophy Timeline</h2>
-                <p className="text-muted-foreground text-sm mt-1">Your hunting journey over time</p>
+                <h2 className="text-xl md:text-2xl font-serif font-bold text-foreground flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Community Feed
+                </h2>
+                <p className="text-muted-foreground text-sm mt-1">Latest trophies from the community</p>
               </div>
-              <Link href="/trophies">
+              <Link href="/community">
                 <span className="text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1 cursor-pointer transition-colors">
                   View All <ArrowRight className="h-4 w-4" />
                 </span>
               </Link>
             </div>
-
-            {sortedTrophies.length > 0 ? (
-              <div className="space-y-8">
-                {sortedYears.map(({ year, trophies: yearTrophies }) => (
-                  <div key={year}>
-                    <div className="flex items-center gap-3 mb-4">
-                      <span className="text-lg font-serif font-bold text-primary">{year}</span>
-                      <div className="flex-1 h-px bg-border/50"></div>
-                      <span className="text-xs text-muted-foreground">{yearTrophies.length} {yearTrophies.length === 1 ? "hunt" : "hunts"}</span>
-                    </div>
-                    <div className="relative pl-6 md:pl-8 border-l-2 border-primary/20 space-y-4">
-                      {yearTrophies.map((trophy, i) => (
-                        <TimelineEntry key={trophy.id} trophy={trophy} index={i} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <Trophy className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                <p className="font-serif text-lg">No trophies yet</p>
-                <p className="text-sm mt-1">Upload your first trophy to start your timeline</p>
-              </div>
-            )}
+            <CommunityFeed />
           </motion.div>
         </div>
       </div>
@@ -261,192 +236,14 @@ export default function Home() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, subtext, delay }: any) {
+function CompactStat({ icon: Icon, label, value, subtext }: { icon: any; label: string; value: string; subtext: string }) {
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: delay, duration: 0.5 }}
-    >
-      <Card className="bg-card/90 backdrop-blur-xl border-border/10 shadow-2xl h-full">
-        <CardContent className="p-4 md:p-5">
-          <div className="flex items-start justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-muted-foreground text-[10px] md:text-xs font-medium uppercase tracking-wider truncate">{label}</p>
-              <h3 className="text-xl md:text-2xl font-serif font-bold mt-1 text-foreground truncate" data-testid={`text-stat-${label.toLowerCase().replace(/\s/g, '-')}`}>{value}</h3>
-              <p className="text-[10px] md:text-xs text-primary mt-0.5 truncate">{subtext}</p>
-            </div>
-            <div className="p-2 md:p-3 bg-primary/10 rounded-lg ml-2 shrink-0">
-              <Icon className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
-
-function StarRating({ rating }: { rating: number }) {
-  return (
-    <div className="flex gap-0.5" data-testid="star-rating-display">
-      {[1, 2, 3, 4, 5].map((star) => {
-        const fill = Math.min(1, Math.max(0, rating - (star - 1)));
-        return (
-          <div key={star} className="relative h-4 w-4 md:h-5 md:w-5">
-            <Star className="absolute inset-0 h-4 w-4 md:h-5 md:w-5 text-primary/20" />
-            <div className="absolute inset-0 overflow-hidden" style={{ width: `${fill * 100}%` }}>
-              <Star className="h-4 w-4 md:h-5 md:w-5 text-primary fill-primary" />
-            </div>
-          </div>
-        );
-      })}
+    <div className="flex items-center gap-3 py-1.5" data-testid={`stat-line-${label.toLowerCase().replace(/\s/g, '-')}`}>
+      <Icon className="h-4 w-4 text-primary shrink-0" />
+      <span className="text-sm text-muted-foreground min-w-[140px]">{label}</span>
+      <span className="text-sm font-serif font-bold text-foreground">{value}</span>
+      <span className="text-xs text-primary ml-1">{subtext}</span>
     </div>
-  );
-}
-
-function RatingCard({ rating, source, ratingCount, roomVisibility, delay }: { rating: number | null; source: string; ratingCount: number; roomVisibility: string; delay: number }) {
-  const isPrivate = roomVisibility === "private";
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.5 }}
-    >
-      <Card className="bg-card/90 backdrop-blur-xl border-border/10 shadow-2xl h-full">
-        <CardContent className="p-4 md:p-5">
-          <div className="flex items-start justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-muted-foreground text-[10px] md:text-xs font-medium uppercase tracking-wider">Room Rating</p>
-              {isPrivate ? (
-                <>
-                  <div className="mt-1 h-[1.75rem] md:h-[2rem] flex items-center" data-testid="text-stat-room-rating">
-                    <StarRating rating={0} />
-                  </div>
-                  <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">Unrated · Private</p>
-                </>
-              ) : rating !== null && source === "community" ? (
-                <>
-                  <div className="mt-1 h-[1.75rem] md:h-[2rem] flex items-center" data-testid="text-stat-room-rating">
-                    <StarRating rating={rating} />
-                  </div>
-                  <p className="text-[10px] md:text-xs text-primary mt-0.5">{rating.toFixed(1)} · {ratingCount} {ratingCount === 1 ? "rating" : "ratings"}</p>
-                </>
-              ) : (
-                <>
-                  <div className="mt-1 h-[1.75rem] md:h-[2rem] flex items-center" data-testid="text-stat-room-rating">
-                    <StarRating rating={0} />
-                  </div>
-                  <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">Unrated · No ratings yet</p>
-                </>
-              )}
-            </div>
-            <div className="p-2 md:p-3 bg-primary/10 rounded-lg ml-2 shrink-0">
-              <Star className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
-
-const TIER_CONFIG: Record<string, { label: string; color: string; bgColor: string; borderColor: string; icon: any }> = {
-  free: { label: "Free", color: "text-muted-foreground", bgColor: "bg-muted", borderColor: "border-border/40", icon: User },
-  paid: { label: "Paid", color: "text-primary", bgColor: "bg-primary/20", borderColor: "border-primary/30", icon: Zap },
-  pro: { label: "Pro", color: "text-amber-500", bgColor: "bg-amber-500/20", borderColor: "border-amber-500/30", icon: Crown },
-};
-
-function AccountTierCard({ tier, delay }: { tier: string; delay: number }) {
-  const config = TIER_CONFIG[tier] || TIER_CONFIG.free;
-  const TierIcon = config.icon;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.5 }}
-    >
-      <Card className="bg-card/90 backdrop-blur-xl border-border/10 shadow-2xl h-full">
-        <CardContent className="p-4 md:p-5">
-          <div className="flex items-start justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-muted-foreground text-[10px] md:text-xs font-medium uppercase tracking-wider">Account Tier</p>
-              <h3 className={`text-xl md:text-2xl font-serif font-bold mt-1 ${config.color}`} data-testid="text-stat-account-tier">{config.label}</h3>
-              {tier === "free" ? (
-                <Link href="/profile">
-                  <span className="text-[10px] md:text-xs text-primary hover:text-primary/80 mt-0.5 inline-flex items-center gap-0.5 cursor-pointer" data-testid="link-upgrade">
-                    Upgrade <ArrowRight className="h-3 w-3" />
-                  </span>
-                </Link>
-              ) : (
-                <p className="text-[10px] md:text-xs text-primary mt-0.5" data-testid="text-active-membership">Active membership</p>
-              )}
-            </div>
-            <div className={`p-2 md:p-3 ${config.bgColor} rounded-lg ml-2 shrink-0`}>
-              <TierIcon className={`h-4 w-4 md:h-5 md:w-5 ${config.color}`} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
-
-function LeaderboardBadgesCard({ badges, delay }: { badges: LeaderboardBadge[]; delay: number }) {
-  const badgeColors = {
-    gold: "bg-yellow-500/20 text-yellow-500 border-yellow-500/40",
-    silver: "bg-gray-400/20 text-gray-400 border-gray-400/40",
-    bronze: "bg-amber-700/20 text-amber-700 border-amber-700/40",
-    top10: "bg-primary/20 text-primary border-primary/40",
-  };
-
-  const sorted = [...badges].sort((a, b) => a.rank - b.rank);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.5 }}
-    >
-      <Card className="bg-card/90 backdrop-blur-xl border-border/10 shadow-2xl h-full">
-        <CardContent className="p-4 md:p-5">
-          <div className="flex items-start justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-muted-foreground text-[10px] md:text-xs font-medium uppercase tracking-wider">Leaderboard</p>
-              {sorted.length > 0 ? (
-                <>
-                  <div className="flex flex-wrap gap-1.5 mt-2" data-testid="leaderboard-badges-list">
-                    {sorted.map((b, i) => {
-                      const colorClass = badgeColors[b.badge] || badgeColors.top10;
-                      return (
-                        <div
-                          key={`${b.species}-${b.rank}`}
-                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-bold ${colorClass}`}
-                          data-testid={`badge-rank-${b.rank}-${i}`}
-                        >
-                          <Trophy className="h-2.5 w-2.5" />
-                          #{b.rank} {b.species}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[10px] md:text-xs text-primary mt-1" data-testid="text-rankings-count">{sorted.length} {sorted.length === 1 ? "ranking" : "rankings"} earned</p>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-sm md:text-base font-serif mt-1 text-muted-foreground" data-testid="text-no-rankings">No rankings yet</h3>
-                  <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">Upload trophies and go public to compete</p>
-                </>
-              )}
-            </div>
-            <div className="p-2 md:p-3 bg-primary/10 rounded-lg ml-2 shrink-0">
-              <Award className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
   );
 }
 
@@ -497,60 +294,5 @@ function FeaturedCard({ trophy }: { trophy: TrophyType }) {
         </div>
       </div>
     </Link>
-  );
-}
-
-function TimelineEntry({ trophy, index }: { trophy: TrophyType; index: number }) {
-  const dateStr = new Date(trophy.date).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -12 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05, duration: 0.3 }}
-    >
-      <Link href={`/trophies/${trophy.id}`}>
-        <div className="relative group cursor-pointer">
-          <div className="absolute -left-[calc(1.5rem+5px)] md:-left-[calc(2rem+5px)] top-3 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background z-10"></div>
-
-          <Card className="bg-card/80 border-border/30 hover:border-primary/30 transition-colors overflow-hidden">
-            <CardContent className="p-3 md:p-4">
-              <div className="flex items-center gap-3 md:gap-4">
-                {trophy.imageUrl ? (
-                  <img
-                    src={trophy.imageUrl}
-                    alt={trophy.species}
-                    className="w-12 h-12 md:w-14 md:h-14 rounded-lg object-cover shrink-0 border border-border/30"
-                  />
-                ) : (
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 border border-border/30">
-                    <Trophy className="h-5 w-5 text-primary/50" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[10px] font-medium text-primary uppercase tracking-wider">{dateStr}</span>
-                    {trophy.featured && <Star className="h-3 w-3 text-primary fill-primary" />}
-                  </div>
-                  <h4 className="text-sm font-serif font-bold text-foreground truncate">{trophy.species}</h4>
-                  {trophy.name && (
-                    <p className="text-xs text-muted-foreground truncate">{trophy.name}</p>
-                  )}
-                </div>
-                {trophy.score && (
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-serif font-bold text-primary">{trophy.score}</p>
-                    <p className="text-[10px] text-muted-foreground">Score</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </Link>
-    </motion.div>
   );
 }
