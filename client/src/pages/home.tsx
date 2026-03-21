@@ -70,10 +70,6 @@ export default function Home() {
     );
   }
 
-  const scoringLabel = stats?.scoringSystem === "Rowland Ward" ? "RW" 
-    : stats?.scoringSystem === "Boone & Crockett" ? "B&C" 
-    : "SCI";
-
   const badges = stats?.leaderboardBadges || [];
   const hasBadges = badges.length > 0;
   const sortedBadges = [...badges].sort((a, b) => a.rank - b.rank);
@@ -87,17 +83,13 @@ export default function Home() {
 
   const roomRating = stats?.roomRating;
   const roomRatingSource = stats?.roomRatingSource ?? "none";
-  const roomRatingCount = stats?.roomRatingCount ?? 0;
   const isPrivate = (stats?.roomVisibility ?? "private") === "private";
 
   let ratingValue = "—";
-  let ratingSubtext = "Unrated · Private";
   if (!isPrivate && roomRating !== null && roomRating !== undefined && roomRatingSource === "community") {
     ratingValue = roomRating.toFixed(1);
-    ratingSubtext = `${roomRatingCount} ${roomRatingCount === 1 ? "rating" : "ratings"}`;
   } else if (!isPrivate) {
     ratingValue = "—";
-    ratingSubtext = "No ratings yet";
   }
 
   return (
@@ -117,14 +109,6 @@ export default function Home() {
           />
           
           <div className="relative z-20 h-full flex flex-col items-center justify-center pt-12 md:pt-20 p-6 md:p-12 max-w-5xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="mb-4 md:mb-6"
-            >
-              <img src={trophyVaultLogo} alt="Honor The Hunt" className="h-12 md:h-20 w-auto opacity-90 drop-shadow-lg" data-testid="img-logo-dashboard-hero" />
-            </motion.div>
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -139,49 +123,59 @@ export default function Home() {
                 {user?.firstName ? `${user.firstName}'s hunts at a glance.` : "Your hunts at a glance."}
               </p>
             </motion.div>
-          </div>
-        </div>
-
-        {hasBadges && (
-          <div className="max-w-7xl mx-auto px-4 md:px-12 mt-4 md:-mt-6 relative z-30">
             <motion.div
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
-              className="flex flex-wrap items-center gap-3 justify-center"
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="mt-4 md:mt-6"
             >
-              {sortedBadges.map((b, i) => {
-                const color = badgeColors[b.badge] || badgeColors.top10;
-                return (
-                  <div
-                    key={`${b.species}-${b.rank}`}
-                    className="flex items-center gap-1.5"
-                    data-testid={`medal-badge-${b.rank}-${i}`}
-                  >
-                    <Award className={`h-7 w-7 md:h-9 md:w-9 ${color}`} />
-                    <span className={`text-xs md:text-sm font-bold ${color}`}>#{b.rank} {b.species}</span>
-                  </div>
-                );
-              })}
+              <img src={trophyVaultLogo} alt="Honor The Hunt" className="h-12 md:h-20 w-auto opacity-90 drop-shadow-lg" data-testid="img-logo-dashboard-hero" />
             </motion.div>
           </div>
-        )}
+        </div>
 
         <div className="max-w-7xl mx-auto px-4 md:px-12 mt-6 relative z-30">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15, duration: 0.4 }}
-            className="space-y-1.5"
+            className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4"
           >
-            <CompactStat icon={Activity} label="Hunts" value={String(stats?.totalHunts ?? 0)} subtext="Total animals recorded" />
-            <CompactStat icon={Trophy} label="Qualifying Trophies" value={String(stats?.qualifyingTrophies ?? 0)} subtext={`Meeting ${scoringLabel} minimums`} />
-            <CompactStat icon={MapPin} label="Species Collected" value={String(stats?.speciesCollected ?? 0)} subtext={stats?.recentSpecies ? `Last: ${stats.recentSpecies}` : "No species yet"} />
-            <CompactStat icon={Star} label="Room Rating" value={ratingValue} subtext={ratingSubtext} />
-            <CompactStat icon={Shield} label="Weapons in Safe" value={String(stats?.weaponCount ?? 0)} subtext="Firearms & bows" />
-            <CompactStat icon={Crosshair} label="Furthest Shot" value={stats?.furthestShot || "—"} subtext={stats?.furthestShotSpecies || "No shots recorded"} />
+            <StatCard icon={Activity} label="Hunts" value={String(stats?.totalHunts ?? 0)} />
+            <StatCard icon={Trophy} label="Qualifying Trophies" value={String(stats?.qualifyingTrophies ?? 0)} />
+            <StatCard icon={MapPin} label="Species Collected" value={String(stats?.speciesCollected ?? 0)} />
+            <StatCard icon={Star} label="Room Rating" value={ratingValue} />
+            <StatCard icon={Shield} label="Weapons in Safe" value={String(stats?.weaponCount ?? 0)} />
+            <StatCard icon={Crosshair} label="Furthest Shot" value={stats?.furthestShot || "—"} />
           </motion.div>
         </div>
+
+        {hasBadges && (
+          <div className="max-w-7xl mx-auto px-4 md:px-12 mt-4 relative z-30">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.4 }}
+              className="rounded-lg border border-[hsl(38_40%_55%_/_0.25)] bg-card/50 p-4"
+            >
+              <div className="flex flex-wrap items-center gap-3 justify-center">
+                {sortedBadges.map((b, i) => {
+                  const color = badgeColors[b.badge] || badgeColors.top10;
+                  return (
+                    <div
+                      key={`${b.species}-${b.rank}`}
+                      className="flex items-center gap-1.5"
+                      data-testid={`medal-badge-${b.rank}-${i}`}
+                    >
+                      <Award className={`h-7 w-7 md:h-9 md:w-9 ${color}`} />
+                      <span className={`text-xs md:text-sm font-bold ${color}`}>#{b.rank} {b.species}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </div>
+        )}
 
         {featuredTrophy && (
           <div className="max-w-7xl mx-auto px-4 md:px-12 mt-10">
@@ -236,13 +230,15 @@ export default function Home() {
   );
 }
 
-function CompactStat({ icon: Icon, label, value, subtext }: { icon: any; label: string; value: string; subtext: string }) {
+function StatCard({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3 py-1.5" data-testid={`stat-line-${label.toLowerCase().replace(/\s/g, '-')}`}>
-      <Icon className="h-4 w-4 text-primary shrink-0" />
-      <span className="text-sm text-muted-foreground min-w-[140px]">{label}</span>
-      <span className="text-sm font-serif font-bold text-foreground">{value}</span>
-      <span className="text-xs text-primary ml-1">{subtext}</span>
+    <div
+      className="rounded-lg border border-[hsl(38_40%_55%_/_0.25)] bg-card/60 p-4 flex flex-col items-center text-center gap-2"
+      data-testid={`stat-card-${label.toLowerCase().replace(/\s/g, '-')}`}
+    >
+      <Icon className="h-5 w-5 text-primary shrink-0" />
+      <span className="text-xs text-muted-foreground uppercase tracking-wide">{label}</span>
+      <span className="text-xl font-serif font-bold text-foreground">{value}</span>
     </div>
   );
 }
