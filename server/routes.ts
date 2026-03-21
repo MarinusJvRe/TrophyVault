@@ -3,9 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerEmailAuthRoutes } from "./auth";
-import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema, insertProProfileSchema, TIER_LIMITS, AI_COSTS, type AccountTier, users, trophies as trophiesTable } from "@shared/schema";
+import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema, insertProProfileSchema, insertGroupSchema, TIER_LIMITS, AI_COSTS, type AccountTier, users, trophies as trophiesTable } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, or, ilike } from "drizzle-orm";
+import { z } from "zod";
 import { analyzeTrophyImage } from "./trophy-ai";
 import { generate3DModel, generateMountImageOnly } from "./trophy-3d";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -741,6 +742,145 @@ export async function registerRoutes(
 
     const updated = await storage.updateTrophy(trophyId, userId, { featured: !trophy.featured });
     res.json(updated);
+  });
+
+  // ========== GROUPS ==========
+  app.post("/api/groups", isAuthenticated, async (req, res) => {
+    const parsed = insertGroupSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten() });
+    const group = await storage.createGroup(getUserId(req), parsed.data);
+    res.status(201).json(group);
+  });
+
+  app.get("/api/groups", isAuthenticated, async (req, res) => {
+    const groups = await storage.getUserGroups(getUserId(req));
+    res.json(groups);
+  });
+
+  app.get("/api/groups/invites", isAuthenticated, async (req, res) => {
+    const invites = await storage.getUserPendingInvites(getUserId(req));
+    res.json(invites);
+  });
+
+  app.get("/api/groups/:id", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const group = await storage.getGroup(req.params.id as string, userId);
+    if (!group) return res.status(403).json({ message: "Group not found or access denied" });
+    const members = await storage.getGroupMembers(group.id, userId);
+    res.json({ group, members });
+  });
+
+  app.delete("/api/groups/:id", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const isAdmin = await storage.isGroupAdmin(req.params.id as string, userId);
+    if (!isAdmin) return res.status(403).json({ message: "Only the group admin can delete this group" });
+    const deleted = await storage.deleteGroup(req.params.id as string, userId);
+    if (!deleted) return res.status(404).json({ message: "Group not found" });
+    res.status(204).send();
+  });
+
+  const groupInviteBodySchema = z.object({
+    username: z.string().optional(),
+    email: z.string().email().optional(),
+  }).refine(data => data.username || data.email, { message: "Username or email is required" });
+
+  app.post("/api/groups/:id/invite", isAuthenticated, async (req, res) => {
+    const parsed = groupInviteBodySchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten() });
+    const { username, email } = parsed.data;
+
+    const userId = getUserId(req);
+    const groupId = req.params.id as string;
+    const isAdmin = await storage.isGroupAdmin(groupId, userId);
+    if (!isAdmin) return res.status(403).json({ message: "Only the group admin can invite members" });
+
+    let targetUser;
+    if (email) {
+      [targetUser] = await db.select().from(users).where(eq(users.email, email));
+    } else if (username) {
+      [targetUser] = await db.select().from(users).where(
+        or(ilike(users.firstName, username), ilike(users.email, username))!
+      );
+    }
+    if (!targetUser) return res.status(404).json({ message: "User not found" });
+    if (targetUser.id === userId) return res.status(400).json({ message: "Cannot invite yourself" });
+
+    const alreadyMember = await storage.isGroupMember(groupId, targetUser.id);
+    if (alreadyMember) return res.status(409).json({ message: "User is already a member" });
+
+    const pendingInvites = await storage.getUserPendingInvites(targetUser.id);
+    const hasPending = pendingInvites.some(inv => inv.groupId === groupId);
+    if (hasPending) return res.status(409).json({ message: "User already has a pending invite to this group" });
+
+    const invite = await storage.createGroupInvite(groupId, userId, targetUser.id);
+    res.status(201).json(invite);
+  });
+
+  const groupInviteRespondSchema = z.object({
+    accept: z.boolean(),
+  });
+
+  app.post("/api/groups/invites/:id/respond", isAuthenticated, async (req, res) => {
+    const parsed = groupInviteRespondSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten() });
+    const invite = await storage.respondToGroupInvite(req.params.id as string, getUserId(req), parsed.data.accept);
+    if (!invite) return res.status(404).json({ message: "Invite not found or already responded" });
+    res.json(invite);
+  });
+
+  app.get("/api/groups/:id/trophies", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const groupId = req.params.id as string;
+    const trophyList = await storage.getGroupTrophies(groupId, userId);
+    res.json(trophyList);
+  });
+
+  const groupTrophyShareSchema = z.object({
+    trophyId: z.string().optional(),
+    assignedToUserId: z.string().optional(),
+    newTrophy: insertTrophySchema.optional(),
+  }).refine(data => data.trophyId || data.newTrophy, { message: "trophyId or newTrophy is required" });
+
+  app.post("/api/groups/:id/trophies", isAuthenticated, async (req, res) => {
+    const bodyParsed = groupTrophyShareSchema.safeParse(req.body);
+    if (!bodyParsed.success) return res.status(400).json({ message: "Invalid data", errors: bodyParsed.error.flatten() });
+    const { trophyId, assignedToUserId, newTrophy } = bodyParsed.data;
+
+    const userId = getUserId(req);
+    const groupId = req.params.id as string;
+    const isMember = await storage.isGroupMember(groupId, userId);
+    if (!isMember) return res.status(403).json({ message: "Access denied" });
+
+    if (assignedToUserId && assignedToUserId !== userId) {
+      const assigneeIsMember = await storage.isGroupMember(groupId, assignedToUserId);
+      if (!assigneeIsMember) return res.status(400).json({ message: "Assigned user is not a group member" });
+    }
+
+    try {
+      if (trophyId) {
+        const trophy = await storage.getTrophy(trophyId, userId);
+        if (!trophy) return res.status(404).json({ message: "Trophy not found or not owned by you" });
+        const groupTrophy = await storage.addGroupTrophy(groupId, trophyId, userId, assignedToUserId || null);
+        res.status(201).json(groupTrophy);
+      } else if (newTrophy) {
+        const trophy = await storage.createTrophy(userId, newTrophy);
+        const groupTrophy = await storage.addGroupTrophy(groupId, trophy.id, userId, assignedToUserId || null);
+        res.status(201).json({ trophy, groupTrophy });
+      }
+    } catch (err: any) {
+      if (err.code === "23505") return res.status(409).json({ message: "Trophy is already shared in this group" });
+      throw err;
+    }
+  });
+
+  app.delete("/api/groups/:id/trophies/:trophyId", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const groupId = req.params.id as string;
+    const isMember = await storage.isGroupMember(groupId, userId);
+    if (!isMember) return res.status(403).json({ message: "Access denied" });
+    const removed = await storage.removeGroupTrophy(groupId, req.params.trophyId as string);
+    if (!removed) return res.status(404).json({ message: "Trophy not found in group" });
+    res.status(204).send();
   });
 
   // ========== STATS ==========

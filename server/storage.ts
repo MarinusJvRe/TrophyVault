@@ -1,6 +1,7 @@
 import {
   users, weapons, trophies, userPreferences, roomRatings,
   proProfiles, referrals, usageLedger, follows, trophyApplauds,
+  groups, groupMembers, groupInvites, groupTrophies,
   type Weapon, type InsertWeapon,
   type Trophy, type InsertTrophy,
   type UserPreferences, type InsertPreferences,
@@ -11,9 +12,13 @@ import {
   type User,
   type Follow,
   type TrophyApplaud,
+  type Group, type InsertGroup,
+  type GroupMember,
+  type GroupInvite,
+  type GroupTrophy, type InsertGroupTrophy,
   AI_COSTS,
 } from "@shared/schema";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { eq, and, desc, sql, avg, count, gte, or, ilike, asc, inArray } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -118,6 +123,25 @@ export interface IStorage {
   hasApplauded(userId: string, trophyId: string): Promise<boolean>;
   getApplaudCounts(trophyIds: string[]): Promise<Map<string, number>>;
   getUserApplauds(userId: string, trophyIds: string[]): Promise<Set<string>>;
+
+  // Groups
+  createGroup(adminUserId: string, data: InsertGroup): Promise<Group>;
+  deleteGroup(groupId: string, adminUserId: string): Promise<boolean>;
+  getGroup(groupId: string, requestingUserId: string): Promise<Group | undefined>;
+  getUserGroups(userId: string): Promise<(Group & { memberCount: number })[]>;
+  getGroupMembers(groupId: string, requestingUserId: string): Promise<(GroupMember & { user: { id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null } })[]>;
+  isGroupMember(groupId: string, userId: string): Promise<boolean>;
+  isGroupAdmin(groupId: string, userId: string): Promise<boolean>;
+
+  // Group invites
+  createGroupInvite(groupId: string, invitedByUserId: string, invitedUserId: string): Promise<GroupInvite>;
+  getUserPendingInvites(userId: string): Promise<(GroupInvite & { group: Group; invitedBy: { id: string; firstName: string | null; lastName: string | null } })[]>;
+  respondToGroupInvite(inviteId: string, userId: string, accept: boolean): Promise<GroupInvite | undefined>;
+
+  // Group trophies
+  addGroupTrophy(groupId: string, trophyId: string, sharedByUserId: string, assignedToUserId?: string | null): Promise<GroupTrophy>;
+  removeGroupTrophy(groupId: string, trophyId: string): Promise<boolean>;
+  getGroupTrophies(groupId: string, requestingUserId: string): Promise<(GroupTrophy & { trophy: Trophy })[]>;
 
   // Trophy feed
   getTrophyFeed(options: {
@@ -886,6 +910,176 @@ export class DatabaseStorage implements IStorage {
     }));
 
     return { items, total };
+  }
+
+  // ========== GROUPS ==========
+  async createGroup(adminUserId: string, data: InsertGroup): Promise<Group> {
+    return await db.transaction(async (tx) => {
+      const [group] = await tx.insert(groups).values({ ...data, adminUserId }).returning();
+      await tx.insert(groupMembers).values({ groupId: group.id, userId: adminUserId, role: "admin" });
+      return group;
+    });
+  }
+
+  async deleteGroup(groupId: string, adminUserId: string): Promise<boolean> {
+    const result = await db.delete(groups).where(and(eq(groups.id, groupId), eq(groups.adminUserId, adminUserId))).returning();
+    return result.length > 0;
+  }
+
+  async getGroup(groupId: string, userId: string): Promise<Group | undefined> {
+    const isMember = await this.isGroupMember(groupId, userId);
+    if (!isMember) return undefined;
+    const [group] = await db.select().from(groups).where(eq(groups.id, groupId));
+    return group;
+  }
+
+  async getUserGroups(userId: string): Promise<(Group & { memberCount: number })[]> {
+    const memberships = await db.select({ groupId: groupMembers.groupId })
+      .from(groupMembers)
+      .where(eq(groupMembers.userId, userId));
+
+    if (memberships.length === 0) return [];
+
+    const groupIds = memberships.map(m => m.groupId);
+    const groupRows = await db.select().from(groups).where(inArray(groups.id, groupIds)).orderBy(desc(groups.createdAt));
+
+    const memberCounts = await db.select({
+      groupId: groupMembers.groupId,
+      cnt: count(groupMembers.id),
+    })
+      .from(groupMembers)
+      .where(inArray(groupMembers.groupId, groupIds))
+      .groupBy(groupMembers.groupId);
+
+    const countMap = new Map<string, number>();
+    for (const mc of memberCounts) {
+      countMap.set(mc.groupId, mc.cnt);
+    }
+
+    return groupRows.map(g => ({ ...g, memberCount: countMap.get(g.id) ?? 0 }));
+  }
+
+  async getGroupMembers(groupId: string, requestingUserId: string): Promise<(GroupMember & { user: { id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null } })[]> {
+    const isMember = await this.isGroupMember(groupId, requestingUserId);
+    if (!isMember) return [];
+    const rows = await db.select({
+      member: groupMembers,
+      userId: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      profileImageUrl: users.profileImageUrl,
+    })
+      .from(groupMembers)
+      .innerJoin(users, eq(groupMembers.userId, users.id))
+      .where(eq(groupMembers.groupId, groupId))
+      .orderBy(asc(groupMembers.joinedAt));
+
+    return rows.map(r => ({
+      ...r.member,
+      user: { id: r.userId, firstName: r.firstName, lastName: r.lastName, profileImageUrl: r.profileImageUrl },
+    }));
+  }
+
+  async isGroupMember(groupId: string, userId: string): Promise<boolean> {
+    const [row] = await db.select().from(groupMembers).where(
+      and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId))
+    );
+    return !!row;
+  }
+
+  async isGroupAdmin(groupId: string, userId: string): Promise<boolean> {
+    const [row] = await db.select().from(groupMembers).where(
+      and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId), eq(groupMembers.role, "admin"))
+    );
+    return !!row;
+  }
+
+  // Group invites
+  async createGroupInvite(groupId: string, invitedByUserId: string, invitedUserId: string): Promise<GroupInvite> {
+    const [created] = await db.insert(groupInvites).values({
+      groupId,
+      invitedByUserId,
+      invitedUserId,
+      status: "pending",
+    }).returning();
+    return created;
+  }
+
+  async getUserPendingInvites(userId: string): Promise<(GroupInvite & { group: Group; invitedBy: { id: string; firstName: string | null; lastName: string | null } })[]> {
+    const rows = await db.select({
+      invite: groupInvites,
+      group: groups,
+      invitedById: users.id,
+      invitedByFirstName: users.firstName,
+      invitedByLastName: users.lastName,
+    })
+      .from(groupInvites)
+      .innerJoin(groups, eq(groupInvites.groupId, groups.id))
+      .innerJoin(users, eq(groupInvites.invitedByUserId, users.id))
+      .where(and(eq(groupInvites.invitedUserId, userId), eq(groupInvites.status, "pending")))
+      .orderBy(desc(groupInvites.createdAt));
+
+    return rows.map(r => ({
+      ...r.invite,
+      group: r.group,
+      invitedBy: { id: r.invitedById, firstName: r.invitedByFirstName, lastName: r.invitedByLastName },
+    }));
+  }
+
+  async respondToGroupInvite(inviteId: string, userId: string, accept: boolean): Promise<GroupInvite | undefined> {
+    return await db.transaction(async (tx) => {
+      const [invite] = await tx.select().from(groupInvites).where(
+        and(eq(groupInvites.id, inviteId), eq(groupInvites.invitedUserId, userId), eq(groupInvites.status, "pending"))
+      );
+      if (!invite) return undefined;
+
+      const newStatus = accept ? "accepted" : "declined";
+      const [updated] = await tx.update(groupInvites).set({ status: newStatus }).where(eq(groupInvites.id, inviteId)).returning();
+
+      if (accept) {
+        const [existing] = await tx.select().from(groupMembers).where(
+          and(eq(groupMembers.groupId, invite.groupId), eq(groupMembers.userId, userId))
+        );
+        if (!existing) {
+          await tx.insert(groupMembers).values({ groupId: invite.groupId, userId, role: "member" });
+        }
+      }
+
+      return updated;
+    });
+  }
+
+  // Group trophies
+  async addGroupTrophy(groupId: string, trophyId: string, sharedByUserId: string, assignedToUserId?: string | null): Promise<GroupTrophy> {
+    const [created] = await db.insert(groupTrophies).values({
+      groupId,
+      trophyId,
+      sharedByUserId,
+      assignedToUserId: assignedToUserId || null,
+    }).returning();
+    return created;
+  }
+
+  async removeGroupTrophy(groupId: string, trophyId: string): Promise<boolean> {
+    const result = await db.delete(groupTrophies).where(
+      and(eq(groupTrophies.groupId, groupId), eq(groupTrophies.trophyId, trophyId))
+    ).returning();
+    return result.length > 0;
+  }
+
+  async getGroupTrophies(groupId: string, requestingUserId: string): Promise<(GroupTrophy & { trophy: Trophy })[]> {
+    const isMember = await this.isGroupMember(groupId, requestingUserId);
+    if (!isMember) return [];
+    const rows = await db.select({
+      groupTrophy: groupTrophies,
+      trophy: trophies,
+    })
+      .from(groupTrophies)
+      .innerJoin(trophies, eq(groupTrophies.trophyId, trophies.id))
+      .where(eq(groupTrophies.groupId, groupId))
+      .orderBy(desc(groupTrophies.createdAt));
+
+    return rows.map(r => ({ ...r.groupTrophy, trophy: r.trophy }));
   }
 }
 

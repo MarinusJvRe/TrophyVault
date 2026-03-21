@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, real, doublePrecision, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, real, doublePrecision, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -127,12 +127,54 @@ export const trophyApplauds = pgTable("trophy_applauds", {
   uniqueIndex("trophy_applauds_user_trophy_unique").on(table.userId, table.trophyId),
 ]);
 
+// ========== GROUPS ==========
+export const groups = pgTable("groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  region: text("region"),
+  description: text("description"),
+  adminUserId: varchar("admin_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const groupMembers = pgTable("group_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("member"),
+  joinedAt: timestamp("joined_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("group_members_group_user_unique").on(table.groupId, table.userId),
+]);
+
+export const groupInvites = pgTable("group_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
+  invitedByUserId: varchar("invited_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  invitedUserId: varchar("invited_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const groupTrophies = pgTable("group_trophies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
+  trophyId: varchar("trophy_id").notNull().references(() => trophies.id, { onDelete: "cascade" }),
+  sharedByUserId: varchar("shared_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assignedToUserId: varchar("assigned_to_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("group_trophies_group_trophy_unique").on(table.groupId, table.trophyId),
+]);
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   trophies: many(trophies),
   weapons: many(weapons),
   preferences: one(userPreferences),
   proProfile: one(proProfiles),
+  adminGroups: many(groups),
+  groupMemberships: many(groupMembers),
 }));
 
 export const weaponsRelations = relations(weapons, ({ one }) => ({
@@ -166,6 +208,30 @@ export const roomRatingsRelations = relations(roomRatings, ({ one }) => ({
   rater: one(users, { fields: [roomRatings.raterId], references: [users.id] }),
 }));
 
+export const groupsRelations = relations(groups, ({ one, many }) => ({
+  admin: one(users, { fields: [groups.adminUserId], references: [users.id] }),
+  members: many(groupMembers),
+  invites: many(groupInvites),
+  groupTrophies: many(groupTrophies),
+}));
+
+export const groupMembersRelations = relations(groupMembers, ({ one }) => ({
+  group: one(groups, { fields: [groupMembers.groupId], references: [groups.id] }),
+  user: one(users, { fields: [groupMembers.userId], references: [users.id] }),
+}));
+
+export const groupInvitesRelations = relations(groupInvites, ({ one }) => ({
+  group: one(groups, { fields: [groupInvites.groupId], references: [groups.id] }),
+  invitedBy: one(users, { fields: [groupInvites.invitedByUserId], references: [users.id] }),
+  invitedUser: one(users, { fields: [groupInvites.invitedUserId], references: [users.id] }),
+}));
+
+export const groupTrophiesRelations = relations(groupTrophies, ({ one }) => ({
+  group: one(groups, { fields: [groupTrophies.groupId], references: [groups.id] }),
+  trophy: one(trophies, { fields: [groupTrophies.trophyId], references: [trophies.id] }),
+  sharedBy: one(users, { fields: [groupTrophies.sharedByUserId], references: [users.id] }),
+}));
+
 // Insert schemas
 export const insertWeaponSchema = createInsertSchema(weapons).omit({ id: true, userId: true, createdAt: true });
 export const insertTrophySchema = createInsertSchema(trophies).omit({ id: true, userId: true, createdAt: true });
@@ -190,11 +256,21 @@ export type Referral = typeof referrals.$inferSelect;
 
 export const insertFollowSchema = createInsertSchema(follows).omit({ id: true, createdAt: true });
 export const insertTrophyApplaudSchema = createInsertSchema(trophyApplauds).omit({ id: true, createdAt: true });
+export const insertGroupSchema = createInsertSchema(groups).omit({ id: true, adminUserId: true, createdAt: true });
+export const insertGroupInviteSchema = createInsertSchema(groupInvites).omit({ id: true, invitedByUserId: true, status: true, createdAt: true });
+export const insertGroupTrophySchema = createInsertSchema(groupTrophies).omit({ id: true, sharedByUserId: true, createdAt: true });
 
 export type InsertFollow = z.infer<typeof insertFollowSchema>;
 export type Follow = typeof follows.$inferSelect;
 export type InsertTrophyApplaud = z.infer<typeof insertTrophyApplaudSchema>;
 export type TrophyApplaud = typeof trophyApplauds.$inferSelect;
+export type Group = typeof groups.$inferSelect;
+export type InsertGroup = z.infer<typeof insertGroupSchema>;
+export type GroupMember = typeof groupMembers.$inferSelect;
+export type GroupInvite = typeof groupInvites.$inferSelect;
+export type InsertGroupInvite = z.infer<typeof insertGroupInviteSchema>;
+export type GroupTrophy = typeof groupTrophies.$inferSelect;
+export type InsertGroupTrophy = z.infer<typeof insertGroupTrophySchema>;
 
 // Tier constants
 export const TIER_LIMITS = {
