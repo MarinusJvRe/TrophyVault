@@ -4,6 +4,7 @@
 Honor The Hunt is a virtual trophy room application for hunters. Users can track hunting achievements, manage weapons, customize trophy room aesthetics, and participate in community features.
 
 ## Recent Changes
+- **2026-03-17**: Community Legacy Feed redesign: Replaced "Public Rooms" tab with Instagram-style "Legacy Feed" showing individual trophy photos in a visual, scrollable feed. Added `follows` and `trophy_applauds` tables with unique constraints. New API endpoints: `GET /api/community/feed` (paginated trophy feed with global/following modes, species/region search, sort by newest/most_applauded/highest_score), `POST/DELETE /api/community/follow/:userId`, `GET /api/community/following`, `POST/DELETE /api/community/applaud/:trophyId`. Feed cards show hero trophy photo, hunter avatar+name overlay, species+location, AI Verified Score badge, applaud/comment/3D action bar. Infinite scroll via `useInfiniteQuery`. Follow/unfollow buttons on feed cards and public room page. Comment functionality shown as placeholder/coming soon.
 - **2026-03-15**: Trophy pipeline v2 — GPT-image-1 mount transformation: Added 4th step to trophy pipeline between BG removal and Meshy 3D. GPT-image-1 `images.edit` transforms bg-removed animal photo into a front-facing shoulder mount with theme-appropriate background (lodge/manor/minimal). Enhanced GPT-4o vision analysis with `animal_description` (coat_color, horn_description, distinctive_features, face_details) and structured `visibility` object (head_visible, horns_visible, body_visible, occlusion_percent, occluded_by). Switched bounding box format to `x_min/y_min/x_max/y_max`. Mount image saved as `renderImageUrl` on trophy. Free users get vision + mount render only (no 3D). Frontend displays renderImageUrl > glbPreviewUrl > imageUrl fallback chain across all trophy displays.
 - **2026-03-14**: Trophy UI polish: Share icon now opens dropdown (Copy Link / Share to WhatsApp) instead of directly opening WhatsApp. Removed big green WhatsApp button and separate certificate button from trophy detail; replaced with single "Generate Proof of Hunt" button that generates a downloadable branded PNG image (canvas-rendered) with trophy photo, hunt details, and honorthehunt.ai branding. Added hover tooltips to all trophy detail header icons (Feature/Share/Edit/Delete). Fixed trophy photo display on detail page to fill container with `object-cover` instead of small `object-contain` thumbnail. Updated ProTagSearch entity labels for new business types (outfitter_ph, ranch_game_farm). New file: `client/src/lib/proof-of-hunt.ts` (replaces `TrophyCertificate.tsx` PDF).
 - **2026-03-13**: PostHog analytics integration: `posthog-js` SDK initialized on app load via `VITE_POSTHOG_KEY` secret. Automatic pageview tracking on every route change (both public and authenticated) via `usePageViewTracking` in AuthGate. Authenticated users identified with user ID and account tier (no PII). Custom events tracked: `trophy_created`, `onboarding_completed`, `tier_upgrade_clicked`, `referral_link_shared`. PostHog only initializes in production unless `VITE_POSTHOG_ENABLE=true` is set. User reset on logout. New file: `client/src/lib/posthog.ts`. Optional env vars: `VITE_POSTHOG_HOST` (defaults to `https://us.i.posthog.com`), `VITE_POSTHOG_ENABLE` (force-enable in dev).
@@ -88,8 +89,8 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - `/trophies/:id` - Trophy Detail (image viewer, hunt details, WhatsApp share, certificate PDF)
 - `/trophies/map` - Map View (interactive Google Maps with trophy pins, terrain/satellite toggle)
 - `/safe` - The Safe (weapon management)
-- `/community` - Community (paginated public rooms with search/sort, species leaderboards with region filter, my room status)
-- `/community/room/:userId` - Public Room Viewer (read-only trophy wall, hunt locations, rating, trophy detail modal - no sensitive data exposed)
+- `/community` - Community (Legacy Feed with global/following modes, species leaderboards with region filter, my groups)
+- `/community/room/:userId` - Public Room Viewer (read-only trophy wall, hunt locations, rating, follow button, trophy detail modal)
 - `/profile` - Profile & Settings (theme, about, locations, sharing, tier badge, leaderboard verification)
 - `/onboarding` - First-time setup (Hunter vs Pro fork → theme → preferences → locations)
 - `/pro` - Pro Dashboard (referral stats, tag stats, copy referral link)
@@ -106,6 +107,10 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - `GET /api/community/leaderboard?species=&region=&limit=20&offset=0` (species leaderboard with top-10 badges)
 - `GET /api/community/species` (distinct species with scores for leaderboard dropdown)
 - `GET /api/community/locations` (distinct locations for region filter)
+- `GET /api/community/feed?mode=global|following&species=&region=&sort=newest|most_applauded|highest_score&limit=20&offset=0` (paginated trophy feed)
+- `POST/DELETE /api/community/follow/:userId` (follow/unfollow user)
+- `GET /api/community/following` (list of followed user IDs)
+- `POST/DELETE /api/community/applaud/:trophyId` (applaud/un-applaud trophy)
 - `POST /api/community/rate`
 - `GET /api/my-room-rating`
 - `GET /api/maps-config` (returns Google Maps API key for authenticated users)
@@ -126,6 +131,8 @@ Honor The Hunt is a virtual trophy room application for hunters. Users can track
 - `referrals` (proUserId, referralCode, referredUserId, convertedToTier?, createdAt)
 - `usage_ledger` (userId, actionType, cost, metadata?, createdAt)
 - `room_ratings` (roomOwnerId, raterId, score)
+- `follows` (followerId, followedId, createdAt) — unique(followerId, followedId)
+- `trophy_applauds` (userId, trophyId, createdAt) — unique(userId, trophyId)
 
 ## Logo
 - Transparent background logo: `attached_assets/trophy_vault_logo_transparent.png`

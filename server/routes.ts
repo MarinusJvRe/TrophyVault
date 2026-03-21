@@ -3,7 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerEmailAuthRoutes } from "./auth";
-import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema, insertProProfileSchema, TIER_LIMITS, AI_COSTS, type AccountTier } from "@shared/schema";
+import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema, insertProProfileSchema, TIER_LIMITS, AI_COSTS, type AccountTier, users, trophies as trophiesTable } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { analyzeTrophyImage } from "./trophy-ai";
 import { generate3DModel, generateMountImageOnly } from "./trophy-3d";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -597,6 +599,115 @@ export async function registerRoutes(
       trophies: trophiesWithBadges,
       rating,
     });
+  });
+
+  // ========== COMMUNITY FEED ==========
+  const resolveOptionalUser = async (req: Request): Promise<string | undefined> => {
+    if ((req as any).user?.claims?.sub) {
+      return (req as any).user.claims.sub;
+    }
+
+    const session = (req as any).session;
+    if (session?.userId && ["email", "google", "apple"].includes(session?.authProvider)) {
+      const [user] = await db.select().from(users).where(eq(users.id, session.userId));
+      if (user) {
+        (req as any).user = { claims: { sub: user.id }, id: user.id };
+        return user.id;
+      }
+    }
+
+    const authToken = req.headers["x-auth-token"] as string;
+    if (authToken) {
+      const { validateAuthToken } = await import("./auth");
+      const userId = validateAuthToken(authToken);
+      if (userId) {
+        const [user] = await db.select().from(users).where(eq(users.id, userId));
+        if (user) {
+          (req as any).user = { claims: { sub: user.id }, id: user.id };
+          return user.id;
+        }
+      }
+    }
+
+    return undefined;
+  };
+
+  app.get("/api/community/feed", async (req, res) => {
+    const mode = (req.query.mode as string) === "following" ? "following" : "global";
+    const species = (req.query.species as string) || undefined;
+    const region = (req.query.region as string) || undefined;
+    const sort = (req.query.sort as string) || "newest";
+    const validSorts = ["newest", "most_applauded", "highest_score"];
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+
+    const feedUserId = await resolveOptionalUser(req);
+
+    if (mode === "following" && !feedUserId) {
+      return res.json({ items: [], total: 0, userApplauds: [] });
+    }
+
+    const result = await storage.getTrophyFeed({
+      mode,
+      userId: feedUserId,
+      species,
+      region,
+      sort: validSorts.includes(sort) ? sort as "newest" | "most_applauded" | "highest_score" : "newest",
+      limit,
+      offset,
+    });
+
+    let userApplauds: string[] = [];
+    if (feedUserId && result.items.length > 0) {
+      const trophyIds = result.items.map(i => i.trophy.id);
+      const applaudSet = await storage.getUserApplauds(feedUserId, trophyIds);
+      userApplauds = Array.from(applaudSet);
+    }
+
+    res.json({ ...result, userApplauds });
+  });
+
+  // ========== COMMUNITY FOLLOW ==========
+  app.post("/api/community/follow/:userId", isAuthenticated, async (req, res) => {
+    const followerId = getUserId(req);
+    const followedId = req.params.userId as string;
+    if (followerId === followedId) return res.status(400).json({ message: "Cannot follow yourself" });
+    const targetUser = await storage.getUserPublic(followedId);
+    if (!targetUser) return res.status(404).json({ message: "User not found" });
+    const result = await storage.followUser(followerId, followedId);
+    res.json(result);
+  });
+
+  app.delete("/api/community/follow/:userId", isAuthenticated, async (req, res) => {
+    const followerId = getUserId(req);
+    const followedId = req.params.userId as string;
+    await storage.unfollowUser(followerId, followedId);
+    res.status(204).send();
+  });
+
+  app.get("/api/community/following", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const followedIds = await storage.getFollowing(userId);
+    res.json(followedIds);
+  });
+
+  // ========== COMMUNITY APPLAUD ==========
+  app.post("/api/community/applaud/:trophyId", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const trophyId = req.params.trophyId as string;
+    const [trophy] = await db.select({ id: trophiesTable.id }).from(trophiesTable).where(eq(trophiesTable.id, trophyId));
+    if (!trophy) return res.status(404).json({ message: "Trophy not found" });
+    const result = await storage.applaudTrophy(userId, trophyId);
+    const count = await storage.getApplaudCount(trophyId);
+    res.json({ applaud: result, count });
+  });
+
+  app.delete("/api/community/applaud/:trophyId", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const trophyId = req.params.trophyId as string;
+    await storage.unApplaudTrophy(userId, trophyId);
+    const count = await storage.getApplaudCount(trophyId);
+    res.json({ count });
   });
 
   app.post("/api/community/rate", isAuthenticated, async (req, res) => {

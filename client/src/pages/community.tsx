@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
-import { useQuery } from "@tanstack/react-query";
-import { Trophy as TrophyIcon, Medal, Star, Users, Search, ChevronLeft, ChevronRight, ArrowUpDown, MapPin, Eye, Crosshair, UsersRound, Lock, Target } from "lucide-react";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Trophy as TrophyIcon, Medal, Star, Users, Search, ChevronLeft, ChevronRight, ArrowUpDown, MapPin, Eye, Crosshair, UsersRound, Lock, Target, ThumbsUp, MessageCircle, Box, UserPlus, UserMinus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,31 +17,43 @@ import {
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useState, useRef, useCallback, useEffect } from "react";
-
 import { Link } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest } from "@/lib/queryClient";
 
-const ROOMS_PAGE_SIZE = 10;
+const FEED_PAGE_SIZE = 20;
 const LEADERBOARD_PAGE_SIZE = 20;
 
-interface PublicRoom {
-  userId: string;
-  firstName: string | null;
-  lastName: string | null;
-  profileImageUrl: string | null;
-  theme: string | null;
-  pursuit: string | null;
-  huntingLocations: string[] | null;
-  avgScore: number;
-  totalRatings: number;
-  trophyCount: number;
-  createdAt: string | null;
+interface FeedTrophy {
+  trophy: {
+    id: string;
+    userId: string;
+    species: string;
+    name: string;
+    date: string;
+    location: string | null;
+    score: string | null;
+    imageUrl: string | null;
+    renderImageUrl: string | null;
+    glbUrl: string | null;
+    glbPreviewUrl: string | null;
+    isAiAnalyzed: boolean;
+    createdAt: string | null;
+  };
+  user: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    profileImageUrl: string | null;
+  };
+  applaudCount: number;
+  score: string | null;
 }
 
-interface RoomDetailData {
-  user: { id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null };
-  preferences: Record<string, unknown> | null;
-  trophies: { id: string; species: string; name: string; score: string | null; location: string | null; imageUrl: string | null }[];
-  rating: { avgScore: number; totalRatings: number };
+interface FeedResponse {
+  items: FeedTrophy[];
+  total: number;
+  userApplauds: string[];
 }
 
 interface LeaderboardEntry {
@@ -77,137 +89,158 @@ function RankBadge({ badge }: { badge: { rank: number; badge: string } }) {
   );
 }
 
-function RoomDetailPanel({ room, rooms, onSelectIndex }: { room: PublicRoom; rooms: PublicRoom[]; onSelectIndex: (i: number) => void }) {
-  const name = room.firstName ? `${room.firstName} ${room.lastName || ""}`.trim() : `User ${room.userId?.slice(0, 6)}`;
-  const regions = room.huntingLocations?.filter(Boolean) ?? [];
-  const pursuit = room.pursuit;
+function TrophyFeedCard({
+  item,
+  isApplauded,
+  onApplaud,
+  onUnApplaud,
+  isFollowed,
+  onFollow,
+  onUnfollow,
+  isAuthenticated,
+  currentUserId,
+}: {
+  item: FeedTrophy;
+  isApplauded: boolean;
+  onApplaud: (trophyId: string) => void;
+  onUnApplaud: (trophyId: string) => void;
+  isFollowed: boolean;
+  onFollow: (userId: string) => void;
+  onUnfollow: (userId: string) => void;
+  isAuthenticated: boolean;
+  currentUserId?: string;
+}) {
+  const { trophy, user, applaudCount } = item;
+  const userName = user.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : `User ${user.id.slice(0, 6)}`;
+  const heroImage = trophy.renderImageUrl || trophy.imageUrl || trophy.glbPreviewUrl;
+  const isOwnTrophy = currentUserId === user.id;
+  const [localApplaudCount, setLocalApplaudCount] = useState(applaudCount);
+  const [localApplauded, setLocalApplauded] = useState(isApplauded);
 
-  const { data: roomData } = useQuery<RoomDetailData | null>({
-    queryKey: ["/api/community/room", room.userId],
-    queryFn: async () => {
-      const res = await fetch(`/api/community/room/${room.userId}`);
-      if (!res.ok) return null;
-      return res.json();
-    },
-    enabled: !!room.userId,
-  });
+  useEffect(() => {
+    setLocalApplaudCount(applaudCount);
+  }, [applaudCount]);
 
-  const speciesHighlights = (() => {
-    const trophyList = roomData?.trophies;
-    if (!trophyList || trophyList.length === 0) return [];
-    const counts: Record<string, number> = {};
-    for (const t of trophyList) {
-      if (t.species) counts[t.species] = (counts[t.species] || 0) + 1;
+  useEffect(() => {
+    setLocalApplauded(isApplauded);
+  }, [isApplauded]);
+
+  const handleApplaud = () => {
+    if (localApplauded) {
+      setLocalApplauded(false);
+      setLocalApplaudCount(c => Math.max(0, c - 1));
+      onUnApplaud(trophy.id);
+    } else {
+      setLocalApplauded(true);
+      setLocalApplaudCount(c => c + 1);
+      onApplaud(trophy.id);
     }
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([species, count]) => ({ species, count }));
-  })();
-
-  const touchStartX = useRef(0);
-  const currentIndex = rooms.findIndex((r) => r.userId === room.userId);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    const diff = touchStartX.current - e.changedTouches[0].clientX;
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) {
-        onSelectIndex(currentIndex < rooms.length - 1 ? currentIndex + 1 : 0);
-      } else if (diff < 0) {
-        onSelectIndex(currentIndex > 0 ? currentIndex - 1 : rooms.length - 1);
-      }
-    }
-  }, [currentIndex, rooms.length, onSelectIndex]);
+  };
 
   return (
     <motion.div
-      key={room.userId}
-      initial={{ opacity: 0, y: -8 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
+      className="rounded-xl overflow-hidden border border-border/30 bg-card shadow-lg"
+      data-testid={`card-feed-trophy-${trophy.id}`}
     >
-      <Card className="bg-card border-primary/20 shadow-lg shadow-primary/5" data-testid="card-room-detail">
-        <CardContent className="p-5 md:p-6">
-          <div className="flex flex-col md:flex-row gap-5">
-            <div className="flex items-start gap-4 flex-1">
-              <Avatar className="h-14 w-14 border-2 border-primary/30 shrink-0">
-                <AvatarImage src={room.profileImageUrl || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary font-serif text-lg">
-                  {name.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-serif font-semibold text-foreground truncate" data-testid="text-detail-name">{name}</h3>
-                <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                  {pursuit && (
-                    <Badge variant="outline" className="border-primary/30 text-primary gap-1 text-[11px]">
-                      <Crosshair className="h-3 w-3" />
-                      {pursuit}
-                    </Badge>
-                  )}
-                  {regions.length > 0 && regions.slice(0, 3).map((loc: string, i: number) => (
-                    <Badge key={i} variant="outline" className="border-border/50 text-muted-foreground gap-1 text-[11px]">
-                      <MapPin className="h-3 w-3" />
-                      {loc}
-                    </Badge>
-                  ))}
-                  {regions.length > 3 && (
-                    <span className="text-[11px] text-muted-foreground">+{regions.length - 3} more</span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-4 mt-3">
-                  <div className="flex items-center gap-1.5">
-                    <TrophyIcon className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">{room.trophyCount}</span>
-                    <span className="text-xs text-muted-foreground">trophies</span>
-                  </div>
-                  {room.avgScore > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                      <span className="text-sm font-medium">{Number(room.avgScore).toFixed(1)}</span>
-                      <span className="text-xs text-muted-foreground">({room.totalRatings} {room.totalRatings === 1 ? "rating" : "ratings"})</span>
-                    </div>
-                  )}
-                </div>
-
-                {speciesHighlights.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-border/20">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Top Species</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {speciesHighlights.map(({ species, count }) => (
-                        <Badge key={species} variant="secondary" className="text-[10px] gap-1 bg-muted/80">
-                          <TrophyIcon className="h-2.5 w-2.5" />
-                          {species} ({count})
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 md:flex-col md:justify-center">
-              <Link href={`/community/room/${room.userId}`}>
-                <Button size="sm" className="gap-2" data-testid="button-view-room">
-                  <Eye className="h-4 w-4" />
-                  View Room
-                </Button>
-              </Link>
-              <div className="text-[10px] text-muted-foreground md:text-center">
-                {currentIndex + 1} of {rooms.length}
-                <span className="md:hidden"> · Swipe to browse</span>
-              </div>
-            </div>
+      <div className="relative">
+        {heroImage ? (
+          <img
+            src={heroImage}
+            alt={trophy.species}
+            className="w-full aspect-[4/3] object-cover"
+            data-testid={`img-feed-trophy-${trophy.id}`}
+          />
+        ) : (
+          <div className="w-full aspect-[4/3] bg-muted/30 flex items-center justify-center">
+            <TrophyIcon className="h-16 w-16 text-muted-foreground/20" />
           </div>
-        </CardContent>
-      </Card>
+        )}
+
+        <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/60 to-transparent">
+          <div className="flex items-center justify-between">
+            <Link href={`/community/room/${user.id}`}>
+              <div className="flex items-center gap-2 cursor-pointer" data-testid={`link-feed-user-${user.id}`}>
+                <Avatar className="h-9 w-9 border-2 border-white/30">
+                  <AvatarImage src={user.profileImageUrl || undefined} />
+                  <AvatarFallback className="bg-white/20 text-white text-xs font-serif">
+                    {userName.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-white text-sm font-semibold leading-tight drop-shadow">{userName}</p>
+                  <p className="text-white/70 text-[11px] leading-tight drop-shadow">
+                    {trophy.species} {trophy.location ? `• ${trophy.location}` : ""}
+                  </p>
+                </div>
+              </div>
+            </Link>
+
+            {!isOwnTrophy && isAuthenticated && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-7 px-2 text-[11px] gap-1 rounded-full border",
+                  isFollowed
+                    ? "bg-white/20 text-white border-white/30 hover:bg-white/30 hover:text-white"
+                    : "bg-primary/80 text-white border-primary hover:bg-primary hover:text-white"
+                )}
+                onClick={() => isFollowed ? onUnfollow(user.id) : onFollow(user.id)}
+                data-testid={`button-follow-${user.id}`}
+              >
+                {isFollowed ? <UserMinus className="h-3 w-3" /> : <UserPlus className="h-3 w-3" />}
+                {isFollowed ? "Following" : "Follow"}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {trophy.score && trophy.isAiAnalyzed && (
+          <div className="absolute top-3 right-3 bg-primary/90 backdrop-blur-sm text-white text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-lg" data-testid={`badge-score-${trophy.id}`}>
+            AI Verified Score: {trophy.score}
+          </div>
+        )}
+
+        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
+          <p className="text-white text-xs font-medium drop-shadow">
+            {trophy.species} {trophy.location ? `• ${trophy.location}` : ""}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between px-3 py-2.5 border-t border-border/20">
+        <div className="flex items-center gap-3">
+          <button
+            className={cn(
+              "flex items-center gap-1.5 text-sm transition-colors",
+              localApplauded ? "text-primary font-semibold" : "text-muted-foreground hover:text-primary"
+            )}
+            onClick={handleApplaud}
+            disabled={!isAuthenticated}
+            data-testid={`button-applaud-${trophy.id}`}
+          >
+            <ThumbsUp className={cn("h-4 w-4", localApplauded && "fill-primary")} />
+            <span>Applaud</span>
+            {localApplaudCount > 0 && <span className="text-xs">{localApplaudCount.toLocaleString()}</span>}
+          </button>
+
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground/50 cursor-default" data-testid={`button-comment-${trophy.id}`}>
+            <MessageCircle className="h-4 w-4" />
+            <span>0</span>
+          </div>
+        </div>
+
+        {trophy.glbUrl && (
+          <Link href={`/community/room/${user.id}`}>
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" data-testid={`button-view3d-${trophy.id}`}>
+              <Box className="h-3.5 w-3.5" />
+              View in 3D
+            </Button>
+          </Link>
+        )}
+      </div>
     </motion.div>
   );
 }
@@ -219,41 +252,118 @@ const MOCK_GROUPS = [
 ];
 
 export default function Community() {
-  const [roomSearch, setRoomSearch] = useState("");
-  const [roomSort, setRoomSort] = useState<string>("rating");
-  const [roomPage, setRoomPage] = useState(0);
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [selectedRoomIndex, setSelectedRoomIndex] = useState(0);
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { user: currentUser, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+
+  const [feedMode, setFeedMode] = useState<"global" | "following">("global");
+  const [feedSearch, setFeedSearch] = useState("");
+  const [feedSort, setFeedSort] = useState("newest");
+  const [debouncedFeedSearch, setDebouncedFeedSearch] = useState("");
+  const feedSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [selectedSpecies, setSelectedSpecies] = useState<string>("");
   const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [leaderboardPage, setLeaderboardPage] = useState(0);
 
-  const handleSearchChange = (value: string) => {
-    setRoomSearch(value);
-    setRoomPage(0);
-    setSelectedRoomIndex(0);
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => {
-      setDebouncedSearch(value);
+  const handleFeedSearchChange = (value: string) => {
+    setFeedSearch(value);
+    if (feedSearchTimeout.current) clearTimeout(feedSearchTimeout.current);
+    feedSearchTimeout.current = setTimeout(() => {
+      setDebouncedFeedSearch(value);
     }, 300);
   };
 
-  const roomsQueryKey = ["/api/community/rooms", `?limit=${ROOMS_PAGE_SIZE}&offset=${roomPage * ROOMS_PAGE_SIZE}&sort=${roomSort}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`];
-  const { data: roomsData, isLoading: roomsLoading } = useQuery<{ rooms: PublicRoom[]; total: number }>({
-    queryKey: roomsQueryKey,
+  const feedQueryParams = `?mode=${feedMode}&sort=${feedSort}&limit=${FEED_PAGE_SIZE}${debouncedFeedSearch ? `&species=${encodeURIComponent(debouncedFeedSearch)}&region=${encodeURIComponent(debouncedFeedSearch)}` : ""}`;
+
+  const {
+    data: feedData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: feedLoading,
+  } = useInfiniteQuery<FeedResponse>({
+    queryKey: ["/api/community/feed", feedQueryParams],
+    queryFn: async ({ pageParam = 0 }) => {
+      const headers: Record<string, string> = {};
+      const token = localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token");
+      if (token) {
+        headers["X-Auth-Token"] = token;
+      }
+      const res = await fetch(`/api/community/feed${feedQueryParams}&offset=${pageParam}`, {
+        credentials: "include",
+        headers,
+      });
+      if (!res.ok) throw new Error("Failed to fetch feed");
+      return res.json();
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.items.length, 0);
+      return loaded < lastPage.total ? loaded : undefined;
+    },
+    initialPageParam: 0,
   });
 
-  const rooms = roomsData?.rooms ?? [];
-  const roomsTotal = roomsData?.total ?? 0;
-  const totalRoomPages = Math.ceil(roomsTotal / ROOMS_PAGE_SIZE);
+  const allFeedItems = feedData?.pages.flatMap(p => p.items) ?? [];
+  const allUserApplauds = new Set(feedData?.pages.flatMap(p => p.userApplauds) ?? []);
 
+  const { data: followingList = [] } = useQuery<string[]>({
+    queryKey: ["/api/community/following"],
+    enabled: isAuthenticated,
+  });
+  const followingSet = new Set(followingList);
+
+  const followMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("POST", `/api/community/follow/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/community/following"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/community/feed"] });
+    },
+  });
+
+  const unfollowMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("DELETE", `/api/community/follow/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/community/following"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/community/feed"] });
+    },
+  });
+
+  const applaudMutation = useMutation({
+    mutationFn: async (trophyId: string) => {
+      await apiRequest("POST", `/api/community/applaud/${trophyId}`);
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/community/feed"] });
+    },
+  });
+
+  const unApplaudMutation = useMutation({
+    mutationFn: async (trophyId: string) => {
+      await apiRequest("DELETE", `/api/community/applaud/${trophyId}`);
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/community/feed"] });
+    },
+  });
+
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    setSelectedRoomIndex(0);
-  }, [roomPage, roomSort, debouncedSearch]);
-
-  const selectedRoom = rooms[selectedRoomIndex] ?? rooms[0];
+    if (!loadMoreRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const { data: speciesList = [] } = useQuery<string[]>({
     queryKey: ["/api/community/species"],
@@ -290,207 +400,109 @@ export default function Community() {
             Community
           </h1>
           <p className="text-muted-foreground max-w-md">
-            Compare your achievements, rate other trophy rooms, and climb the global leaderboards.
+            Browse trophy photos, applaud great hunts, and follow your favorite hunters.
           </p>
         </motion.header>
 
-        <Tabs defaultValue="rooms" className="w-full">
+        <Tabs defaultValue="feed" className="w-full">
           <TabsList className="bg-card border border-border/40 mb-8">
-            <TabsTrigger value="rooms" className="font-serif" data-testid="tab-rooms">Public Rooms</TabsTrigger>
+            <TabsTrigger value="feed" className="font-serif" data-testid="tab-feed">Legacy Feed</TabsTrigger>
             <TabsTrigger value="leaderboards" className="font-serif" data-testid="tab-leaderboards">Species Leaderboards</TabsTrigger>
             <TabsTrigger value="groups" className="font-serif" data-testid="tab-groups">My Groups</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="rooms" className="space-y-6">
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name..."
-                  className="pl-9 bg-card border-border/50 h-9 text-sm"
-                  value={roomSearch}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  data-testid="input-search-rooms"
-                />
+          <TabsContent value="feed" className="space-y-6">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={feedMode === "global" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFeedMode("global")}
+                  className="rounded-full"
+                  data-testid="button-feed-global"
+                >
+                  Global Feed
+                </Button>
+                <Button
+                  variant={feedMode === "following" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFeedMode("following")}
+                  className="rounded-full"
+                  disabled={!isAuthenticated}
+                  data-testid="button-feed-following"
+                >
+                  Following
+                </Button>
               </div>
-              <Select value={roomSort} onValueChange={(v) => { setRoomSort(v); setRoomPage(0); setSelectedRoomIndex(0); }}>
-                <SelectTrigger className="w-[180px] bg-card border-border/50 h-9" data-testid="select-sort-rooms">
-                  <ArrowUpDown className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rating">Highest Rated</SelectItem>
-                  <SelectItem value="trophies">Most Trophies</SelectItem>
-                  <SelectItem value="ratings">Most Ratings</SelectItem>
-                  <SelectItem value="newest">Newest</SelectItem>
-                </SelectContent>
-              </Select>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search species or region..."
+                    className="pl-9 bg-card border-border/50 h-9 text-sm"
+                    value={feedSearch}
+                    onChange={(e) => handleFeedSearchChange(e.target.value)}
+                    data-testid="input-search-feed"
+                  />
+                </div>
+                <Select value={feedSort} onValueChange={setFeedSort}>
+                  <SelectTrigger className="w-[180px] bg-card border-border/50 h-9" data-testid="select-sort-feed">
+                    <ArrowUpDown className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Newest</SelectItem>
+                    <SelectItem value="most_applauded">Most Applauded</SelectItem>
+                    <SelectItem value="highest_score">Highest Score</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {roomsLoading ? (
+            {feedLoading ? (
               <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-            ) : rooms.length > 0 ? (
-              <>
-                {selectedRoom && (
-                  <RoomDetailPanel
-                    room={selectedRoom}
-                    rooms={rooms}
-                    onSelectIndex={setSelectedRoomIndex}
+            ) : allFeedItems.length > 0 ? (
+              <div className="max-w-2xl mx-auto space-y-6">
+                {allFeedItems.map((item, i) => (
+                  <TrophyFeedCard
+                    key={`${item.trophy.id}-${i}`}
+                    item={item}
+                    isApplauded={allUserApplauds.has(item.trophy.id)}
+                    onApplaud={(id) => applaudMutation.mutate(id)}
+                    onUnApplaud={(id) => unApplaudMutation.mutate(id)}
+                    isFollowed={followingSet.has(item.user.id)}
+                    onFollow={(id) => followMutation.mutate(id)}
+                    onUnfollow={(id) => unfollowMutation.mutate(id)}
+                    isAuthenticated={isAuthenticated}
+                    currentUserId={currentUser?.id}
                   />
-                )}
+                ))}
 
-                <Card className="bg-card border-border/40">
-                  <CardContent className="p-0">
-                    <div className="hidden md:grid grid-cols-[2.5fr_1.5fr_1fr_0.8fr_0.6fr_0.6fr] gap-2 px-4 py-2.5 border-b border-border/30 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                      <div>Hunter</div>
-                      <div>Regions</div>
-                      <div>Pursuit</div>
-                      <div className="text-center">Trophies</div>
-                      <div className="text-center">Rating</div>
-                      <div className="text-right"># Ratings</div>
-                    </div>
-
-                    <div className="divide-y divide-border/20">
-                      {rooms.map((room, i) => {
-                        const name = room.firstName ? `${room.firstName} ${room.lastName || ""}`.trim() : `User ${room.userId?.slice(0, 6)}`;
-                        const regions = room.huntingLocations?.filter(Boolean) ?? [];
-                        const isSelected = i === selectedRoomIndex;
-
-                        return (
-                          <motion.div
-                            key={room.userId}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: i * 0.03 }}
-                          >
-                            <div
-                              className={cn(
-                                "flex flex-col md:grid md:grid-cols-[2.5fr_1.5fr_1fr_0.8fr_0.6fr_0.6fr] gap-1 md:gap-2 px-4 py-3 cursor-pointer transition-all",
-                                isSelected
-                                  ? "bg-primary/8 border-l-2 border-l-primary"
-                                  : "hover:bg-muted/50 border-l-2 border-l-transparent"
-                              )}
-                              onClick={() => setSelectedRoomIndex(i)}
-                              data-testid={`row-room-${room.userId}`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8 border border-primary/20 shrink-0">
-                                  <AvatarImage src={room.profileImageUrl || undefined} />
-                                  <AvatarFallback className="bg-primary/10 text-primary font-serif text-xs">
-                                    {name.charAt(0)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-sm font-medium truncate" data-testid={`text-room-name-${i}`}>{name}</span>
-                              </div>
-
-                              <div className="hidden md:flex items-center gap-1 flex-wrap">
-                                {regions.length > 0 ? regions.slice(0, 2).map((loc: string, j: number) => (
-                                  <span key={j} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-muted text-muted-foreground">
-                                    <MapPin className="h-2.5 w-2.5" />
-                                    {loc}
-                                  </span>
-                                )) : (
-                                  <span className="text-[10px] text-muted-foreground/50">—</span>
-                                )}
-                                {regions.length > 2 && (
-                                  <span className="text-[10px] text-muted-foreground">+{regions.length - 2}</span>
-                                )}
-                              </div>
-
-                              <div className="hidden md:flex items-center">
-                                {room.pursuit ? (
-                                  <span className="text-xs text-muted-foreground truncate">{room.pursuit}</span>
-                                ) : (
-                                  <span className="text-[10px] text-muted-foreground/50">—</span>
-                                )}
-                              </div>
-
-                              <div className="hidden md:flex items-center justify-center">
-                                <Badge variant="outline" className="border-primary/30 text-primary gap-1 text-[10px]">
-                                  <TrophyIcon className="h-2.5 w-2.5" />
-                                  {room.trophyCount}
-                                </Badge>
-                              </div>
-
-                              <div className="hidden md:flex items-center justify-center gap-1">
-                                {room.avgScore > 0 ? (
-                                  <>
-                                    <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                                    <span className="text-xs font-semibold">{Number(room.avgScore).toFixed(1)}</span>
-                                  </>
-                                ) : (
-                                  <span className="text-[10px] text-muted-foreground/50">—</span>
-                                )}
-                              </div>
-
-                              <div className="hidden md:flex items-center justify-end">
-                                <span className="text-xs text-muted-foreground">{room.totalRatings || 0}</span>
-                              </div>
-
-                              <div className="flex md:hidden items-center gap-3 text-xs text-muted-foreground pl-11 flex-wrap">
-                                {room.pursuit && (
-                                  <span className="flex items-center gap-1">
-                                    <Crosshair className="h-3 w-3" />
-                                    {room.pursuit}
-                                  </span>
-                                )}
-                                <span className="flex items-center gap-1">
-                                  <TrophyIcon className="h-3 w-3 text-primary" />
-                                  {room.trophyCount}
-                                </span>
-                                {room.avgScore > 0 && (
-                                  <span className="flex items-center gap-1">
-                                    <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                                    {Number(room.avgScore).toFixed(1)} ({room.totalRatings})
-                                  </span>
-                                )}
-                                {regions.length > 0 && (
-                                  <span className="flex items-center gap-1">
-                                    <MapPin className="h-3 w-3" />
-                                    {regions[0]}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {totalRoomPages > 1 && (
-                  <div className="flex items-center justify-center gap-4 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setRoomPage(p => p === 0 ? totalRoomPages - 1 : p - 1)}
-                      data-testid="button-rooms-prev"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm text-muted-foreground" data-testid="text-rooms-page">
-                      Page {roomPage + 1} of {totalRoomPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setRoomPage(p => p >= totalRoomPages - 1 ? 0 : p + 1)}
-                      data-testid="button-rooms-next"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </>
+                <div ref={loadMoreRef} className="py-4 flex justify-center">
+                  {isFetchingNextPage && (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  )}
+                  {!hasNextPage && allFeedItems.length > 0 && (
+                    <p className="text-sm text-muted-foreground">You've reached the end</p>
+                  )}
+                </div>
+              </div>
             ) : (
               <div className="text-center py-16 text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                <p className="font-serif text-lg">No public rooms found</p>
+                <TrophyIcon className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                <p className="font-serif text-lg">
+                  {feedMode === "following" ? "No trophies from users you follow" : "No trophies found"}
+                </p>
                 <p className="text-sm mt-1">
-                  {debouncedSearch ? "Try a different search term" : "Make your room public in settings to appear here"}
+                  {feedMode === "following"
+                    ? "Follow some hunters to see their trophies here"
+                    : debouncedFeedSearch
+                      ? "Try a different search term"
+                      : "Be the first to share a trophy!"
+                  }
                 </p>
               </div>
             )}
@@ -557,7 +569,7 @@ export default function Community() {
                             <div
                               className={cn(
                                 "flex items-center justify-between p-3 rounded-lg border border-border/30 hover:bg-primary/5 transition-colors",
-                                entry.badge?.rank <= 3 ? "border-primary/30" : ""
+                                entry.badge?.rank && entry.badge.rank <= 3 ? "border-primary/30" : ""
                               )}
                               data-testid={`row-leaderboard-${entry.rank}`}
                             >
@@ -573,7 +585,7 @@ export default function Community() {
 
                                 {(entry.renderImageUrl || entry.glbPreviewUrl || entry.imageUrl) && (
                                   <div className="h-10 w-10 rounded overflow-hidden border border-border/30 shrink-0">
-                                    <img src={entry.renderImageUrl || entry.glbPreviewUrl || entry.imageUrl} alt={entry.species} className="w-full h-full object-cover" />
+                                    <img src={entry.renderImageUrl || entry.glbPreviewUrl || entry.imageUrl!} alt={entry.species} className="w-full h-full object-cover" />
                                   </div>
                                 )}
 

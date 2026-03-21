@@ -5,7 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
 import {
   ArrowLeft, Star, MapPin, Calendar, Camera, Trophy as TrophyIcon,
-  X, Eye
+  X, Eye, UserPlus, UserMinus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -102,6 +102,33 @@ export default function PublicRoom() {
     },
   });
 
+  const { data: followingList = [] } = useQuery<string[]>({
+    queryKey: ["/api/community/following"],
+    enabled: !!currentUser,
+  });
+
+  const roomOwnerId = data?.user?.id;
+
+  const followMutation = useMutation({
+    mutationFn: async () => {
+      if (!roomOwnerId) return;
+      await apiRequest("POST", `/api/community/follow/${roomOwnerId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/community/following"] });
+    },
+  });
+
+  const unfollowMutation = useMutation({
+    mutationFn: async () => {
+      if (!roomOwnerId) return;
+      await apiRequest("DELETE", `/api/community/follow/${roomOwnerId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/community/following"] });
+    },
+  });
+
   const handleRate = (score: number) => {
     setRatingValue(score);
     rateMutation.mutate(score);
@@ -138,7 +165,8 @@ export default function PublicRoom() {
     ? `${roomOwner.firstName} ${roomOwner.lastName || ""}`.trim()
     : `User ${roomOwner.id.slice(0, 6)}`;
 
-  const isOwnRoom = currentUser && (currentUser as any).id === roomOwner.id;
+  const isOwnRoom = currentUser && currentUser.id === roomOwner.id;
+  const isFollowed = followingList.includes(roomOwner.id);
 
   const huntLocations = (roomTrophies || [])
     .filter((t: any) => t.location)
@@ -187,16 +215,29 @@ export default function PublicRoom() {
             </div>
 
             {!isOwnRoom && currentUser && (
-              <Card className="bg-card/80 border-border/40">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="text-sm font-medium text-muted-foreground">Rate this room:</div>
-                  <StarRating
-                    value={ratingValue}
-                    onChange={handleRate}
-                    disabled={rateMutation.isPending}
-                  />
-                </CardContent>
-              </Card>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant={isFollowed ? "outline" : "default"}
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => isFollowed ? unfollowMutation.mutate() : followMutation.mutate()}
+                  disabled={followMutation.isPending || unfollowMutation.isPending}
+                  data-testid="button-follow-room-owner"
+                >
+                  {isFollowed ? <UserMinus className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                  {isFollowed ? "Following" : "Follow"}
+                </Button>
+                <Card className="bg-card/80 border-border/40">
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <div className="text-sm font-medium text-muted-foreground">Rate this room:</div>
+                    <StarRating
+                      value={ratingValue}
+                      onChange={handleRate}
+                      disabled={rateMutation.isPending}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
             )}
           </header>
 

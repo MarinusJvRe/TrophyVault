@@ -1,6 +1,6 @@
 import {
   users, weapons, trophies, userPreferences, roomRatings,
-  proProfiles, referrals, usageLedger,
+  proProfiles, referrals, usageLedger, follows, trophyApplauds,
   type Weapon, type InsertWeapon,
   type Trophy, type InsertTrophy,
   type UserPreferences, type InsertPreferences,
@@ -9,10 +9,12 @@ import {
   type UsageLedgerEntry,
   type Referral,
   type User,
+  type Follow,
+  type TrophyApplaud,
   AI_COSTS,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, avg, count, gte, or, ilike, asc } from "drizzle-orm";
+import { eq, and, desc, sql, avg, count, gte, or, ilike, asc, inArray } from "drizzle-orm";
 import crypto from "crypto";
 
 export interface IStorage {
@@ -102,6 +104,39 @@ export interface IStorage {
   // Pro tagging
   getTrophiesTaggingPro(proUserId: string): Promise<Trophy[]>;
   getTagStats(proUserId: string): Promise<{ totalTags: number; recentTags: Trophy[] }>;
+
+  // Follows
+  followUser(followerId: string, followedId: string): Promise<Follow>;
+  unfollowUser(followerId: string, followedId: string): Promise<boolean>;
+  getFollowing(userId: string): Promise<string[]>;
+  isFollowing(followerId: string, followedId: string): Promise<boolean>;
+
+  // Trophy applauds
+  applaudTrophy(userId: string, trophyId: string): Promise<TrophyApplaud>;
+  unApplaudTrophy(userId: string, trophyId: string): Promise<boolean>;
+  getApplaudCount(trophyId: string): Promise<number>;
+  hasApplauded(userId: string, trophyId: string): Promise<boolean>;
+  getApplaudCounts(trophyIds: string[]): Promise<Map<string, number>>;
+  getUserApplauds(userId: string, trophyIds: string[]): Promise<Set<string>>;
+
+  // Trophy feed
+  getTrophyFeed(options: {
+    mode: "global" | "following";
+    userId?: string;
+    species?: string;
+    region?: string;
+    sort?: "newest" | "most_applauded" | "highest_score";
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    items: {
+      trophy: Trophy;
+      user: { id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null };
+      applaudCount: number;
+      score: string | null;
+    }[];
+    total: number;
+  }>;
 }
 
 const numericScoreExpr = sql<number>`
@@ -657,6 +692,200 @@ export class DatabaseStorage implements IStorage {
       totalTags: allTags.length,
       recentTags: allTags.slice(0, 10),
     };
+  }
+
+  // Follows
+  async followUser(followerId: string, followedId: string): Promise<Follow> {
+    const existing = await db.select().from(follows).where(
+      and(eq(follows.followerId, followerId), eq(follows.followedId, followedId))
+    );
+    if (existing.length > 0) return existing[0];
+    const [created] = await db.insert(follows).values({ followerId, followedId }).returning();
+    return created;
+  }
+
+  async unfollowUser(followerId: string, followedId: string): Promise<boolean> {
+    const result = await db.delete(follows).where(
+      and(eq(follows.followerId, followerId), eq(follows.followedId, followedId))
+    ).returning();
+    return result.length > 0;
+  }
+
+  async getFollowing(userId: string): Promise<string[]> {
+    const rows = await db.select({ followedId: follows.followedId })
+      .from(follows)
+      .where(eq(follows.followerId, userId));
+    return rows.map(r => r.followedId);
+  }
+
+  async isFollowing(followerId: string, followedId: string): Promise<boolean> {
+    const [row] = await db.select().from(follows).where(
+      and(eq(follows.followerId, followerId), eq(follows.followedId, followedId))
+    );
+    return !!row;
+  }
+
+  // Trophy applauds
+  async applaudTrophy(userId: string, trophyId: string): Promise<TrophyApplaud> {
+    const existing = await db.select().from(trophyApplauds).where(
+      and(eq(trophyApplauds.userId, userId), eq(trophyApplauds.trophyId, trophyId))
+    );
+    if (existing.length > 0) return existing[0];
+    const [created] = await db.insert(trophyApplauds).values({ userId, trophyId }).returning();
+    return created;
+  }
+
+  async unApplaudTrophy(userId: string, trophyId: string): Promise<boolean> {
+    const result = await db.delete(trophyApplauds).where(
+      and(eq(trophyApplauds.userId, userId), eq(trophyApplauds.trophyId, trophyId))
+    ).returning();
+    return result.length > 0;
+  }
+
+  async getApplaudCount(trophyId: string): Promise<number> {
+    const [result] = await db.select({ cnt: count(trophyApplauds.id) })
+      .from(trophyApplauds)
+      .where(eq(trophyApplauds.trophyId, trophyId));
+    return result?.cnt ?? 0;
+  }
+
+  async hasApplauded(userId: string, trophyId: string): Promise<boolean> {
+    const [row] = await db.select().from(trophyApplauds).where(
+      and(eq(trophyApplauds.userId, userId), eq(trophyApplauds.trophyId, trophyId))
+    );
+    return !!row;
+  }
+
+  async getApplaudCounts(trophyIds: string[]): Promise<Map<string, number>> {
+    if (trophyIds.length === 0) return new Map();
+    const rows = await db.select({
+      trophyId: trophyApplauds.trophyId,
+      cnt: count(trophyApplauds.id),
+    })
+      .from(trophyApplauds)
+      .where(inArray(trophyApplauds.trophyId, trophyIds))
+      .groupBy(trophyApplauds.trophyId);
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      map.set(row.trophyId, row.cnt);
+    }
+    return map;
+  }
+
+  async getUserApplauds(userId: string, trophyIds: string[]): Promise<Set<string>> {
+    if (trophyIds.length === 0) return new Set();
+    const rows = await db.select({ trophyId: trophyApplauds.trophyId })
+      .from(trophyApplauds)
+      .where(and(eq(trophyApplauds.userId, userId), inArray(trophyApplauds.trophyId, trophyIds)));
+    return new Set(rows.map(r => r.trophyId));
+  }
+
+  // Trophy feed
+  async getTrophyFeed(options: {
+    mode: "global" | "following";
+    userId?: string;
+    species?: string;
+    region?: string;
+    sort?: "newest" | "most_applauded" | "highest_score";
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    items: {
+      trophy: Trophy;
+      user: { id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null };
+      applaudCount: number;
+      score: string | null;
+    }[];
+    total: number;
+  }> {
+    const limit = options.limit ?? 20;
+    const offset = options.offset ?? 0;
+    const sort = options.sort ?? "newest";
+
+    let searchCondition = undefined;
+    if (options.species && options.region) {
+      searchCondition = or(
+        ilike(trophies.species, `%${options.species}%`),
+        ilike(trophies.location, `%${options.region}%`)
+      );
+    } else if (options.species) {
+      searchCondition = ilike(trophies.species, `%${options.species}%`);
+    } else if (options.region) {
+      searchCondition = ilike(trophies.location, `%${options.region}%`);
+    }
+
+    let followCondition = undefined;
+    if (options.mode === "following" && options.userId) {
+      const followedIds = await this.getFollowing(options.userId);
+      if (followedIds.length === 0) {
+        return { items: [], total: 0 };
+      }
+      followCondition = inArray(trophies.userId, followedIds);
+    }
+
+    const whereClause = and(
+      eq(userPreferences.roomVisibility, "public"),
+      ...(searchCondition ? [searchCondition] : []),
+      ...(followCondition ? [followCondition] : []),
+    );
+
+    const applaudCountSq = db
+      .select({
+        trophyId: trophyApplauds.trophyId,
+        cnt: count(trophyApplauds.id).as("cnt"),
+      })
+      .from(trophyApplauds)
+      .groupBy(trophyApplauds.trophyId)
+      .as("applaud_counts");
+
+    const [countResult] = await db
+      .select({ total: count(trophies.id) })
+      .from(trophies)
+      .innerJoin(userPreferences, eq(trophies.userId, userPreferences.userId))
+      .where(whereClause);
+
+    const total = countResult?.total ?? 0;
+
+    let orderClause;
+    if (sort === "most_applauded") {
+      orderClause = sql`COALESCE(${applaudCountSq.cnt}, 0) DESC, ${trophies.createdAt} DESC NULLS LAST`;
+    } else if (sort === "highest_score") {
+      orderClause = sql`${numericScoreExpr} DESC NULLS LAST, ${trophies.createdAt} DESC NULLS LAST`;
+    } else {
+      orderClause = sql`${trophies.createdAt} DESC NULLS LAST`;
+    }
+
+    const rows = await db
+      .select({
+        trophy: trophies,
+        userId: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+        applaudCount: applaudCountSq.cnt,
+      })
+      .from(trophies)
+      .innerJoin(users, eq(trophies.userId, users.id))
+      .innerJoin(userPreferences, eq(trophies.userId, userPreferences.userId))
+      .leftJoin(applaudCountSq, eq(trophies.id, applaudCountSq.trophyId))
+      .where(whereClause)
+      .orderBy(orderClause)
+      .limit(limit)
+      .offset(offset);
+
+    const items = rows.map(r => ({
+      trophy: r.trophy,
+      user: {
+        id: r.userId,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        profileImageUrl: r.profileImageUrl,
+      },
+      applaudCount: r.applaudCount ?? 0,
+      score: r.trophy.score,
+    }));
+
+    return { items, total };
   }
 }
 

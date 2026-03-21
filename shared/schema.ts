@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, real, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, real, doublePrecision, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -109,6 +109,24 @@ export const roomRatings = pgTable("room_ratings", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const follows = pgTable("follows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  followerId: varchar("follower_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  followedId: varchar("followed_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("follows_follower_followed_unique").on(table.followerId, table.followedId),
+]);
+
+export const trophyApplauds = pgTable("trophy_applauds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  trophyId: varchar("trophy_id").notNull().references(() => trophies.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("trophy_applauds_user_trophy_unique").on(table.userId, table.trophyId),
+]);
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   trophies: many(trophies),
@@ -169,6 +187,14 @@ export type InsertProProfile = z.infer<typeof insertProProfileSchema>;
 export type ProProfile = typeof proProfiles.$inferSelect;
 export type UsageLedgerEntry = typeof usageLedger.$inferSelect;
 export type Referral = typeof referrals.$inferSelect;
+
+export const insertFollowSchema = createInsertSchema(follows).omit({ id: true, createdAt: true });
+export const insertTrophyApplaudSchema = createInsertSchema(trophyApplauds).omit({ id: true, createdAt: true });
+
+export type InsertFollow = z.infer<typeof insertFollowSchema>;
+export type Follow = typeof follows.$inferSelect;
+export type InsertTrophyApplaud = z.infer<typeof insertTrophyApplaudSchema>;
+export type TrophyApplaud = typeof trophyApplauds.$inferSelect;
 
 // Tier constants
 export const TIER_LIMITS = {
