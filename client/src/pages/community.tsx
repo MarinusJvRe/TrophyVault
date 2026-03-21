@@ -1,11 +1,11 @@
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
-import { Trophy as TrophyIcon, Medal, Star, Users, Search, ChevronLeft, ChevronRight, ArrowUpDown, MapPin, Eye, Crosshair, UsersRound, Lock, Target } from "lucide-react";
+import { Trophy as TrophyIcon, Medal, Users, Search, ChevronLeft, ChevronRight, ArrowUpDown, MapPin } from "lucide-react";
 import CommunityFeed from "@/components/CommunityFeed";
+import MyGroups, { useGroupInviteCount } from "@/components/MyGroups";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -56,14 +56,10 @@ function RankBadge({ badge }: { badge: { rank: number; badge: string } }) {
   );
 }
 
-const MOCK_GROUPS = [
-  { id: "1", name: "Jones Family Rocky Mountains 2025", members: 6, trophies: 14, region: "Rocky Mountains, CO" },
-  { id: "2", name: "Safari Brothers Limpopo 2025", members: 4, trophies: 22, region: "Limpopo, South Africa" },
-  { id: "3", name: "Nordic Elk Hunters Club", members: 12, trophies: 38, region: "Northern Norway" },
-];
 
 export default function Community() {
   const { isAuthenticated } = useAuth();
+  const inviteCount = useGroupInviteCount();
 
   const [feedMode, setFeedMode] = useState<"global" | "following">("global");
   const [feedSearch, setFeedSearch] = useState("");
@@ -126,7 +122,14 @@ export default function Community() {
           <TabsList className="bg-card border border-border/40 mb-8">
             <TabsTrigger value="feed" className="font-serif" data-testid="tab-feed">Legacy Feed</TabsTrigger>
             <TabsTrigger value="leaderboards" className="font-serif" data-testid="tab-leaderboards">Species Leaderboards</TabsTrigger>
-            <TabsTrigger value="groups" className="font-serif" data-testid="tab-groups">My Groups</TabsTrigger>
+            <TabsTrigger value="groups" className="font-serif relative" data-testid="tab-groups">
+              My Groups
+              {inviteCount > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-[10px] font-bold text-primary-foreground" data-testid="badge-tab-invite-count">
+                  {inviteCount}
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="feed" className="space-y-6">
@@ -327,105 +330,7 @@ export default function Community() {
           </TabsContent>
 
           <TabsContent value="groups" className="space-y-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full">
-                <Lock className="h-3.5 w-3.5 text-amber-500" />
-                <span className="text-xs font-medium text-amber-500">Coming Soon</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Create or join hunting groups with shared trophy rooms
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {MOCK_GROUPS.map((group) => (
-                <motion.div
-                  key={group.id}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 0.6, y: 0 }}
-                  transition={{ delay: parseInt(group.id) * 0.1 }}
-                >
-                  <Card className="bg-card border-border/40 h-full relative overflow-hidden" data-testid={`card-group-${group.id}`}>
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
-                    <CardContent className="p-5 relative">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2.5 bg-primary/10 rounded-lg">
-                            <UsersRound className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-serif font-semibold leading-tight">{group.name}</h3>
-                            <div className="flex items-center gap-1 mt-1 text-[11px] text-muted-foreground">
-                              <MapPin className="h-3 w-3" />
-                              {group.region}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Users className="h-3.5 w-3.5" />
-                          <span>{group.members} members</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <TrophyIcon className="h-3.5 w-3.5 text-primary" />
-                          <span>{group.trophies} trophies</span>
-                        </div>
-                      </div>
-
-                      <div className="flex -space-x-2 mt-4">
-                        {Array.from({ length: Math.min(group.members, 5) }).map((_, j) => (
-                          <div
-                            key={j}
-                            className="h-7 w-7 rounded-full bg-muted border-2 border-card flex items-center justify-center text-[10px] font-medium text-muted-foreground"
-                          >
-                            {String.fromCharCode(65 + j)}
-                          </div>
-                        ))}
-                        {group.members > 5 && (
-                          <div className="h-7 w-7 rounded-full bg-primary/10 border-2 border-card flex items-center justify-center text-[10px] font-medium text-primary">
-                            +{group.members - 5}
-                          </div>
-                        )}
-                      </div>
-
-                      <Button variant="outline" size="sm" className="w-full mt-4 gap-2 opacity-50 cursor-not-allowed" disabled data-testid={`button-join-group-${group.id}`}>
-                        <Lock className="h-3.5 w-3.5" />
-                        Join Group
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-
-            <Card className="bg-primary/5 border-primary/20 max-w-lg">
-              <CardContent className="p-5">
-                <h3 className="font-serif font-semibold text-sm mb-2 flex items-center gap-2">
-                  <Target className="h-4 w-4 text-primary" />
-                  What are Groups?
-                </h3>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary mt-0.5">•</span>
-                    Create a group for your hunting trip (e.g. "Jones Family Rocky Mountains 2025")
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary mt-0.5">•</span>
-                    Share a communal trophy room with your group members
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary mt-0.5">•</span>
-                    Add your existing trophies to the group room, or load trophies on behalf of others
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary mt-0.5">•</span>
-                    Group trophies can be added to your individual trophy room too
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
+            <MyGroups />
           </TabsContent>
         </Tabs>
       </div>

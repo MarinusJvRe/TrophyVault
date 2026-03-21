@@ -132,7 +132,7 @@ export interface IStorage {
   createGroup(adminUserId: string, data: InsertGroup): Promise<Group>;
   deleteGroup(groupId: string, adminUserId: string): Promise<boolean>;
   getGroup(groupId: string, requestingUserId: string): Promise<Group | undefined>;
-  getUserGroups(userId: string): Promise<(Group & { memberCount: number })[]>;
+  getUserGroups(userId: string): Promise<(Group & { memberCount: number; trophyCount: number; memberPreviews: { id: string; firstName: string | null; profileImageUrl: string | null }[] })[]>;
   getGroupMembers(groupId: string, requestingUserId: string): Promise<(GroupMember & { user: { id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null } })[]>;
   isGroupMember(groupId: string, userId: string): Promise<boolean>;
   isGroupAdmin(groupId: string, userId: string): Promise<boolean>;
@@ -951,7 +951,7 @@ export class DatabaseStorage implements IStorage {
     return group;
   }
 
-  async getUserGroups(userId: string): Promise<(Group & { memberCount: number })[]> {
+  async getUserGroups(userId: string): Promise<(Group & { memberCount: number; trophyCount: number; memberPreviews: { id: string; firstName: string | null; profileImageUrl: string | null }[] })[]> {
     const memberships = await db.select({ groupId: groupMembers.groupId })
       .from(groupMembers)
       .where(eq(groupMembers.userId, userId));
@@ -974,7 +974,44 @@ export class DatabaseStorage implements IStorage {
       countMap.set(mc.groupId, mc.cnt);
     }
 
-    return groupRows.map(g => ({ ...g, memberCount: countMap.get(g.id) ?? 0 }));
+    const trophyCounts = await db.select({
+      groupId: groupTrophies.groupId,
+      cnt: count(groupTrophies.id),
+    })
+      .from(groupTrophies)
+      .where(inArray(groupTrophies.groupId, groupIds))
+      .groupBy(groupTrophies.groupId);
+
+    const trophyCountMap = new Map<string, number>();
+    for (const tc of trophyCounts) {
+      trophyCountMap.set(tc.groupId, tc.cnt);
+    }
+
+    const memberRows = await db.select({
+      groupId: groupMembers.groupId,
+      userId: users.id,
+      firstName: users.firstName,
+      profileImageUrl: users.profileImageUrl,
+    })
+      .from(groupMembers)
+      .innerJoin(users, eq(groupMembers.userId, users.id))
+      .where(inArray(groupMembers.groupId, groupIds));
+
+    const memberPreviewMap = new Map<string, { id: string; firstName: string | null; profileImageUrl: string | null }[]>();
+    for (const mr of memberRows) {
+      const list = memberPreviewMap.get(mr.groupId) || [];
+      if (list.length < 5) {
+        list.push({ id: mr.userId, firstName: mr.firstName, profileImageUrl: mr.profileImageUrl });
+      }
+      memberPreviewMap.set(mr.groupId, list);
+    }
+
+    return groupRows.map(g => ({
+      ...g,
+      memberCount: countMap.get(g.id) ?? 0,
+      trophyCount: trophyCountMap.get(g.id) ?? 0,
+      memberPreviews: memberPreviewMap.get(g.id) ?? [],
+    }));
   }
 
   async getGroupMembers(groupId: string, requestingUserId: string): Promise<(GroupMember & { user: { id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null } })[]> {
