@@ -28,5 +28,13 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const authTokens = pgTable("auth_tokens", {
+  token: varchar("token").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [index("IDX_auth_tokens_user").on(table.userId), index("IDX_auth_tokens_expires").on(table.expiresAt)]);
+
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type AuthToken = typeof authTokens.$inferSelect;

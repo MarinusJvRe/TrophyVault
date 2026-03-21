@@ -3,9 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerEmailAuthRoutes } from "./auth";
-import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema, insertProProfileSchema, insertGroupSchema, TIER_LIMITS, AI_COSTS, type AccountTier, users, trophies as trophiesTable } from "@shared/schema";
+import { insertWeaponSchema, insertTrophySchema, insertPreferencesSchema, insertRoomRatingSchema, insertProProfileSchema, insertGroupSchema, TIER_LIMITS, AI_COSTS, type AccountTier, users, trophies as trophiesTable, modelJobs } from "@shared/schema";
 import { db } from "./db";
-import { eq, or, ilike } from "drizzle-orm";
+import { eq, and, or, ilike } from "drizzle-orm";
 import { z } from "zod";
 import { analyzeTrophyImage } from "./trophy-ai";
 import { generate3DModel, generateMountImageOnly } from "./trophy-3d";
@@ -14,6 +14,7 @@ import { uploadBufferToStorage, uploadFileToStorage } from "./object-storage-hel
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import fsPromises from "fs/promises";
 import os from "os";
 
 const tmpUploadDir = path.join(os.tmpdir(), "hth-uploads");
@@ -165,22 +166,26 @@ export async function registerRoutes(
   });
 
   // ========== TROPHIES ==========
-  const pendingModels = new Map<string, { status: "pending" | "done" | "failed"; glbUrl: string | null; glbPreviewUrl: string | null; usdzUrl: string | null; mountRenderUrl: string | null }>();
-
   app.get("/api/trophies", isAuthenticated, async (req, res) => {
     const list = await storage.getTrophies(getUserId(req));
     res.json(list);
   });
 
-  app.get("/api/trophies/model-status", isAuthenticated, (req, res) => {
+  app.get("/api/trophies/model-status", isAuthenticated, async (req, res) => {
     const imageUrl = req.query.imageUrl as string;
     if (!imageUrl) return res.status(400).json({ message: "imageUrl query param required" });
-    const entry = pendingModels.get(imageUrl);
-    if (!entry) return res.json({ status: "unknown", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: null });
-    if (entry.status === "done") {
-      pendingModels.delete(imageUrl);
+    const userId = getUserId(req);
+    const [job] = await db.select().from(modelJobs).where(and(eq(modelJobs.imageUrl, imageUrl), eq(modelJobs.userId, userId)));
+    if (!job) {
+      return res.json({ status: "unknown", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: null });
     }
-    res.json(entry);
+    res.json({
+      status: job.status,
+      glbUrl: job.glbUrl,
+      glbPreviewUrl: job.glbPreviewUrl,
+      usdzUrl: job.usdzUrl,
+      mountRenderUrl: job.mountRenderUrl,
+    });
   });
 
   app.get("/api/trophies/:id", isAuthenticated, async (req, res) => {
@@ -283,6 +288,14 @@ export async function registerRoutes(
   });
 
   // ========== AI TROPHY ANALYSIS (with tier enforcement) ==========
+  async function createModelJob(userId: string, imageUrl: string) {
+    await db.insert(modelJobs).values({ userId, imageUrl, status: "pending" });
+  }
+
+  async function updateModelJob(userId: string, imageUrl: string, status: string, updates?: { glbUrl?: string | null; glbPreviewUrl?: string | null; usdzUrl?: string | null; mountRenderUrl?: string | null; mountType?: string | null }) {
+    await db.update(modelJobs).set({ status, ...updates }).where(and(eq(modelJobs.userId, userId), eq(modelJobs.imageUrl, imageUrl)));
+  }
+
   app.post("/api/trophies/analyze", isAuthenticated, trophyUpload.single("image"), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "No image file provided" });
@@ -300,7 +313,7 @@ export async function registerRoutes(
         console.error("[upload] Object Storage upload failed, using local fallback:", err);
         imageUrl = `/uploads/trophies/${req.file.filename}`;
       }
-      const fileBuffer = fs.readFileSync(req.file.path);
+      const fileBuffer = await fsPromises.readFile(req.file.path);
       const base64 = fileBuffer.toString("base64");
       const prefs = await storage.getPreferences(userId);
       const units = prefs?.units || "imperial";
@@ -319,15 +332,15 @@ export async function registerRoutes(
       if (isPaidTier) {
         const modelCheck = await checkTierLimit(userId, "3d_model");
         if (modelCheck.allowed) {
-          pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: null });
+          await createModelJob(userId, imageUrl);
           console.log(`[3d-model] Started background 3D generation for ${imageUrl} (mount: ${mountType}, theme: ${roomTheme}, tier: ${accountTier})`);
           generate3DModel(req.file!.path, mountType, analysis, roomTheme, (localMountUrl) => {
             uploadFileToStorage(path.join(process.cwd(), localMountUrl))
               .then((uploadedMountUrl) => {
-                pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: uploadedMountUrl });
+                updateModelJob(userId, imageUrl, "pending", { mountRenderUrl: uploadedMountUrl });
               })
               .catch(() => {
-                pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: localMountUrl });
+                updateModelJob(userId, imageUrl, "pending", { mountRenderUrl: localMountUrl });
               });
           })
             .then(async ({ glbUrl: localGlbUrl, glbPreviewUrl: localPreviewUrl, usdzUrl: localUsdzUrl, mountRenderUrl: localMountRenderUrl }) => {
@@ -345,22 +358,18 @@ export async function registerRoutes(
               } catch (err) {
                 console.error("[3d-model] Object Storage upload failed, using local paths:", err);
               }
-              pendingModels.set(imageUrl, { status: "done", glbUrl, glbPreviewUrl, usdzUrl: localUsdzUrl, mountRenderUrl });
+              await updateModelJob(userId, imageUrl, "done", { glbUrl, glbPreviewUrl, usdzUrl: localUsdzUrl, mountRenderUrl, mountType });
+              await storage.patchTrophyGlb(imageUrl, glbUrl, glbPreviewUrl, mountType, localUsdzUrl, mountRenderUrl);
               console.log(`[3d-model] Completed 3D model for ${imageUrl} → ${glbUrl}`);
               await storage.logUsage(userId, "3d_model", AI_COSTS["3d_model"], `3D model for: ${imageUrl}`);
-              storage.patchTrophyGlb(imageUrl, glbUrl, glbPreviewUrl, mountType, localUsdzUrl, mountRenderUrl).then(() => {
-                console.log(`[3d-model] Auto-patched trophy GLB for ${imageUrl}`);
-              }).catch((err) => {
-                console.error("[3d-model] Failed to patch trophy GLB:", err);
-              });
             })
-            .catch((err) => {
+            .catch(async (err) => {
               console.error(`[3d-model] 3D model generation failed for ${imageUrl}:`, err);
-              pendingModels.set(imageUrl, { status: "failed", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: null });
+              await updateModelJob(userId, imageUrl, "failed");
             });
         }
       } else {
-        pendingModels.set(imageUrl, { status: "pending", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: null });
+        await createModelJob(userId, imageUrl);
         console.log(`[mount-image] Free user: generating mount render only for ${imageUrl} (theme: ${roomTheme})`);
         generateMountImageOnly(req.file!.path, analysis, roomTheme)
           .then(async ({ mountRenderUrl: localMountRenderUrl }) => {
@@ -371,17 +380,15 @@ export async function registerRoutes(
               } catch (err) {
                 console.error("[mount-image] Object Storage upload failed, using local path:", err);
               }
-              storage.patchTrophyRenderImage(imageUrl, mountRenderUrl!).then(() => {
-                console.log(`[mount-image] Auto-patched trophy render image for ${imageUrl}`);
-              }).catch((err) => {
-                console.error("[mount-image] Failed to patch trophy render image:", err);
-              });
             }
-            pendingModels.set(imageUrl, { status: "done", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl });
+            await updateModelJob(userId, imageUrl, "done", { mountRenderUrl });
+            if (mountRenderUrl) {
+              await storage.patchTrophyRenderImage(imageUrl, mountRenderUrl);
+            }
           })
-          .catch((err) => {
+          .catch(async (err) => {
             console.error(`[mount-image] Mount image generation failed for ${imageUrl}:`, err);
-            pendingModels.set(imageUrl, { status: "failed", glbUrl: null, glbPreviewUrl: null, usdzUrl: null, mountRenderUrl: null });
+            await updateModelJob(userId, imageUrl, "failed");
           });
       }
     } catch (error: any) {
@@ -466,8 +473,19 @@ export async function registerRoutes(
   app.post("/api/referral/track", async (req, res) => {
     const { referralCode, referredUserId } = req.body;
     if (!referralCode) return res.status(400).json({ message: "Referral code required" });
+
     const profile = await storage.getProProfileByReferralCode(referralCode);
     if (!profile) return res.status(404).json({ message: "Invalid referral code" });
+
+    if (referredUserId) {
+      const [referredUser] = await db.select().from(users).where(eq(users.id, referredUserId));
+      if (!referredUser) return res.status(400).json({ message: "Referred user not found" });
+
+      const existingReferrals = await storage.getReferralsByProUser(profile.userId);
+      const isDuplicate = existingReferrals.some(r => r.referredUserId === referredUserId);
+      if (isDuplicate) return res.status(409).json({ message: "Referral already tracked for this user" });
+    }
+
     const referral = await storage.createReferral(profile.userId, referralCode, referredUserId);
     res.json(referral);
   });
@@ -620,7 +638,7 @@ export async function registerRoutes(
     const authToken = req.headers["x-auth-token"] as string;
     if (authToken) {
       const { validateAuthToken } = await import("./auth");
-      const userId = validateAuthToken(authToken);
+      const userId = await validateAuthToken(authToken);
       if (userId) {
         const [user] = await db.select().from(users).where(eq(users.id, userId));
         if (user) {

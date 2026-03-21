@@ -3,8 +3,8 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { z } from "zod";
 import { db } from "./db";
-import { users } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { users, authTokens } from "@shared/schema";
+import { eq, and, lte } from "drizzle-orm";
 import { storage } from "./storage";
 
 const registerSchema = z.object({
@@ -21,39 +21,38 @@ const loginSchema = z.object({
 });
 
 const TOKEN_TTL = 7 * 24 * 60 * 60 * 1000;
-const authTokens = new Map<string, { userId: string; expiresAt: number }>();
 
-function generateAuthToken(userId: string): string {
+async function generateAuthToken(userId: string): Promise<string> {
   const token = crypto.randomBytes(32).toString("hex");
-  authTokens.set(token, { userId, expiresAt: Date.now() + TOKEN_TTL });
+  const expiresAt = new Date(Date.now() + TOKEN_TTL);
+  await db.insert(authTokens).values({ token, userId, expiresAt });
   return token;
 }
 
-export function validateAuthToken(token: string): string | null {
-  const entry = authTokens.get(token);
+export async function validateAuthToken(token: string): Promise<string | null> {
+  const [entry] = await db.select().from(authTokens).where(eq(authTokens.token, token));
   if (!entry) return null;
-  if (Date.now() > entry.expiresAt) {
-    authTokens.delete(token);
+  if (new Date() > entry.expiresAt) {
+    await db.delete(authTokens).where(eq(authTokens.token, token));
     return null;
   }
   return entry.userId;
 }
 
-export function invalidateAuthToken(token: string): void {
-  authTokens.delete(token);
+export async function invalidateAuthToken(token: string): Promise<void> {
+  await db.delete(authTokens).where(eq(authTokens.token, token));
 }
 
-export function invalidateUserTokens(userId: string): void {
-  authTokens.forEach((entry, token) => {
-    if (entry.userId === userId) authTokens.delete(token);
-  });
+export async function invalidateUserTokens(userId: string): Promise<void> {
+  await db.delete(authTokens).where(eq(authTokens.userId, userId));
 }
 
-setInterval(() => {
-  const now = Date.now();
-  authTokens.forEach((entry, token) => {
-    if (now > entry.expiresAt) authTokens.delete(token);
-  });
+setInterval(async () => {
+  try {
+    await db.delete(authTokens).where(lte(authTokens.expiresAt, new Date()));
+  } catch (err) {
+    console.error("Token cleanup error:", err);
+  }
 }, 60 * 60 * 1000);
 
 function saveSession(req: any): Promise<void> {
@@ -157,7 +156,7 @@ export function registerEmailAuthRoutes(app: Express) {
       return res.status(401).json({ message: "User not found" });
     }
 
-    const authToken = generateAuthToken(user.id);
+    const authToken = await generateAuthToken(user.id);
     res.json({ authToken });
   });
 
@@ -201,7 +200,7 @@ export function registerEmailAuthRoutes(app: Express) {
         }
       }
 
-      const authToken = generateAuthToken(user.id);
+      const authToken = await generateAuthToken(user.id);
 
       res.status(201).json({
         id: user.id,
@@ -241,7 +240,7 @@ export function registerEmailAuthRoutes(app: Express) {
 
       await saveSession(req);
 
-      const authToken = generateAuthToken(user.id);
+      const authToken = await generateAuthToken(user.id);
 
       res.json({
         id: user.id,

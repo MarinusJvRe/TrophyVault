@@ -203,18 +203,25 @@ export default function AddTrophyDialog({ open, onOpenChange }: AddTrophyDialogP
         });
         if (!res.ok) return;
         const data = await res.json();
-        if (data.status === "done" && data.glbUrl) {
-          setGlbUrl(data.glbUrl);
-          setGlbPreviewUrl(data.glbPreviewUrl || null);
-          setUsdzUrl(data.usdzUrl || null);
+        if (data.status === "done") {
+          if (data.glbUrl) {
+            setGlbUrl(data.glbUrl);
+            setGlbPreviewUrl(data.glbPreviewUrl || null);
+            setUsdzUrl(data.usdzUrl || null);
+          }
           setModelPollingImageUrl(null);
         } else if (data.status === "failed") {
           setModelPollingImageUrl(null);
+          toast({
+            title: "3D Generation Failed",
+            description: "The 3D model could not be generated for this trophy. You can still save your trophy without the 3D model.",
+            variant: "destructive",
+          });
         }
       } catch {}
     }, 5000);
     return () => clearInterval(interval);
-  }, [modelPollingImageUrl, glbUrl]);
+  }, [modelPollingImageUrl, glbUrl, toast]);
 
   const resetState = useCallback(() => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);

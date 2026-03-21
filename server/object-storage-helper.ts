@@ -1,4 +1,4 @@
-import fs from "fs";
+import fs from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { objectStorageClient } from "./replit_integrations/object_storage";
@@ -40,7 +40,7 @@ export async function uploadFileToStorage(
   filePath: string,
   contentType?: string
 ): Promise<string> {
-  const buffer = fs.readFileSync(filePath);
+  const buffer = await fs.readFile(filePath);
   const ext = path.extname(filePath).toLowerCase();
   const mime =
     contentType ||

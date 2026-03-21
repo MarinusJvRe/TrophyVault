@@ -234,7 +234,7 @@ export async function analyzeTrophyImage(
     ],
     max_tokens: 2000,
     temperature: 0.2,
-  });
+  }, { signal: AbortSignal.timeout(60_000) });
 
   const content = response.choices[0]?.message?.content || "";
   const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();

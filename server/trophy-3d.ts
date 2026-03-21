@@ -1,9 +1,15 @@
 import { fal } from "@fal-ai/client";
 import fs from "fs";
+import fsPromises from "fs/promises";
 import path from "path";
 import https from "https";
+import OpenAI from "openai";
 import type { TrophyAnalysis, CropBox, AnimalDescription } from "./trophy-ai";
-import { openai } from "./replit_integrations/image/client";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 fal.config({
   credentials: process.env.FAL_KEY,
@@ -25,9 +31,11 @@ function downloadFile(url: string, destPath: string, maxRedirects = 3): Promise<
       const parsed = new URL(url);
       const hostAllowed = ALLOWED_DOWNLOAD_HOSTS.some(h => parsed.hostname === h || parsed.hostname.endsWith("." + h));
       if (!hostAllowed) {
-        console.warn(`[3d-model] Download host not in allowlist: ${parsed.hostname}, proceeding anyway`);
+        return reject(new Error(`Download host not in allowlist: ${parsed.hostname}`));
       }
-    } catch { /* URL parse failure handled by https.get */ }
+    } catch {
+      return reject(new Error(`Invalid URL: ${url}`));
+    }
 
     const file = fs.createWriteStream(destPath);
     https.get(url, (response) => {
@@ -94,7 +102,7 @@ export async function smartCropForMount(
 export async function removeBackground(localImagePath: string): Promise<string> {
   console.log("[3d-model] Removing background...");
 
-  const imageBuffer = fs.readFileSync(localImagePath);
+  const imageBuffer = await fsPromises.readFile(localImagePath);
   const ext = path.extname(localImagePath) || ".jpg";
   const mimeType = ext === ".png" ? "image/png" : "image/jpeg";
   const blob = new Blob([imageBuffer], { type: mimeType });
@@ -108,6 +116,7 @@ export async function removeBackground(localImagePath: string): Promise<string> 
       model: "General Use (Light)",
     },
     logs: true,
+    timeout: 120_000,
     onQueueUpdate: (update) => {
       if (update.status === "IN_PROGRESS") {
         const logs = (update as any).logs;
@@ -154,7 +163,7 @@ export async function generateMountImage(
 
   const prompt = `Transform this animal photo into a professional front-facing taxidermy shoulder mount. The animal is a ${species} with these specific features: ${animalDetails}. Repose the animal to face directly forward, showing head, neck, and upper shoulders symmetrically as a classic wall-mount trophy. Preserve the exact coloring, markings, horn/antler shape, and facial features of this specific animal. The mount should be ${bgDescription}. Photorealistic taxidermy quality, dramatic museum lighting, sharp detail.`;
 
-  const imageBuffer = fs.readFileSync(bgRemovedImagePath);
+  const imageBuffer = await fsPromises.readFile(bgRemovedImagePath);
   const imageFile = new File(
     [imageBuffer],
     path.basename(bgRemovedImagePath),
@@ -166,7 +175,7 @@ export async function generateMountImage(
     image: imageFile,
     prompt,
     size: "1024x1024",
-  });
+  }, { signal: AbortSignal.timeout(120_000) });
 
   const resultBase64 = (response.data && response.data[0]?.b64_json) ?? "";
   if (!resultBase64) {
@@ -175,7 +184,7 @@ export async function generateMountImage(
 
   const mountFilename = `mount-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
   const mountPath = path.join(trophyUploadDir, mountFilename);
-  fs.writeFileSync(mountPath, Buffer.from(resultBase64, "base64"));
+  await fsPromises.writeFile(mountPath, Buffer.from(resultBase64, "base64"));
 
   console.log(`[mount-image] Mount image generated: ${mountFilename}`);
   return mountPath;
@@ -187,7 +196,7 @@ export async function generateGlb(
 ): Promise<{ glbPath: string; previewPath: string | null; usdzUrl: string | null }> {
   console.log("[3d-model] Generating 3D model via Meshy v6...");
 
-  const imageBuffer = fs.readFileSync(bgRemovedImagePath);
+  const imageBuffer = await fsPromises.readFile(bgRemovedImagePath);
   const blob = new Blob([imageBuffer], { type: "image/png" });
   const file = new File([blob], "trophy-nobg.png", { type: "image/png" });
   const uploadedUrl = await fal.storage.upload(file);
@@ -208,6 +217,7 @@ export async function generateGlb(
       texture_prompt: texturePrompt,
     },
     logs: true,
+    timeout: 120_000,
     onQueueUpdate: (update) => {
       if (update.status === "IN_PROGRESS") {
         const logs = (update as any).logs;

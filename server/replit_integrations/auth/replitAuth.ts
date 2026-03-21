@@ -151,7 +151,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const authToken = req.headers["x-auth-token"] as string;
   if (authToken) {
     const { validateAuthToken } = await import("../../auth");
-    const userId = validateAuthToken(authToken);
+    const userId = await validateAuthToken(authToken);
     if (userId) {
       const { db } = await import("../../db");
       const { users } = await import("@shared/schema");

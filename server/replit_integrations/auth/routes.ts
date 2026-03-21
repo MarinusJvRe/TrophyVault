@@ -20,14 +20,14 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/auth/email-logout", (req, res) => {
+  app.post("/api/auth/email-logout", async (req, res) => {
     const authToken = req.headers["x-auth-token"] as string;
     if (authToken) {
-      invalidateAuthToken(authToken);
+      await invalidateAuthToken(authToken);
     }
     const session = req.session as any;
     if (session?.userId) {
-      invalidateUserTokens(session.userId);
+      await invalidateUserTokens(session.userId);
     }
     req.session.destroy((err) => {
       if (err) {

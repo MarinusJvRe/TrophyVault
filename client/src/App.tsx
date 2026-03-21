@@ -12,7 +12,6 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import TrophyRoom from "@/pages/trophy-room";
 import TrophyDetail from "@/pages/trophy-detail";
-import Placeholder from "@/pages/placeholder";
 import Onboarding from "@/pages/onboarding";
 import Safe from "@/pages/safe";
 import Community from "@/pages/community";

@@ -168,6 +168,23 @@ export const groupTrophies = pgTable("group_trophies", {
   uniqueIndex("group_trophies_group_trophy_unique").on(table.groupId, table.trophyId),
 ]);
 
+export const modelJobs = pgTable("model_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  imageUrl: text("image_url").notNull(),
+  status: text("status").notNull().default("pending"),
+  glbUrl: text("glb_url"),
+  glbPreviewUrl: text("glb_preview_url"),
+  usdzUrl: text("usdz_url"),
+  mountRenderUrl: text("mount_render_url"),
+  mountType: text("mount_type"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("IDX_model_jobs_user_image").on(table.userId, table.imageUrl),
+]);
+
+export type ModelJob = typeof modelJobs.$inferSelect;
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   trophies: many(trophies),
