@@ -620,7 +620,7 @@ export async function registerRoutes(
     });
   });
 
-  // ========== COMMUNITY FEED ==========
+  // ========== HELPER: resolve optional user ==========
   const resolveOptionalUser = async (req: Request): Promise<string | undefined> => {
     if ((req as any).user?.claims?.sub) {
       return (req as any).user.claims.sub;
@@ -651,6 +651,117 @@ export async function registerRoutes(
     return undefined;
   };
 
+  // ========== PUBLIC ROOM ROUTES ==========
+  app.get("/api/room/:userId", async (req, res) => {
+    const ownerId = req.params.userId as string;
+    const viewerId = await resolveOptionalUser(req);
+
+    const roomData = await storage.getUserRoomData(ownerId);
+    if (!roomData) return res.status(404).json({ message: "User not found" });
+
+    const isOwner = viewerId === ownerId;
+    const roomVisibility = roomData.preferences?.roomVisibility || "private";
+    let followStatus: "none" | "pending" | "following" = "none";
+
+    if (viewerId && !isOwner) {
+      followStatus = await storage.getFollowStatus(viewerId, ownerId);
+    }
+
+    if (!isOwner && roomVisibility !== "public" && followStatus !== "following") {
+      return res.json({
+        private: true,
+        followStatus,
+        user: {
+          id: roomData.user.id,
+          firstName: roomData.user.firstName,
+          lastName: roomData.user.lastName,
+          profileImageUrl: roomData.user.profileImageUrl,
+        },
+      });
+    }
+
+    const rawTrophies = roomData.trophies;
+    const rating = await storage.getRoomRating(ownerId);
+
+    const safeTrophies = rawTrophies.map(t => ({
+      id: t.id,
+      species: t.species,
+      name: t.name,
+      date: t.date,
+      location: t.location,
+      score: t.score,
+      gender: t.gender,
+      imageUrl: t.imageUrl,
+      glbUrl: t.glbUrl,
+      glbPreviewUrl: t.glbPreviewUrl,
+      renderImageUrl: t.renderImageUrl,
+      usdzUrl: t.usdzUrl,
+      mountType: t.mountType,
+      featured: t.featured,
+      huntNotes: t.huntNotes,
+      createdAt: t.createdAt,
+    }));
+
+    const speciesSet = new Set(rawTrophies.map(t => t.species));
+    const badgeMap: Record<string, { rank: number; badge: string } | null> = {};
+    for (const sp of speciesSet) {
+      const top10 = await storage.getTop10ForSpecies(sp);
+      for (const trophy of rawTrophies) {
+        if (trophy.species === sp && top10.has(trophy.id)) {
+          badgeMap[trophy.id] = top10.get(trophy.id)!;
+        }
+      }
+    }
+
+    const trophiesWithBadges = safeTrophies.map(t => ({
+      ...t,
+      badge: badgeMap[t.id] || null,
+    }));
+
+    res.json({
+      private: false,
+      followStatus,
+      user: {
+        id: roomData.user.id,
+        firstName: roomData.user.firstName,
+        lastName: roomData.user.lastName,
+        profileImageUrl: roomData.user.profileImageUrl,
+      },
+      preferences: {
+        theme: roomData.preferences?.theme || "lodge",
+      },
+      trophies: trophiesWithBadges,
+      rating,
+    });
+  });
+
+  app.get("/api/room/:userId/trophy/:trophyId", async (req, res) => {
+    const ownerId = req.params.userId as string;
+    const trophyId = req.params.trophyId as string;
+    const viewerId = await resolveOptionalUser(req);
+
+    const roomData = await storage.getUserRoomData(ownerId);
+    if (!roomData) return res.status(404).json({ message: "User not found" });
+
+    const isOwner = viewerId === ownerId;
+    const roomVisibility = roomData.preferences?.roomVisibility || "private";
+    let followStatus: "none" | "pending" | "following" = "none";
+
+    if (viewerId && !isOwner) {
+      followStatus = await storage.getFollowStatus(viewerId, ownerId);
+    }
+
+    if (!isOwner && roomVisibility !== "public" && followStatus !== "following") {
+      return res.status(403).json({ message: "This room is private" });
+    }
+
+    const trophy = await storage.getTrophyPublic(trophyId, ownerId);
+    if (!trophy) return res.status(404).json({ message: "Trophy not found" });
+
+    res.json(trophy);
+  });
+
+  // ========== COMMUNITY FEED ==========
   app.get("/api/community/feed", async (req, res) => {
     const mode = (req.query.mode as string) === "following" ? "following" : "global";
     const species = (req.query.species as string) || undefined;

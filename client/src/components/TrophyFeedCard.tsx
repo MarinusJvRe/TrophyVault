@@ -78,7 +78,7 @@ export default function TrophyFeedCard({
 
         <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/60 to-transparent">
           <div className="flex items-center justify-between">
-            <Link href={`/community/room/${user.id}`}>
+            <Link href={`/room/${user.id}`}>
               <div className="flex items-center gap-2 cursor-pointer" data-testid={`link-feed-user-${user.id}`}>
                 <Avatar className="h-9 w-9 border-2 border-white/30">
                   <AvatarImage src={user.profileImageUrl || undefined} />
@@ -150,7 +150,7 @@ export default function TrophyFeedCard({
           </div>
         </div>
 
-        <Link href={`/community/room/${user.id}`}>
+        <Link href={`/room/${user.id}`}>
           <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" data-testid={`button-view-trophy-${trophy.id}`}>
             <Eye className="h-3.5 w-3.5" />
             View Trophy

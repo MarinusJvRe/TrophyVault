@@ -15,7 +15,6 @@ import TrophyDetail from "@/pages/trophy-detail";
 import Onboarding from "@/pages/onboarding";
 import Safe from "@/pages/safe";
 import Community from "@/pages/community";
-import PublicRoom from "@/pages/public-room";
 import Profile from "@/pages/profile";
 import TrophyMap from "@/pages/trophy-map";
 import TrophyTimeline from "@/pages/trophy-timeline";
@@ -63,6 +62,14 @@ function usePageViewTracking() {
   }, [location]);
 }
 
+function CommunityRoomRedirect({ userId }: { userId: string }) {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation(`/room/${userId}`, { replace: true });
+  }, [userId, setLocation]);
+  return null;
+}
+
 function Router() {
   const [location] = useLocation();
 
@@ -77,7 +84,9 @@ function Router() {
         <Route path="/trophies/:id">{() => <AnimatedPage><TrophyDetail /></AnimatedPage>}</Route>
         <Route path="/safe">{() => <AnimatedPage><Safe /></AnimatedPage>}</Route>
         <Route path="/community">{() => <AnimatedPage><Community /></AnimatedPage>}</Route>
-        <Route path="/community/room/:userId">{() => <AnimatedPage><PublicRoom /></AnimatedPage>}</Route>
+        <Route path="/community/room/:userId">{(params) => <CommunityRoomRedirect userId={params.userId} />}</Route>
+        <Route path="/room/:userId/trophy/:trophyId">{(params) => <AnimatedPage><TrophyDetail viewOnly roomUserId={params.userId} /></AnimatedPage>}</Route>
+        <Route path="/room/:userId">{(params) => <AnimatedPage><TrophyRoom userId={params.userId} /></AnimatedPage>}</Route>
         <Route path="/profile">{() => <AnimatedPage><Profile /></AnimatedPage>}</Route>
         <Route path="/pro">{() => <AnimatedPage><ProDashboard /></AnimatedPage>}</Route>
         <Route>{() => <AnimatedPage><NotFound /></AnimatedPage>}</Route>

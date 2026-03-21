@@ -268,7 +268,9 @@ export default function Community() {
                                     {entry.badge && <RankBadge badge={entry.badge} />}
                                   </div>
                                   <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                    <span>{entryName}</span>
+                                    <Link href={`/room/${entry.userId}`}>
+                                      <span className="hover:text-primary cursor-pointer transition-colors" data-testid={`link-leaderboard-user-${entry.userId}`}>{entryName}</span>
+                                    </Link>
                                     {entry.location && (
                                       <>
                                         <span>·</span>

@@ -72,8 +72,15 @@ function parseStoredScore(value: string | null): { num: string; unit: string } {
   return { num: v, unit: '"' };
 }
 
-export default function TrophyDetail() {
-  const [match, params] = useRoute("/trophies/:id");
+export default function TrophyDetail({ viewOnly, roomUserId }: { viewOnly?: boolean; roomUserId?: string }) {
+  const [matchOwn, ownParams] = useRoute("/trophies/:id");
+  const [matchPublic, publicParams] = useRoute("/room/:userId/trophy/:trophyId");
+  const isPublicView = viewOnly || !!matchPublic;
+  const trophyId = isPublicView ? (publicParams?.trophyId || ownParams?.id) : ownParams?.id;
+  const ownerUserId = isPublicView ? (roomUserId || publicParams?.userId) : undefined;
+  const match = matchOwn || matchPublic;
+  const params = { id: trophyId };
+
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
@@ -92,8 +99,13 @@ export default function TrophyDetail() {
   const [editScoreNum, setEditScoreNum] = useState<string>("");
   
   const { data: trophy, isLoading } = useQuery<Trophy>({
-    queryKey: ["/api/trophies", params?.id],
-    enabled: !!match && !!params?.id,
+    queryKey: isPublicView ? ["/api/room", ownerUserId, "trophy", trophyId] : ["/api/trophies", params?.id],
+    queryFn: isPublicView ? async () => {
+      const res = await fetch(`/api/room/${ownerUserId}/trophy/${trophyId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Trophy not found");
+      return res.json();
+    } : undefined,
+    enabled: !!match && !!trophyId,
   });
 
   const { data: weapons = [] } = useQuery<Weapon[]>({
@@ -258,10 +270,10 @@ export default function TrophyDetail() {
                   Cancel
                 </Button>
               ) : (
-                <Link href="/trophies">
+                <Link href={isPublicView ? `/room/${ownerUserId}` : "/trophies"}>
                   <Button variant="ghost" size="sm" className="gap-2 text-foreground hover:bg-card" data-testid="button-back">
                     <ArrowLeft className="h-4 w-4" />
-                    Back to Vault
+                    {isPublicView ? "Back to Room" : "Back to Vault"}
                   </Button>
                 </Link>
               )}
@@ -270,7 +282,7 @@ export default function TrophyDetail() {
                   <span className="text-xs text-primary font-medium flex items-center gap-1">
                     <Pencil className="h-3 w-3" /> Editing
                   </span>
-                ) : (
+                ) : !isPublicView ? (
                   <>
                     <Button
                       onClick={() => starMutation.mutate()}
@@ -307,7 +319,7 @@ export default function TrophyDetail() {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </>
-                )}
+                ) : null}
               </div>
             </div>
 
@@ -339,7 +351,7 @@ export default function TrophyDetail() {
               </motion.div>
             </div>
 
-            {editing ? (
+            {editing && !isPublicView ? (
               <EditForm
                 trophy={trophy}
                 weapons={weapons}
@@ -371,6 +383,7 @@ export default function TrophyDetail() {
               <ViewMode
                 trophy={trophy}
                 weapon={weapon}
+                viewOnly={isPublicView}
                 onProofOfHunt={async () => {
                   try {
                     await generateProofOfHunt(trophy, weapon);
@@ -386,32 +399,34 @@ export default function TrophyDetail() {
         </div>
       </div>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="bg-card border-border/50">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Delete Trophy
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete your <strong>{trophy.species}</strong> trophy "{trophy.name}"? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteMutation.mutate()}
-              disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Yes, Delete Trophy"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {!isPublicView && (
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent className="bg-card border-border/50">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Delete Trophy
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete your <strong>{trophy.species}</strong> trophy "{trophy.name}"? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                {deleteMutation.isPending ? "Deleting..." : "Yes, Delete Trophy"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
-      {showAR && trophy?.glbUrl && (
+      {!isPublicView && showAR && trophy?.glbUrl && (
         <TrophyARViewer
           glbUrl={trophy.glbUrl}
           species={trophy.species}
@@ -427,11 +442,13 @@ export default function TrophyDetail() {
 function ViewMode({
   trophy,
   weapon,
+  viewOnly,
   onProofOfHunt,
   onViewAR,
 }: {
   trophy: Trophy;
   weapon: Weapon | null | undefined;
+  viewOnly?: boolean;
   onProofOfHunt: () => void;
   onViewAR: () => void;
 }) {
@@ -584,16 +601,18 @@ function ViewMode({
         </div>
       )}
 
-      <div className="pt-4 border-t border-border/50 space-y-3">
-        <Button onClick={onProofOfHunt} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-serif flex items-center gap-2" data-testid="button-proof-of-hunt">
-          <Award className="h-4 w-4" /> Generate Proof of Hunt
-        </Button>
-        {trophy.glbUrl && (
-          <Button onClick={onViewAR} className="w-full bg-[#b87333] hover:bg-[#a0622a] text-white flex items-center gap-2 font-serif" data-testid="button-view-ar-detail">
-            <Box className="h-4 w-4" /> View in 3D / AR
+      {!viewOnly && (
+        <div className="pt-4 border-t border-border/50 space-y-3">
+          <Button onClick={onProofOfHunt} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-serif flex items-center gap-2" data-testid="button-proof-of-hunt">
+            <Award className="h-4 w-4" /> Generate Proof of Hunt
           </Button>
-        )}
-      </div>
+          {trophy.glbUrl && (
+            <Button onClick={onViewAR} className="w-full bg-[#b87333] hover:bg-[#a0622a] text-white flex items-center gap-2 font-serif" data-testid="button-view-ar-detail">
+              <Box className="h-4 w-4" /> View in 3D / AR
+            </Button>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }

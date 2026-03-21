@@ -110,6 +110,10 @@ export interface IStorage {
   getTrophiesTaggingPro(proUserId: string): Promise<Trophy[]>;
   getTagStats(proUserId: string): Promise<{ totalTags: number; recentTags: Trophy[] }>;
 
+  getFollowStatus(viewerId: string, ownerId: string): Promise<"none" | "pending" | "following">;
+  getUserRoomData(userId: string): Promise<{ user: User; preferences: UserPreferences | null; trophies: Trophy[] } | undefined>;
+  getTrophyPublic(trophyId: string, ownerId: string): Promise<Trophy | undefined>;
+
   // Follows
   followUser(followerId: string, followedId: string): Promise<Follow>;
   unfollowUser(followerId: string, followedId: string): Promise<boolean>;
@@ -712,6 +716,24 @@ export class DatabaseStorage implements IStorage {
       totalTags: allTags.length,
       recentTags: allTags.slice(0, 10),
     };
+  }
+
+  async getFollowStatus(viewerId: string, ownerId: string): Promise<"none" | "pending" | "following"> {
+    const isFollow = await this.isFollowing(viewerId, ownerId);
+    return isFollow ? "following" : "none";
+  }
+
+  async getUserRoomData(userId: string): Promise<{ user: User; preferences: UserPreferences | null; trophies: Trophy[] } | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) return undefined;
+    const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+    const userTrophies = await db.select().from(trophies).where(eq(trophies.userId, userId)).orderBy(desc(trophies.createdAt));
+    return { user, preferences: prefs || null, trophies: userTrophies };
+  }
+
+  async getTrophyPublic(trophyId: string, ownerId: string): Promise<Trophy | undefined> {
+    const [trophy] = await db.select().from(trophies).where(and(eq(trophies.id, trophyId), eq(trophies.userId, ownerId)));
+    return trophy;
   }
 
   // Follows

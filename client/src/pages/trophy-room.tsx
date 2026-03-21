@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
-import { useQuery } from "@tanstack/react-query";
-import { Search, Filter, SlidersHorizontal, ChevronDown, Calendar, Ruler, MapPin, Box, Loader2, Clock } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Search, Filter, SlidersHorizontal, ChevronDown, Calendar, Ruler, MapPin, Box, Loader2, Clock, Lock, UserPlus, UserMinus, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ import TrophyARViewer from "@/components/TrophyARViewer";
 import UsageBanner from "@/components/UsageBanner";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
 
 import wallLodge from "@/assets/wall-lodge.png";
 import wallManor from "@/assets/wall-manor-texture.png";
@@ -33,26 +35,79 @@ const WALL_TEXTURES: Record<string, { src: string; opacity: string }> = {
   minimal: { src: wallMinimal, opacity: "opacity-[0.06]" },
 };
 
-export default function TrophyRoom() {
+interface PublicRoomData {
+  private: boolean;
+  followStatus: "none" | "pending" | "following";
+  user: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    profileImageUrl: string | null;
+  };
+  preferences?: { theme: string };
+  trophies?: (Trophy & { badge?: { rank: number; badge: string } | null })[];
+  rating?: { avgScore: number; totalRatings: number };
+}
+
+export default function TrophyRoom({ userId }: { userId?: string }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSpecies, setFilterSpecies] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [arTrophy, setArTrophy] = useState<Trophy | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const { theme } = useTheme();
-  const wallTexture = WALL_TEXTURES[theme] || WALL_TEXTURES.lodge;
+  const { theme: ownTheme } = useTheme();
+  const { user: currentUser } = useAuth();
+  const isViewingOther = !!userId && userId !== currentUser?.id;
 
-  const { data: trophies = [], isLoading } = useQuery<Trophy[]>({
+  const { data: ownTrophies = [], isLoading: ownLoading } = useQuery<Trophy[]>({
     queryKey: ["/api/trophies"],
+    enabled: !isViewingOther,
   });
 
-  const { data: preferences } = useQuery<UserPreferences>({
+  const { data: ownPreferences } = useQuery<UserPreferences>({
     queryKey: ["/api/preferences"],
+    enabled: !isViewingOther,
   });
+
+  const { data: publicRoom, isLoading: publicLoading } = useQuery<PublicRoomData>({
+    queryKey: ["/api/room", userId],
+    queryFn: async () => {
+      const res = await fetch(`/api/room/${userId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Room not found");
+      return res.json();
+    },
+    enabled: isViewingOther,
+  });
+
+  const followMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/community/follow/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/room", userId] });
+    },
+  });
+
+  const unfollowMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/community/follow/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/room", userId] });
+    },
+  });
+
+  const trophies = isViewingOther ? (publicRoom?.trophies || []) : ownTrophies;
+  const isLoading = isViewingOther ? publicLoading : ownLoading;
+
+  const roomTheme = isViewingOther
+    ? (publicRoom?.preferences?.theme || "lodge")
+    : ownTheme;
+  const wallTexture = WALL_TEXTURES[roomTheme] || WALL_TEXTURES.lodge;
 
   useEffect(() => {
-    if (preferences && preferences.firstTrophyUploaded && !preferences.upgradePromptShown && preferences.accountTier === "free") {
-      const aiTrophies = trophies.filter(t => t.isAiAnalyzed);
+    if (!isViewingOther && ownPreferences && ownPreferences.firstTrophyUploaded && !ownPreferences.upgradePromptShown && ownPreferences.accountTier === "free") {
+      const aiTrophies = ownTrophies.filter(t => t.isAiAnalyzed);
       if (aiTrophies.length === 1) {
         setShowUpgrade(true);
         apiRequest("PUT", "/api/preferences", { upgradePromptShown: true }).then(() => {
@@ -60,7 +115,7 @@ export default function TrophyRoom() {
         }).catch(() => {});
       }
     }
-  }, [preferences, trophies]);
+  }, [ownPreferences, ownTrophies, isViewingOther]);
 
   const filteredTrophies = trophies.filter(t => {
     const matchesSearch = (t.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -82,6 +137,63 @@ export default function TrophyRoom() {
     );
   }
 
+  if (isViewingOther && publicRoom?.private) {
+    const ownerName = publicRoom.user.firstName
+      ? `${publicRoom.user.firstName} ${publicRoom.user.lastName || ""}`.trim()
+      : "This user";
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+          <Avatar className="h-20 w-20 mb-4 border-2 border-border/50">
+            <AvatarImage src={publicRoom.user.profileImageUrl || undefined} />
+            <AvatarFallback className="bg-card text-2xl font-serif">
+              {ownerName.charAt(0)}
+            </AvatarFallback>
+          </Avatar>
+          <Lock className="h-12 w-12 text-muted-foreground/30 mb-4" />
+          <h2 className="text-xl font-serif font-bold text-foreground mb-2" data-testid="text-private-room">This Room is Private</h2>
+          <p className="text-muted-foreground text-sm mb-6 max-w-sm">
+            {ownerName}'s trophy room is private. Follow them to request access.
+          </p>
+          {currentUser && (
+            <Button
+              onClick={() => {
+                if (publicRoom.followStatus === "following") {
+                  unfollowMutation.mutate();
+                } else {
+                  followMutation.mutate();
+                }
+              }}
+              disabled={followMutation.isPending || unfollowMutation.isPending || publicRoom.followStatus === "pending"}
+              className="gap-2"
+              data-testid="button-follow-private"
+            >
+              {publicRoom.followStatus === "pending" ? (
+                <>
+                  <Clock className="h-4 w-4" /> Request Pending
+                </>
+              ) : publicRoom.followStatus === "following" ? (
+                <>
+                  <UserMinus className="h-4 w-4" /> Unfollow
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-4 w-4" /> Follow
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </Layout>
+    );
+  }
+
+  const ownerName = isViewingOther && publicRoom?.user
+    ? (publicRoom.user.firstName
+        ? `${publicRoom.user.firstName} ${publicRoom.user.lastName || ""}`.trim()
+        : `User ${publicRoom.user.id.slice(0, 6)}`)
+    : null;
+
   return (
     <Layout>
       <div className="relative min-h-full">
@@ -91,12 +203,63 @@ export default function TrophyRoom() {
           data-testid="wall-cladding-background"
         />
         <div className="relative p-4 md:p-8 max-w-7xl mx-auto min-h-full">
+
+        {isViewingOther && publicRoom?.user && (
+          <div className="mb-6 flex flex-col sm:flex-row items-center gap-4">
+            <Avatar className="h-16 w-16 border-2 border-primary/30">
+              <AvatarImage src={publicRoom.user.profileImageUrl || undefined} />
+              <AvatarFallback className="bg-card text-xl font-serif">
+                {ownerName?.charAt(0) || "?"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 text-center sm:text-left">
+              <h2 className="text-xl font-serif font-bold text-foreground" data-testid="text-room-owner-name">{ownerName}'s Trophy Room</h2>
+              <div className="flex items-center gap-3 justify-center sm:justify-start mt-1">
+                <span className="text-sm text-muted-foreground">{trophies.length} trophies</span>
+                {publicRoom.rating && publicRoom.rating.totalRatings > 0 && (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+                    <span>{publicRoom.rating.avgScore.toFixed(1)}</span>
+                    <span>({publicRoom.rating.totalRatings})</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            {currentUser && (
+              <Button
+                variant={publicRoom.followStatus === "following" ? "outline" : "default"}
+                size="sm"
+                onClick={() => {
+                  if (publicRoom.followStatus === "following") {
+                    unfollowMutation.mutate();
+                  } else {
+                    followMutation.mutate();
+                  }
+                }}
+                disabled={followMutation.isPending || unfollowMutation.isPending}
+                className="gap-1.5"
+                data-testid="button-follow-room"
+              >
+                {publicRoom.followStatus === "following" ? (
+                  <><UserMinus className="h-3.5 w-3.5" /> Following</>
+                ) : (
+                  <><UserPlus className="h-3.5 w-3.5" /> Follow</>
+                )}
+              </Button>
+            )}
+          </div>
+        )}
+
         <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-serif font-bold text-primary mb-1">The Trophy Room</h1>
-            <p className="text-sm text-muted-foreground max-w-md">
-              Your curated collection of achievements.
-            </p>
+            <h1 className="text-2xl md:text-3xl font-serif font-bold text-primary mb-1">
+              {isViewingOther ? "Trophy Room" : "The Trophy Room"}
+            </h1>
+            {!isViewingOther && (
+              <p className="text-sm text-muted-foreground max-w-md">
+                Your curated collection of achievements.
+              </p>
+            )}
           </div>
 
           <div className="flex gap-2 w-full md:w-auto">
@@ -111,19 +274,23 @@ export default function TrophyRoom() {
               />
             </div>
             
-            <Link href="/trophies/map">
-              <Button variant="outline" size="sm" className="gap-1.5 border-border/50 bg-card text-muted-foreground hover:text-foreground h-9" data-testid="button-show-on-map">
-                <MapPin className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline text-xs">Show on Map</span>
-              </Button>
-            </Link>
+            {!isViewingOther && (
+              <>
+                <Link href="/trophies/map">
+                  <Button variant="outline" size="sm" className="gap-1.5 border-border/50 bg-card text-muted-foreground hover:text-foreground h-9" data-testid="button-show-on-map">
+                    <MapPin className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline text-xs">Show on Map</span>
+                  </Button>
+                </Link>
 
-            <Link href="/trophies/timeline">
-              <Button variant="outline" size="sm" className="gap-1.5 border-border/50 bg-card text-muted-foreground hover:text-foreground h-9" data-testid="button-show-timeline">
-                <Clock className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline text-xs">Timeline</span>
-              </Button>
-            </Link>
+                <Link href="/trophies/timeline">
+                  <Button variant="outline" size="sm" className="gap-1.5 border-border/50 bg-card text-muted-foreground hover:text-foreground h-9" data-testid="button-show-timeline">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline text-xs">Timeline</span>
+                  </Button>
+                </Link>
+              </>
+            )}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -149,28 +316,32 @@ export default function TrophyRoom() {
           </div>
         </header>
 
-        <div className="mb-4">
-          <UsageBanner onUpgradeClick={() => setShowUpgrade(true)} />
-        </div>
+        {!isViewingOther && (
+          <div className="mb-4">
+            <UsageBanner onUpgradeClick={() => setShowUpgrade(true)} />
+          </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            onClick={() => setDialogOpen(true)}
-            className="group aspect-square flex flex-col items-center justify-center border-2 border-dashed border-border/40 rounded-lg p-3 text-center hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer"
-            data-testid="button-add-trophy"
-          >
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-              <span className="text-xl text-primary font-light">+</span>
-            </div>
-            <h3 className="font-serif text-sm font-bold text-foreground mb-0.5">Add Trophy</h3>
-            <p className="text-xs text-muted-foreground">Upload for AI Analysis</p>
-          </motion.div>
+          {!isViewingOther && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              onClick={() => setDialogOpen(true)}
+              className="group aspect-square flex flex-col items-center justify-center border-2 border-dashed border-border/40 rounded-lg p-3 text-center hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer"
+              data-testid="button-add-trophy"
+            >
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <span className="text-xl text-primary font-light">+</span>
+              </div>
+              <h3 className="font-serif text-sm font-bold text-foreground mb-0.5">Add Trophy</h3>
+              <p className="text-xs text-muted-foreground">Upload for AI Analysis</p>
+            </motion.div>
+          )}
 
           {filteredTrophies.map((trophy, i) => (
-            <Link key={trophy.id} href={`/trophies/${trophy.id}`}>
+            <Link key={trophy.id} href={isViewingOther ? `/room/${userId}/trophy/${trophy.id}` : `/trophies/${trophy.id}`}>
               <div className="cursor-pointer h-full">
                 <WallMountCard trophy={trophy} index={i} onViewAR={(e) => { e.preventDefault(); e.stopPropagation(); setArTrophy(trophy); }} />
               </div>
@@ -180,21 +351,23 @@ export default function TrophyRoom() {
       </div>
       </div>
 
-      <AddTrophyDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      {!isViewingOther && <AddTrophyDialog open={dialogOpen} onOpenChange={setDialogOpen} />}
 
-      <UpgradePrompt
-        open={showUpgrade}
-        onClose={() => setShowUpgrade(false)}
-        variant="first-trophy"
-        currentTier={preferences?.accountTier || "free"}
-      />
+      {!isViewingOther && (
+        <UpgradePrompt
+          open={showUpgrade}
+          onClose={() => setShowUpgrade(false)}
+          variant="first-trophy"
+          currentTier={ownPreferences?.accountTier || "free"}
+        />
+      )}
 
       {arTrophy?.glbUrl && (
         <TrophyARViewer
           glbUrl={arTrophy.glbUrl}
           species={arTrophy.species}
           mountType={arTrophy.mountType || null}
-          theme={theme}
+          theme={roomTheme}
           onClose={() => setArTrophy(null)}
         />
       )}
