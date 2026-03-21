@@ -512,7 +512,7 @@ function AuthGate() {
     return <PublicRouter />;
   }
 
-  if (isNewUser && (!preferences || !(preferences as any).pursuit)) {
+  if (isNewUser && (!preferences || !preferences.nationality)) {
     return <Onboarding />;
   }
 

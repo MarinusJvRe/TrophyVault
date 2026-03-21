@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useTheme } from "@/lib/theme-context";
 import { useMutation } from "@tanstack/react-query";
@@ -7,7 +7,7 @@ import { trackEvent } from "@/lib/posthog";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, ArrowRight, Home, Feather, Mountain, Crosshair, Briefcase, ArrowLeft } from "lucide-react";
+import { Check, ArrowRight, Home, Feather, Mountain, Crosshair, Briefcase, ArrowLeft, Search, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LocationSearch } from "@/components/LocationSearch";
 
@@ -27,6 +27,202 @@ const PRO_ENTITY_TYPES = [
   { id: "ranch_game_farm", label: "Ranch or Game Farm", description: "Operate a hunting ranch or game farm" },
 ];
 
+const COUNTRIES = [
+  { code: "AF", name: "Afghanistan", flag: "🇦🇫" },
+  { code: "AL", name: "Albania", flag: "🇦🇱" },
+  { code: "DZ", name: "Algeria", flag: "🇩🇿" },
+  { code: "AD", name: "Andorra", flag: "🇦🇩" },
+  { code: "AO", name: "Angola", flag: "🇦🇴" },
+  { code: "AG", name: "Antigua and Barbuda", flag: "🇦🇬" },
+  { code: "AR", name: "Argentina", flag: "🇦🇷" },
+  { code: "AM", name: "Armenia", flag: "🇦🇲" },
+  { code: "AU", name: "Australia", flag: "🇦🇺" },
+  { code: "AT", name: "Austria", flag: "🇦🇹" },
+  { code: "AZ", name: "Azerbaijan", flag: "🇦🇿" },
+  { code: "BS", name: "Bahamas", flag: "🇧🇸" },
+  { code: "BH", name: "Bahrain", flag: "🇧🇭" },
+  { code: "BD", name: "Bangladesh", flag: "🇧🇩" },
+  { code: "BB", name: "Barbados", flag: "🇧🇧" },
+  { code: "BY", name: "Belarus", flag: "🇧🇾" },
+  { code: "BE", name: "Belgium", flag: "🇧🇪" },
+  { code: "BZ", name: "Belize", flag: "🇧🇿" },
+  { code: "BJ", name: "Benin", flag: "🇧🇯" },
+  { code: "BT", name: "Bhutan", flag: "🇧🇹" },
+  { code: "BO", name: "Bolivia", flag: "🇧🇴" },
+  { code: "BA", name: "Bosnia and Herzegovina", flag: "🇧🇦" },
+  { code: "BW", name: "Botswana", flag: "🇧🇼" },
+  { code: "BR", name: "Brazil", flag: "🇧🇷" },
+  { code: "BN", name: "Brunei", flag: "🇧🇳" },
+  { code: "BG", name: "Bulgaria", flag: "🇧🇬" },
+  { code: "BF", name: "Burkina Faso", flag: "🇧🇫" },
+  { code: "BI", name: "Burundi", flag: "🇧🇮" },
+  { code: "KH", name: "Cambodia", flag: "🇰🇭" },
+  { code: "CM", name: "Cameroon", flag: "🇨🇲" },
+  { code: "CA", name: "Canada", flag: "🇨🇦" },
+  { code: "CV", name: "Cape Verde", flag: "🇨🇻" },
+  { code: "CF", name: "Central African Republic", flag: "🇨🇫" },
+  { code: "TD", name: "Chad", flag: "🇹🇩" },
+  { code: "CL", name: "Chile", flag: "🇨🇱" },
+  { code: "CN", name: "China", flag: "🇨🇳" },
+  { code: "CO", name: "Colombia", flag: "🇨🇴" },
+  { code: "KM", name: "Comoros", flag: "🇰🇲" },
+  { code: "CG", name: "Congo", flag: "🇨🇬" },
+  { code: "CR", name: "Costa Rica", flag: "🇨🇷" },
+  { code: "HR", name: "Croatia", flag: "🇭🇷" },
+  { code: "CU", name: "Cuba", flag: "🇨🇺" },
+  { code: "CY", name: "Cyprus", flag: "🇨🇾" },
+  { code: "CZ", name: "Czech Republic", flag: "🇨🇿" },
+  { code: "DK", name: "Denmark", flag: "🇩🇰" },
+  { code: "DJ", name: "Djibouti", flag: "🇩🇯" },
+  { code: "DM", name: "Dominica", flag: "🇩🇲" },
+  { code: "DO", name: "Dominican Republic", flag: "🇩🇴" },
+  { code: "EC", name: "Ecuador", flag: "🇪🇨" },
+  { code: "EG", name: "Egypt", flag: "🇪🇬" },
+  { code: "SV", name: "El Salvador", flag: "🇸🇻" },
+  { code: "GQ", name: "Equatorial Guinea", flag: "🇬🇶" },
+  { code: "ER", name: "Eritrea", flag: "🇪🇷" },
+  { code: "EE", name: "Estonia", flag: "🇪🇪" },
+  { code: "SZ", name: "Eswatini", flag: "🇸🇿" },
+  { code: "ET", name: "Ethiopia", flag: "🇪🇹" },
+  { code: "FJ", name: "Fiji", flag: "🇫🇯" },
+  { code: "FI", name: "Finland", flag: "🇫🇮" },
+  { code: "FR", name: "France", flag: "🇫🇷" },
+  { code: "GA", name: "Gabon", flag: "🇬🇦" },
+  { code: "GM", name: "Gambia", flag: "🇬🇲" },
+  { code: "GE", name: "Georgia", flag: "🇬🇪" },
+  { code: "DE", name: "Germany", flag: "🇩🇪" },
+  { code: "GH", name: "Ghana", flag: "🇬🇭" },
+  { code: "GR", name: "Greece", flag: "🇬🇷" },
+  { code: "GD", name: "Grenada", flag: "🇬🇩" },
+  { code: "GT", name: "Guatemala", flag: "🇬🇹" },
+  { code: "GN", name: "Guinea", flag: "🇬🇳" },
+  { code: "GW", name: "Guinea-Bissau", flag: "🇬🇼" },
+  { code: "GY", name: "Guyana", flag: "🇬🇾" },
+  { code: "HT", name: "Haiti", flag: "🇭🇹" },
+  { code: "HN", name: "Honduras", flag: "🇭🇳" },
+  { code: "HU", name: "Hungary", flag: "🇭🇺" },
+  { code: "IS", name: "Iceland", flag: "🇮🇸" },
+  { code: "IN", name: "India", flag: "🇮🇳" },
+  { code: "ID", name: "Indonesia", flag: "🇮🇩" },
+  { code: "IR", name: "Iran", flag: "🇮🇷" },
+  { code: "IQ", name: "Iraq", flag: "🇮🇶" },
+  { code: "IE", name: "Ireland", flag: "🇮🇪" },
+  { code: "IL", name: "Israel", flag: "🇮🇱" },
+  { code: "IT", name: "Italy", flag: "🇮🇹" },
+  { code: "JM", name: "Jamaica", flag: "🇯🇲" },
+  { code: "JP", name: "Japan", flag: "🇯🇵" },
+  { code: "JO", name: "Jordan", flag: "🇯🇴" },
+  { code: "KZ", name: "Kazakhstan", flag: "🇰🇿" },
+  { code: "KE", name: "Kenya", flag: "🇰🇪" },
+  { code: "KI", name: "Kiribati", flag: "🇰🇮" },
+  { code: "KW", name: "Kuwait", flag: "🇰🇼" },
+  { code: "KG", name: "Kyrgyzstan", flag: "🇰🇬" },
+  { code: "LA", name: "Laos", flag: "🇱🇦" },
+  { code: "LV", name: "Latvia", flag: "🇱🇻" },
+  { code: "LB", name: "Lebanon", flag: "🇱🇧" },
+  { code: "LS", name: "Lesotho", flag: "🇱🇸" },
+  { code: "LR", name: "Liberia", flag: "🇱🇷" },
+  { code: "LY", name: "Libya", flag: "🇱🇾" },
+  { code: "LI", name: "Liechtenstein", flag: "🇱🇮" },
+  { code: "LT", name: "Lithuania", flag: "🇱🇹" },
+  { code: "LU", name: "Luxembourg", flag: "🇱🇺" },
+  { code: "MG", name: "Madagascar", flag: "🇲🇬" },
+  { code: "MW", name: "Malawi", flag: "🇲🇼" },
+  { code: "MY", name: "Malaysia", flag: "🇲🇾" },
+  { code: "MV", name: "Maldives", flag: "🇲🇻" },
+  { code: "ML", name: "Mali", flag: "🇲🇱" },
+  { code: "MT", name: "Malta", flag: "🇲🇹" },
+  { code: "MH", name: "Marshall Islands", flag: "🇲🇭" },
+  { code: "MR", name: "Mauritania", flag: "🇲🇷" },
+  { code: "MU", name: "Mauritius", flag: "🇲🇺" },
+  { code: "MX", name: "Mexico", flag: "🇲🇽" },
+  { code: "FM", name: "Micronesia", flag: "🇫🇲" },
+  { code: "MD", name: "Moldova", flag: "🇲🇩" },
+  { code: "MC", name: "Monaco", flag: "🇲🇨" },
+  { code: "MN", name: "Mongolia", flag: "🇲🇳" },
+  { code: "ME", name: "Montenegro", flag: "🇲🇪" },
+  { code: "MA", name: "Morocco", flag: "🇲🇦" },
+  { code: "MZ", name: "Mozambique", flag: "🇲🇿" },
+  { code: "MM", name: "Myanmar", flag: "🇲🇲" },
+  { code: "NA", name: "Namibia", flag: "🇳🇦" },
+  { code: "NR", name: "Nauru", flag: "🇳🇷" },
+  { code: "NP", name: "Nepal", flag: "🇳🇵" },
+  { code: "NL", name: "Netherlands", flag: "🇳🇱" },
+  { code: "NZ", name: "New Zealand", flag: "🇳🇿" },
+  { code: "NI", name: "Nicaragua", flag: "🇳🇮" },
+  { code: "NE", name: "Niger", flag: "🇳🇪" },
+  { code: "NG", name: "Nigeria", flag: "🇳🇬" },
+  { code: "KP", name: "North Korea", flag: "🇰🇵" },
+  { code: "MK", name: "North Macedonia", flag: "🇲🇰" },
+  { code: "NO", name: "Norway", flag: "🇳🇴" },
+  { code: "OM", name: "Oman", flag: "🇴🇲" },
+  { code: "PK", name: "Pakistan", flag: "🇵🇰" },
+  { code: "PW", name: "Palau", flag: "🇵🇼" },
+  { code: "PA", name: "Panama", flag: "🇵🇦" },
+  { code: "PG", name: "Papua New Guinea", flag: "🇵🇬" },
+  { code: "PY", name: "Paraguay", flag: "🇵🇾" },
+  { code: "PE", name: "Peru", flag: "🇵🇪" },
+  { code: "PH", name: "Philippines", flag: "🇵🇭" },
+  { code: "PL", name: "Poland", flag: "🇵🇱" },
+  { code: "PT", name: "Portugal", flag: "🇵🇹" },
+  { code: "QA", name: "Qatar", flag: "🇶🇦" },
+  { code: "RO", name: "Romania", flag: "🇷🇴" },
+  { code: "RU", name: "Russia", flag: "🇷🇺" },
+  { code: "RW", name: "Rwanda", flag: "🇷🇼" },
+  { code: "KN", name: "Saint Kitts and Nevis", flag: "🇰🇳" },
+  { code: "LC", name: "Saint Lucia", flag: "🇱🇨" },
+  { code: "VC", name: "Saint Vincent and the Grenadines", flag: "🇻🇨" },
+  { code: "WS", name: "Samoa", flag: "🇼🇸" },
+  { code: "SM", name: "San Marino", flag: "🇸🇲" },
+  { code: "ST", name: "Sao Tome and Principe", flag: "🇸🇹" },
+  { code: "SA", name: "Saudi Arabia", flag: "🇸🇦" },
+  { code: "SN", name: "Senegal", flag: "🇸🇳" },
+  { code: "RS", name: "Serbia", flag: "🇷🇸" },
+  { code: "SC", name: "Seychelles", flag: "🇸🇨" },
+  { code: "SL", name: "Sierra Leone", flag: "🇸🇱" },
+  { code: "SG", name: "Singapore", flag: "🇸🇬" },
+  { code: "SK", name: "Slovakia", flag: "🇸🇰" },
+  { code: "SI", name: "Slovenia", flag: "🇸🇮" },
+  { code: "SB", name: "Solomon Islands", flag: "🇸🇧" },
+  { code: "SO", name: "Somalia", flag: "🇸🇴" },
+  { code: "ZA", name: "South Africa", flag: "🇿🇦" },
+  { code: "KR", name: "South Korea", flag: "🇰🇷" },
+  { code: "SS", name: "South Sudan", flag: "🇸🇸" },
+  { code: "ES", name: "Spain", flag: "🇪🇸" },
+  { code: "LK", name: "Sri Lanka", flag: "🇱🇰" },
+  { code: "SD", name: "Sudan", flag: "🇸🇩" },
+  { code: "SR", name: "Suriname", flag: "🇸🇷" },
+  { code: "SE", name: "Sweden", flag: "🇸🇪" },
+  { code: "CH", name: "Switzerland", flag: "🇨🇭" },
+  { code: "SY", name: "Syria", flag: "🇸🇾" },
+  { code: "TW", name: "Taiwan", flag: "🇹🇼" },
+  { code: "TJ", name: "Tajikistan", flag: "🇹🇯" },
+  { code: "TZ", name: "Tanzania", flag: "🇹🇿" },
+  { code: "TH", name: "Thailand", flag: "🇹🇭" },
+  { code: "TL", name: "Timor-Leste", flag: "🇹🇱" },
+  { code: "TG", name: "Togo", flag: "🇹🇬" },
+  { code: "TO", name: "Tonga", flag: "🇹🇴" },
+  { code: "TT", name: "Trinidad and Tobago", flag: "🇹🇹" },
+  { code: "TN", name: "Tunisia", flag: "🇹🇳" },
+  { code: "TR", name: "Turkey", flag: "🇹🇷" },
+  { code: "TM", name: "Turkmenistan", flag: "🇹🇲" },
+  { code: "TV", name: "Tuvalu", flag: "🇹🇻" },
+  { code: "UG", name: "Uganda", flag: "🇺🇬" },
+  { code: "UA", name: "Ukraine", flag: "🇺🇦" },
+  { code: "AE", name: "United Arab Emirates", flag: "🇦🇪" },
+  { code: "GB", name: "United Kingdom", flag: "🇬🇧" },
+  { code: "US", name: "United States", flag: "🇺🇸" },
+  { code: "UY", name: "Uruguay", flag: "🇺🇾" },
+  { code: "UZ", name: "Uzbekistan", flag: "🇺🇿" },
+  { code: "VU", name: "Vanuatu", flag: "🇻🇺" },
+  { code: "VA", name: "Vatican City", flag: "🇻🇦" },
+  { code: "VE", name: "Venezuela", flag: "🇻🇪" },
+  { code: "VN", name: "Vietnam", flag: "🇻🇳" },
+  { code: "YE", name: "Yemen", flag: "🇾🇪" },
+  { code: "ZM", name: "Zambia", flag: "🇿🇲" },
+  { code: "ZW", name: "Zimbabwe", flag: "🇿🇼" },
+];
+
 export default function Onboarding() {
   const [, setLocation] = useLocation();
   const { setTheme } = useTheme();
@@ -34,17 +230,23 @@ export default function Onboarding() {
   const [userType, setUserType] = useState<"hunter" | "professional" | null>(null);
   const [selectedTheme, setSelectedTheme] = useState<string>("lodge");
   const [formData, setFormData] = useState({
-    pursuit: "",
+    nationality: "",
     scoring: "sci",
     units: "imperial",
-    huntingLocations: [] as string[],
   });
+  const [nationalitySearch, setNationalitySearch] = useState("");
   const [proData, setProData] = useState({
     entityType: "",
     businessName: "",
     businessHandle: "",
     location: "",
   });
+
+  const filteredCountries = useMemo(() => {
+    if (!nationalitySearch) return COUNTRIES;
+    const q = nationalitySearch.toLowerCase();
+    return COUNTRIES.filter(c => c.name.toLowerCase().includes(q));
+  }, [nationalitySearch]);
 
   const savePreferencesMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -70,15 +272,6 @@ export default function Onboarding() {
     },
   });
 
-  const toggleLocation = (loc: string) => {
-    setFormData(prev => ({
-      ...prev,
-      huntingLocations: prev.huntingLocations.includes(loc)
-        ? prev.huntingLocations.filter(l => l !== loc)
-        : [...prev.huntingLocations, loc],
-    }));
-  };
-
   const handleFinish = async () => {
     setTheme(selectedTheme as any);
 
@@ -100,7 +293,7 @@ export default function Onboarding() {
     trackEvent("onboarding_completed", {
       userType: userType === "professional" ? "professional" : "hunter",
       theme: selectedTheme,
-      pursuit: formData.pursuit,
+      nationality: formData.nationality,
       scoringSystem: formData.scoring,
       units: formData.units,
       proProfileCreated,
@@ -108,10 +301,9 @@ export default function Onboarding() {
 
     savePreferencesMutation.mutate({
       theme: selectedTheme,
-      pursuit: formData.pursuit,
+      nationality: formData.nationality,
       scoringSystem: formData.scoring,
       units: formData.units,
-      huntingLocations: formData.huntingLocations,
       userType: userType === "professional" ? "professional" : "hunter",
       onboardingCompleted: true,
     });
@@ -130,6 +322,8 @@ export default function Onboarding() {
     }
     return "";
   };
+
+  const selectedCountry = COUNTRIES.find(c => c.code === formData.nationality);
 
   return (
     <div className="h-[100dvh] w-full bg-black text-white overflow-hidden relative">
@@ -392,21 +586,51 @@ export default function Onboarding() {
               <div className="flex-1 overflow-y-auto min-h-0 -mx-1 px-1">
                 <div className="space-y-5 md:space-y-8 bg-white/5 backdrop-blur-xl p-4 sm:p-6 md:p-8 rounded-2xl border border-white/10">
                   <div className="space-y-2 md:space-y-3">
-                    <label className="text-xs md:text-sm font-medium text-white/80 uppercase tracking-wider">Primary Pursuit</label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-                      {["Big Game", "Plains Game", "Waterfowl", "Alpine"].map((option) => (
+                    <label className="text-xs md:text-sm font-medium text-white/80 uppercase tracking-wider">
+                      <Globe className="h-4 w-4 inline mr-2" />
+                      Nationality
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30 pointer-events-none" />
+                      <Input
+                        value={nationalitySearch}
+                        onChange={(e) => setNationalitySearch(e.target.value)}
+                        placeholder="Search countries..."
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 pl-9"
+                        data-testid="input-nationality-search"
+                      />
+                    </div>
+                    {selectedCountry && (
+                      <div className="flex items-center gap-2 py-1.5 px-3 bg-primary/20 border border-primary/50 rounded-lg text-sm w-fit">
+                        <span className="text-lg">{selectedCountry.flag}</span>
+                        <span>{selectedCountry.name}</span>
                         <button
-                          key={option}
-                          onClick={() => setFormData({...formData, pursuit: option})}
-                          data-testid={`button-pursuit-${option.toLowerCase().replace(/\s/g, '-')}`}
+                          onClick={() => setFormData({ ...formData, nationality: "" })}
+                          className="ml-1 text-white/50 hover:text-white"
+                          data-testid="button-clear-nationality"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[140px] md:max-h-[160px] overflow-y-auto pr-1">
+                      {filteredCountries.map((country) => (
+                        <button
+                          key={country.code}
+                          onClick={() => {
+                            setFormData({ ...formData, nationality: country.code });
+                            setNationalitySearch("");
+                          }}
+                          data-testid={`button-nationality-${country.code.toLowerCase()}`}
                           className={cn(
-                            "py-2.5 md:py-3 px-3 md:px-4 rounded-lg text-xs md:text-sm border transition-all",
-                            formData.pursuit === option
-                              ? "bg-primary text-primary-foreground border-primary font-medium"
-                              : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                            "flex items-center gap-2 py-2 px-3 rounded-lg text-xs border text-left transition-all",
+                            formData.nationality === country.code
+                              ? "bg-primary/20 border-primary/50 text-white"
+                              : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
                           )}
                         >
-                          {option}
+                          <span className="text-base shrink-0">{country.flag}</span>
+                          <span className="truncate">{country.name}</span>
                         </button>
                       ))}
                     </div>
@@ -453,45 +677,12 @@ export default function Onboarding() {
                       ))}
                     </div>
                   </div>
+                </div>
 
-                  <div className="space-y-2 md:space-y-3">
-                    <label className="text-xs md:text-sm font-medium text-white/80 uppercase tracking-wider">Where do you hunt?</label>
-                    <p className="text-xs text-white/40">Select all that apply</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[160px] md:max-h-[200px] overflow-y-auto pr-1">
-                      {[
-                        "Southern Africa - Bushveld",
-                        "Southern Africa - Plains",
-                        "Africa - Other",
-                        "North America - High Country",
-                        "North America - Midwest",
-                        "North America - Deep Woods",
-                        "North America - Plains",
-                        "Europe - Alpine",
-                        "Europe - Nordic",
-                        "Other",
-                      ].map((loc) => (
-                        <button
-                          key={loc}
-                          onClick={() => toggleLocation(loc)}
-                          data-testid={`button-location-${loc.toLowerCase().replace(/[\s-]/g, '-')}`}
-                          className={cn(
-                            "flex items-center gap-2 py-2 px-3 rounded-lg text-xs border text-left transition-all",
-                            formData.huntingLocations.includes(loc)
-                              ? "bg-primary/20 border-primary/50 text-white"
-                              : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
-                          )}
-                        >
-                          <div className={cn(
-                            "h-4 w-4 rounded border shrink-0 flex items-center justify-center transition-colors",
-                            formData.huntingLocations.includes(loc) ? "bg-primary border-primary" : "border-white/30"
-                          )}>
-                            {formData.huntingLocations.includes(loc) && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-                          </div>
-                          {loc}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                <div className="mt-4 md:mt-6 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 backdrop-blur-sm">
+                  <p className="text-xs md:text-sm text-white/70 italic leading-relaxed">
+                    This is a space for hunters who are proud of what they do. We stand for ethical, responsible hunting as a force for conservation, connection, and tradition. If you share that belief — welcome home. If not, we kindly ask you to look elsewhere.
+                  </p>
                 </div>
               </div>
 

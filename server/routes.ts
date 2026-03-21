@@ -240,7 +240,7 @@ export async function registerRoutes(
   app.put("/api/preferences", isAuthenticated, async (req, res) => {
     const parsed = insertPreferencesSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten() });
-    const { accountTier, userType, leaderboardVerified, credits, ...safeData } = parsed.data as any;
+    const { accountTier, userType, leaderboardVerified, credits, pursuit, huntingLocations, ...safeData } = parsed.data as any;
     const prefs = await storage.upsertPreferences(getUserId(req), safeData);
     res.json(prefs);
   });

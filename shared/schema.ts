@@ -61,6 +61,7 @@ export const userPreferences = pgTable("user_preferences", {
   isPremium: boolean("is_premium").default(false),
   accountTier: text("account_tier").default("free"),
   userType: text("user_type").default("hunter"),
+  nationality: text("nationality"),
   leaderboardVerified: boolean("leaderboard_verified").default(false),
   onboardingCompleted: boolean("onboarding_completed").default(false),
   firstTrophyUploaded: boolean("first_trophy_uploaded").default(false),
