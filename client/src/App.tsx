@@ -85,7 +85,7 @@ function Router() {
         <Route path="/safe">{() => <AnimatedPage><Safe /></AnimatedPage>}</Route>
         <Route path="/community">{() => <AnimatedPage><Community /></AnimatedPage>}</Route>
         <Route path="/community/room/:userId">{(params) => <CommunityRoomRedirect userId={params.userId} />}</Route>
-        <Route path="/room/:userId/trophy/:trophyId">{(params) => <AnimatedPage><TrophyDetail viewOnly roomUserId={params.userId} /></AnimatedPage>}</Route>
+        <Route path="/room/:userId/trophy/:trophyId">{(params) => <AnimatedPage><TrophyDetail viewOnly roomUserId={params.userId} trophyId={params.trophyId} /></AnimatedPage>}</Route>
         <Route path="/room/:userId">{(params) => <AnimatedPage><TrophyRoom userId={params.userId} /></AnimatedPage>}</Route>
         <Route path="/profile">{() => <AnimatedPage><Profile /></AnimatedPage>}</Route>
         <Route path="/pro">{() => <AnimatedPage><ProDashboard /></AnimatedPage>}</Route>

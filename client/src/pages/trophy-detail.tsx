@@ -72,13 +72,13 @@ function parseStoredScore(value: string | null): { num: string; unit: string } {
   return { num: v, unit: '"' };
 }
 
-export default function TrophyDetail({ viewOnly, roomUserId }: { viewOnly?: boolean; roomUserId?: string }) {
+export default function TrophyDetail({ viewOnly, roomUserId, trophyId: propTrophyId }: { viewOnly?: boolean; roomUserId?: string; trophyId?: string }) {
   const [matchOwn, ownParams] = useRoute("/trophies/:id");
   const [matchPublic, publicParams] = useRoute("/room/:userId/trophy/:trophyId");
   const isPublicView = viewOnly || !!matchPublic;
-  const trophyId = isPublicView ? (publicParams?.trophyId || ownParams?.id) : ownParams?.id;
+  const trophyId = propTrophyId || (isPublicView ? (publicParams?.trophyId || ownParams?.id) : ownParams?.id);
   const ownerUserId = isPublicView ? (roomUserId || publicParams?.userId) : undefined;
-  const match = matchOwn || matchPublic;
+  const match = matchOwn || matchPublic || (!!propTrophyId && !!roomUserId);
   const params = { id: trophyId };
 
   const { toast } = useToast();
