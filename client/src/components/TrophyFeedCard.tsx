@@ -150,7 +150,7 @@ export default function TrophyFeedCard({
           </div>
         </div>
 
-        <Link href={`/room/${user.id}`}>
+        <Link href={isOwnTrophy ? `/trophies/${trophy.id}` : `/room/${user.id}/trophy/${trophy.id}`}>
           <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" data-testid={`button-view-trophy-${trophy.id}`}>
             <Eye className="h-3.5 w-3.5" />
             View Trophy

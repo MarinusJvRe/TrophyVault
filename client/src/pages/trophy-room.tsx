@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Search, Filter, SlidersHorizontal, ChevronDown, Calendar, Ruler, MapPin, Box, Loader2, Clock, Lock, UserPlus, UserMinus, Star } from "lucide-react";
+import { Search, Filter, SlidersHorizontal, ChevronDown, Calendar, Ruler, MapPin, Box, Loader2, Clock, Lock, UserPlus, UserMinus, Star, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -143,6 +143,11 @@ export default function TrophyRoom({ userId }: { userId?: string }) {
       : "This user";
     return (
       <Layout>
+        <div className="p-4">
+          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground mb-4" onClick={() => window.history.back()} data-testid="button-back-private">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </Button>
+        </div>
         <div className="flex flex-col items-center justify-center h-full p-8 text-center">
           <Avatar className="h-20 w-20 mb-4 border-2 border-border/50">
             <AvatarImage src={publicRoom.user.profileImageUrl || undefined} />
@@ -205,7 +210,11 @@ export default function TrophyRoom({ userId }: { userId?: string }) {
         <div className="relative p-4 md:p-8 max-w-7xl mx-auto min-h-full">
 
         {isViewingOther && publicRoom?.user && (
-          <div className="mb-6 flex flex-col sm:flex-row items-center gap-4">
+          <div className="mb-6">
+            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground mb-3" onClick={() => window.history.back()} data-testid="button-back-room">
+              <ArrowLeft className="h-4 w-4" /> Back
+            </Button>
+          <div className="flex flex-col sm:flex-row items-center gap-4">
             <Avatar className="h-16 w-16 border-2 border-primary/30">
               <AvatarImage src={publicRoom.user.profileImageUrl || undefined} />
               <AvatarFallback className="bg-card text-xl font-serif">
@@ -247,6 +256,7 @@ export default function TrophyRoom({ userId }: { userId?: string }) {
                 )}
               </Button>
             )}
+          </div>
           </div>
         )}
 
