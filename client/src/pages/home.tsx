@@ -8,6 +8,7 @@ import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/hooks/use-auth";
 import type { Trophy as TrophyType } from "@shared/schema";
 import CommunityFeed from "@/components/CommunityFeed";
+import { useState } from "react";
 
 import themeLodge from "../assets/theme-lodge.png";
 import themeManor from "../assets/theme-manor.png";
@@ -39,7 +40,8 @@ interface Stats {
 
 export default function Home() {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const [homeFeedMode, setHomeFeedMode] = useState<"global" | "following">("global");
 
   const { data: trophies = [], isLoading: trophiesLoading } = useQuery<TrophyType[]>({
     queryKey: ["/api/trophies"],
@@ -222,7 +224,28 @@ export default function Home() {
                 </span>
               </Link>
             </div>
-            <CommunityFeed />
+            <div className="flex items-center gap-2 mb-4">
+              <Button
+                variant={homeFeedMode === "global" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setHomeFeedMode("global")}
+                className="rounded-full"
+                data-testid="button-home-feed-global"
+              >
+                Global Feed
+              </Button>
+              <Button
+                variant={homeFeedMode === "following" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setHomeFeedMode("following")}
+                className="rounded-full"
+                disabled={!isAuthenticated}
+                data-testid="button-home-feed-following"
+              >
+                Following
+              </Button>
+            </div>
+            <CommunityFeed feedMode={homeFeedMode} />
           </motion.div>
         </div>
       </div>

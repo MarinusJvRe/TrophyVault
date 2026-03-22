@@ -544,14 +544,19 @@ export async function registerRoutes(
     res.json(locations);
   });
 
+  app.get("/api/community/nationalities", async (_req, res) => {
+    const nationalities = await storage.getDistinctNationalities();
+    res.json(nationalities);
+  });
+
   app.get("/api/community/leaderboard", async (req, res) => {
     const species = req.query.species as string;
     if (!species) return res.status(400).json({ message: "species query param required" });
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
-    const region = (req.query.region as string) || undefined;
+    const nationality = (req.query.nationality as string) || undefined;
 
-    const result = await storage.getSpeciesLeaderboard({ species, region, limit, offset });
+    const result = await storage.getSpeciesLeaderboard({ species, nationality, limit, offset });
 
     const top10 = await storage.getTop10ForSpecies(species);
     const entries = result.entries.map(e => ({

@@ -57,7 +57,7 @@ export interface IStorage {
 
   getSpeciesLeaderboard(options: {
     species: string;
-    region?: string;
+    nationality?: string;
     limit?: number;
     offset?: number;
   }): Promise<{
@@ -82,6 +82,7 @@ export interface IStorage {
 
   getDistinctSpeciesWithScores(): Promise<string[]>;
   getDistinctLocations(): Promise<string[]>;
+  getDistinctNationalities(): Promise<string[]>;
 
   getTop10ForSpecies(species: string): Promise<Map<string, { rank: number; badge: "gold" | "silver" | "bronze" | "top10" }>>;
 
@@ -399,7 +400,7 @@ export class DatabaseStorage implements IStorage {
 
   async getSpeciesLeaderboard(options: {
     species: string;
-    region?: string;
+    nationality?: string;
     limit?: number;
     offset?: number;
   }): Promise<{
@@ -415,8 +416,8 @@ export class DatabaseStorage implements IStorage {
       eq(userPreferences.roomVisibility, "public"),
     ];
 
-    if (options.region) {
-      conditions.push(ilike(trophies.location, `%${options.region}%`));
+    if (options.nationality) {
+      conditions.push(sql`LOWER(TRIM(${userPreferences.nationality})) = LOWER(TRIM(${options.nationality}))`);
     }
 
     const whereClause = and(...conditions);
@@ -490,6 +491,20 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(asc(trophies.location));
     return rows.map(r => r.location!);
+  }
+
+  async getDistinctNationalities(): Promise<string[]> {
+    const rows = await db
+      .selectDistinct({ nationality: userPreferences.nationality })
+      .from(userPreferences)
+      .where(
+        and(
+          sql`${userPreferences.nationality} IS NOT NULL AND TRIM(${userPreferences.nationality}) != ''`,
+          eq(userPreferences.roomVisibility, "public")
+        )
+      )
+      .orderBy(asc(userPreferences.nationality));
+    return rows.map(r => r.nationality!);
   }
 
   async getTop10ForSpecies(species: string): Promise<Map<string, { rank: number; badge: "gold" | "silver" | "bronze" | "top10" }>> {

@@ -1,13 +1,10 @@
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
-import { Trophy as TrophyIcon, Medal, Users, Search, ChevronLeft, ChevronRight, ArrowUpDown, MapPin } from "lucide-react";
-import CommunityFeed from "@/components/CommunityFeed";
+import { Trophy as TrophyIcon, Medal, Users, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import MyGroups, { useGroupInviteCount } from "@/components/MyGroups";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -17,9 +14,8 @@ import {
 } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
 
 const LEADERBOARD_PAGE_SIZE = 20;
 
@@ -58,37 +54,22 @@ function RankBadge({ badge }: { badge: { rank: number; badge: string } }) {
 
 
 export default function Community() {
-  const { isAuthenticated } = useAuth();
   const inviteCount = useGroupInviteCount();
 
-  const [feedMode, setFeedMode] = useState<"global" | "following">("global");
-  const [feedSearch, setFeedSearch] = useState("");
-  const [feedSort, setFeedSort] = useState("newest");
-  const [debouncedFeedSearch, setDebouncedFeedSearch] = useState("");
-  const feedSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const [selectedSpecies, setSelectedSpecies] = useState<string>("");
-  const [selectedRegion, setSelectedRegion] = useState<string>("");
+  const [selectedNationality, setSelectedNationality] = useState<string>("");
   const [leaderboardPage, setLeaderboardPage] = useState(0);
-
-  const handleFeedSearchChange = (value: string) => {
-    setFeedSearch(value);
-    if (feedSearchTimeout.current) clearTimeout(feedSearchTimeout.current);
-    feedSearchTimeout.current = setTimeout(() => {
-      setDebouncedFeedSearch(value);
-    }, 300);
-  };
 
   const { data: speciesList = [] } = useQuery<string[]>({
     queryKey: ["/api/community/species"],
   });
 
-  const { data: locationsList = [] } = useQuery<string[]>({
-    queryKey: ["/api/community/locations"],
+  const { data: nationalitiesList = [] } = useQuery<string[]>({
+    queryKey: ["/api/community/nationalities"],
   });
 
   const leaderboardQueryKey = selectedSpecies
-    ? ["/api/community/leaderboard", `?species=${encodeURIComponent(selectedSpecies)}&limit=${LEADERBOARD_PAGE_SIZE}&offset=${leaderboardPage * LEADERBOARD_PAGE_SIZE}${selectedRegion ? `&region=${encodeURIComponent(selectedRegion)}` : ""}`]
+    ? ["/api/community/leaderboard", `?species=${encodeURIComponent(selectedSpecies)}&limit=${LEADERBOARD_PAGE_SIZE}&offset=${leaderboardPage * LEADERBOARD_PAGE_SIZE}${selectedNationality ? `&nationality=${encodeURIComponent(selectedNationality)}` : ""}`]
     : null;
 
   const { data: leaderboardData, isLoading: leaderboardLoading } = useQuery<{ entries: LeaderboardEntry[]; total: number }>({
@@ -118,9 +99,8 @@ export default function Community() {
           </p>
         </motion.header>
 
-        <Tabs defaultValue="feed" className="w-full">
+        <Tabs defaultValue="leaderboards" className="w-full">
           <TabsList className="bg-card border border-border/40 mb-8">
-            <TabsTrigger value="feed" className="font-serif" data-testid="tab-feed">Legacy Feed</TabsTrigger>
             <TabsTrigger value="leaderboards" className="font-serif" data-testid="tab-leaderboards">Species Leaderboards</TabsTrigger>
             <TabsTrigger value="groups" className="font-serif relative" data-testid="tab-groups">
               My Groups
@@ -131,58 +111,6 @@ export default function Community() {
               )}
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="feed" className="space-y-6">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={feedMode === "global" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFeedMode("global")}
-                  className="rounded-full"
-                  data-testid="button-feed-global"
-                >
-                  Global Feed
-                </Button>
-                <Button
-                  variant={feedMode === "following" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFeedMode("following")}
-                  className="rounded-full"
-                  disabled={!isAuthenticated}
-                  data-testid="button-feed-following"
-                >
-                  Following
-                </Button>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search species or region..."
-                    className="pl-9 bg-card border-border/50 h-9 text-sm"
-                    value={feedSearch}
-                    onChange={(e) => handleFeedSearchChange(e.target.value)}
-                    data-testid="input-search-feed"
-                  />
-                </div>
-                <Select value={feedSort} onValueChange={setFeedSort}>
-                  <SelectTrigger className="w-[180px] bg-card border-border/50 h-9" data-testid="select-sort-feed">
-                    <ArrowUpDown className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Newest</SelectItem>
-                    <SelectItem value="most_applauded">Most Applauded</SelectItem>
-                    <SelectItem value="highest_score">Highest Score</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <CommunityFeed feedMode={feedMode} feedSort={feedSort} debouncedSearch={debouncedFeedSearch} />
-          </TabsContent>
 
           <TabsContent value="leaderboards" className="space-y-6">
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -198,15 +126,15 @@ export default function Community() {
                 </SelectContent>
               </Select>
 
-              <Select value={selectedRegion} onValueChange={(v) => { setSelectedRegion(v === "__all__" ? "" : v); setLeaderboardPage(0); }}>
-                <SelectTrigger className="w-full sm:w-[240px] bg-card border-border/50 h-9" data-testid="select-region">
+              <Select value={selectedNationality} onValueChange={(v) => { setSelectedNationality(v === "__all__" ? "" : v); setLeaderboardPage(0); }}>
+                <SelectTrigger className="w-full sm:w-[240px] bg-card border-border/50 h-9" data-testid="select-nationality">
                   <MapPin className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                  <SelectValue placeholder="All regions" />
+                  <SelectValue placeholder="All nationalities" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">All regions</SelectItem>
-                  {locationsList.map((loc: string) => (
-                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                  <SelectItem value="__all__">All nationalities</SelectItem>
+                  {nationalitiesList.map((nat: string) => (
+                    <SelectItem key={nat} value={nat}>{nat}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -323,7 +251,7 @@ export default function Community() {
                 <TrophyIcon className="h-12 w-12 mx-auto mb-4 opacity-30" />
                 <p className="font-serif text-lg">No scored trophies found for {selectedSpecies}</p>
                 <p className="text-sm mt-1">
-                  {selectedRegion ? "Try removing the region filter" : "No trophies have scores recorded for this species yet"}
+                  {selectedNationality ? "Try removing the nationality filter" : "No trophies have scores recorded for this species yet"}
                 </p>
               </div>
             )}
