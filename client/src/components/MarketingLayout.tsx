@@ -67,7 +67,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <div className="md:col-span-2">
               <img src={trophyVaultLogo} alt="Honor The Hunt" className="h-8 w-auto mb-4" data-testid="img-footer-logo" />
               <p className="text-white/50 text-sm max-w-sm leading-relaxed">
-                Take your trophies home in your pocket. Share with friends and preserve your legacy with AI-powered identification and 3D modeling.
+                Document your hunts with AI species identification, 3D trophy models, and a virtual trophy room you can share with other hunters.
               </p>
             </div>
 

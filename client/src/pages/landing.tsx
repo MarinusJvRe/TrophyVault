@@ -14,9 +14,10 @@ import {
   ChevronRight,
   Check,
   Crosshair,
-  Star,
   MapPin,
   Lock,
+  MessageCircle,
+  Heart,
 } from "lucide-react";
 
 import themeLodge from "../assets/theme-lodge.png";
@@ -28,6 +29,7 @@ import screenshotTrophyDetail from "../assets/screenshot-trophydetail.png";
 import screenshotTimeline from "../assets/screenshot-timeline.png";
 import screenshotMap from "../assets/screenshot-map.png";
 import screenshot3D from "../assets/screenshot-3d.png";
+import screenshotCommunity from "../assets/screenshot-community.png";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -38,62 +40,102 @@ const fadeUp = {
   }),
 };
 
+const fadeIn = {
+  hidden: { opacity: 0 },
+  visible: (i: number) => ({
+    opacity: 1,
+    transition: { delay: i * 0.12, duration: 0.5, ease: "easeOut" as const },
+  }),
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: (i: number) => ({
+    opacity: 1,
+    scale: 1,
+    transition: { delay: i * 0.08, duration: 0.5, ease: "easeOut" as const },
+  }),
+};
+
+const slideRight = {
+  hidden: { opacity: 0, x: -20 },
+  visible: (i: number) => ({
+    opacity: 1,
+    x: 0,
+    transition: { delay: i * 0.1, duration: 0.5, ease: "easeOut" as const },
+  }),
+};
+
 const features = [
   {
     id: "ai-upload",
     icon: Brain,
     title: "AI-Powered Trophy Upload",
     description:
-      "Effortlessly upload a photo and let our AI instantly identify species, estimate scores, and classify your trophy — no manual guesswork.",
+      "Upload a photo and let our AI identify the species, estimate scores, and classify your trophy automatically.",
   },
   {
     id: "3d-ar",
     icon: Box,
-    title: "3D Models & AR",
+    title: "3D Models & AR Viewer",
     description:
-      "Transform your trophies into stunning 3D models. View them in augmented reality and share immersive experiences.",
+      "Turn your trophies into 3D models you can rotate, zoom, and place on your wall using augmented reality on your phone.",
   },
   {
     id: "themes",
     icon: Palette,
     title: "Virtual Trophy Room Themes",
     description:
-      "Choose from beautifully crafted room themes — from classic lodge to modern gallery — to showcase your collection.",
+      "Display your collection in themed rooms — from a timber lodge to a safari manor or alpine gallery.",
   },
   {
     id: "community",
     icon: Users,
-    title: "Community & Leaderboards",
+    title: "Community Feed & Groups",
     description:
-      "Connect with fellow hunters. Compare collections, rate trophy rooms, and climb the leaderboards.",
+      "Browse the community feed, applaud other hunters' trophies, join groups, and compare collections on the leaderboard.",
   },
   {
     id: "weapon-safe",
     icon: Shield,
     title: "Weapon Safe",
     description:
-      "Digitally catalog your firearms and bows with full specifications, serial numbers, and maintenance logs.",
+      "Catalog your firearms and bows with specifications, serial numbers, and maintenance records.",
   },
   {
     id: "certificates",
     icon: Award,
-    title: "Certificates & Records",
+    title: "Scoring & Certificates",
     description:
-      "Generate certificates for qualifying trophies and use them as proof of hunt records. Track scores across SCI, B&C, and Rowland Ward systems.",
+      "Track scores across SCI, Boone & Crockett, and Rowland Ward systems. Generate certificates for qualifying trophies.",
   },
   {
     id: "maps",
     icon: MapPin,
-    title: "Map Integration & Geo-Tagging",
+    title: "Map & Geo-Tagging",
     description:
-      "Pin every hunt on an interactive map. Geo-tag your trophies with precise harvest locations and visualize your hunting journey across the globe.",
+      "Pin every hunt on an interactive map with precise harvest locations and see your hunting journey at a glance.",
   },
   {
     id: "privacy",
     icon: Lock,
     title: "Public or Private Rooms",
     description:
-      "Choose to open your trophy room for the community to admire, or keep it private and secure — you're always in control.",
+      "Open your trophy room for the community or keep it private — you control who sees your collection.",
+  },
+  {
+    id: "feed",
+    icon: MessageCircle,
+    title: "Trophy Feed & Applause",
+    description:
+      "Share your latest trophies in a live feed. Other hunters can applaud your achievements and leave reactions.",
+  },
+  {
+    id: "oauth",
+    icon: Heart,
+    title: "Quick Sign-Up & Onboarding",
+    description:
+      "Create your account with Google or Apple in seconds. A guided onboarding walks you through setting up your first trophy room.",
   },
 ];
 
@@ -101,30 +143,36 @@ const pricingTiers = [
   {
     name: "Free",
     price: "$0",
+    originalPrice: null as string | null,
     period: "forever",
-    description: "Start preserving your legacy",
+    badge: null as string | null,
+    description: "Start documenting your hunts",
     features: [
       "3 AI trophy analyses",
       "1 3D trophy model",
       "25 manual trophy entries",
       "Public trophy room",
       "Basic species database",
+      "Community feed access",
     ],
     cta: "Get Started",
     highlighted: false,
   },
   {
     name: "Paid",
-    price: "$9.99",
+    price: "$0",
+    originalPrice: "$9.99",
     period: "/month",
-    description: "For the serious hunter",
+    badge: "100% off — Free for first 3 months (Beta Launch)",
+    description: "For the dedicated hunter",
     features: [
       "Unlimited AI analyses",
       "Unlimited 3D models",
       "Unlimited trophy entries",
       "Private trophy rooms",
       "Leaderboard access",
-      "Advanced scoring systems",
+      "All scoring systems",
+      "Groups access",
       "Priority support",
     ],
     cta: "Get Started",
@@ -132,16 +180,17 @@ const pricingTiers = [
   },
   {
     name: "Pro",
-    price: "$19.99",
+    price: "$0",
+    originalPrice: "$19.99",
     period: "/month",
-    description: "Business & outfitter tools",
+    badge: "100% off — Free for first 3 months (Beta Launch)",
+    description: "For outfitters & professionals",
     features: [
       "Everything in Paid",
       "Referral program access",
       "Pro badge & verification",
-      "Business management tools",
-      "Client trophy management",
-      "Bulk upload & export",
+      "Pro tagging on trophies",
+      "Groups creation & management",
       "Dedicated support",
     ],
     cta: "Get Started",
@@ -161,7 +210,8 @@ const appScreenshots = [
   { src: screenshotTrophyDetail, label: "Trophy Detail", description: "Every detail captured" },
   { src: screenshotTimeline, label: "Trophy Timeline", description: "Your hunting journey over time" },
   { src: screenshotMap, label: "Trophy Map", description: "Geo-tagged hunt locations" },
-  { src: screenshot3D, label: "3D & AR View", description: "Immersive 3D trophy models" },
+  { src: screenshot3D, label: "3D & AR View", description: "Rotate, zoom, and place on your wall" },
+  { src: screenshotCommunity, label: "Community Feed", description: "Browse and applaud other hunters" },
 ];
 
 function scrollToFeatureDetails() {
@@ -174,7 +224,7 @@ export default function LandingPage() {
     <MarketingLayout>
       <div className="bg-[#b87333] text-white text-center py-3 px-4" data-testid="banner-coming-soon">
         <p className="text-sm font-medium tracking-wide">
-          <span className="font-bold">Coming Soon</span> — Honor The Hunt is launching soon. Be the first to know!
+          <span className="font-bold">Beta Launch</span> — Honor The Hunt is in early access. Sign up free and help shape the platform.
         </p>
       </div>
       <motion.div
@@ -211,19 +261,19 @@ export default function LandingPage() {
           </motion.h1>
 
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.7, delay: 0.3 }}
             className="text-lg sm:text-xl text-white/70 max-w-2xl mx-auto mb-10 leading-relaxed font-normal"
             data-testid="text-hero-subheadline"
           >
-            Take your trophies home in your pocket and share it with fellow hunters. AI-powered trophy identification, 3D models, and a stunning virtual trophy room — all in one app.
+            Upload a photo, get an AI species ID and score estimate, then view your trophy in 3D — all stored in a virtual trophy room you can share with other hunters.
           </motion.p>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <Link href="/login?mode=signup">
@@ -245,14 +295,16 @@ export default function LandingPage() {
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.5 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8"
           >
             <a
               href="#"
-              className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl transition-colors"
+              onClick={(e) => e.preventDefault()}
+              aria-disabled="true"
+              className="relative flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-xl opacity-50 cursor-default select-none pointer-events-auto"
               data-testid="button-app-store"
             >
               <svg viewBox="0 0 24 24" className="h-7 w-7 text-white fill-current">
@@ -262,10 +314,13 @@ export default function LandingPage() {
                 <div className="text-[10px] text-white/60 leading-none">Download on the</div>
                 <div className="text-sm font-semibold text-white leading-tight">App Store</div>
               </div>
+              <span className="absolute -top-2 -right-2 px-2 py-0.5 bg-[#b87333] text-white text-[9px] font-bold rounded-full uppercase tracking-wider">Coming Soon</span>
             </a>
             <a
               href="#"
-              className="flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl transition-colors"
+              onClick={(e) => e.preventDefault()}
+              aria-disabled="true"
+              className="relative flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-xl opacity-50 cursor-default select-none pointer-events-auto"
               data-testid="button-google-play"
             >
               <svg viewBox="0 0 24 24" className="h-7 w-7 text-white fill-current">
@@ -275,6 +330,7 @@ export default function LandingPage() {
                 <div className="text-[10px] text-white/60 leading-none">Get it on</div>
                 <div className="text-sm font-semibold text-white leading-tight">Google Play</div>
               </div>
+              <span className="absolute -top-2 -right-2 px-2 py-0.5 bg-[#b87333] text-white text-[9px] font-bold rounded-full uppercase tracking-wider">Coming Soon</span>
             </a>
           </motion.div>
         </div>
@@ -287,8 +343,8 @@ export default function LandingPage() {
             viewport={{ once: true, amount: 0.2 }}
             className="text-center mb-10"
           >
-            <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
-              Everything You Need
+            <motion.p variants={fadeIn} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
+              What You Get
             </motion.p>
             <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-features-heading">
               Built for Hunters, by Hunters
@@ -304,7 +360,7 @@ export default function LandingPage() {
             {features.map((feature, i) => (
               <motion.button
                 key={feature.id}
-                variants={fadeUp}
+                variants={slideRight}
                 custom={i}
                 onClick={() => scrollToFeatureDetails()}
                 className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.03] transition-colors text-left group cursor-pointer"
@@ -328,14 +384,14 @@ export default function LandingPage() {
             viewport={{ once: true, amount: 0.2 }}
             className="text-center mb-16"
           >
-            <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
+            <motion.p variants={fadeIn} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
               See It In Action
             </motion.p>
             <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-preview-heading">
               Your Trophy Room Awaits
             </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
-              Real screenshots from the app. Track your hunts, browse your collection, and explore every detail.
+            <motion.p variants={fadeIn} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
+              Screenshots from the app. Track hunts, browse your collection, and explore every detail.
             </motion.p>
           </motion.div>
 
@@ -346,7 +402,7 @@ export default function LandingPage() {
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true, amount: 0.1 }}
-                variants={fadeUp}
+                variants={scaleIn}
                 custom={i}
                 className="relative group"
                 data-testid={`card-preview-${i}`}
@@ -377,26 +433,26 @@ export default function LandingPage() {
             viewport={{ once: true, amount: 0.2 }}
             className="text-center mb-16"
           >
-            <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
-              Packed With Features
+            <motion.p variants={fadeIn} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
+              Features
             </motion.p>
             <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-feature-details-heading">
-              Preserve Every Detail of Your Hunt
+              What You Can Do Today
             </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
-              From AI identification to 3D scanning, Honor The Hunt gives you the most advanced tools to document and showcase your achievements.
+            <motion.p variants={fadeIn} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
+              AI identification, 3D scanning, community feed, groups, and scoring — everything to document and share your hunts.
             </motion.p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
             {features.map((feature, i) => (
               <motion.div
                 key={feature.id}
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true, amount: 0.2 }}
-                variants={fadeUp}
-                custom={i}
+                variants={i % 2 === 0 ? fadeUp : scaleIn}
+                custom={i % 5}
                 className="group p-5 rounded-xl bg-white/[0.02] border border-white/5 hover:border-[#b87333]/20 transition-all duration-300"
                 data-testid={`card-feature-detail-${feature.id}`}
               >
@@ -418,14 +474,14 @@ export default function LandingPage() {
             viewport={{ once: true, amount: 0.2 }}
             className="text-center mb-16"
           >
-            <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
-              Stunning Trophy Rooms
+            <motion.p variants={fadeIn} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
+              Trophy Room Themes
             </motion.p>
             <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-showcase-heading">
-              Choose Your Perfect Theme
+              Choose Your Theme
             </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
-              Your trophies deserve a world-class showcase. Pick from handcrafted room themes that bring your collection to life.
+            <motion.p variants={fadeIn} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
+              Three handcrafted room themes to display your collection. Pick the one that fits your style.
             </motion.p>
           </motion.div>
 
@@ -436,7 +492,7 @@ export default function LandingPage() {
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true, amount: 0.2 }}
-                variants={fadeUp}
+                variants={scaleIn}
                 custom={i}
                 className="group relative overflow-hidden rounded-xl border border-white/5"
                 data-testid={`card-showcase-${i}`}
@@ -466,7 +522,7 @@ export default function LandingPage() {
             viewport={{ once: true, amount: 0.3 }}
             className="text-center"
           >
-            <motion.div variants={fadeUp} custom={0} className="flex items-center justify-center gap-6 mb-8">
+            <motion.div variants={scaleIn} custom={0} className="flex items-center justify-center gap-6 mb-8">
               <div className="w-16 h-16 rounded-2xl bg-[#b87333]/10 flex items-center justify-center">
                 <Smartphone className="h-8 w-8 text-[#b87333]" />
               </div>
@@ -477,12 +533,12 @@ export default function LandingPage() {
             </motion.div>
 
             <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-crossdevice-heading">
-              Works on Your Phone and Your Computer
+              Phone and Desktop
             </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg mb-8">
-              Capture trophies in the field on your phone, then explore your full collection on desktop. Your data syncs seamlessly across all your devices.
+            <motion.p variants={fadeIn} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg mb-8">
+              Capture trophies in the field on your phone, then manage your full collection on desktop. Your data syncs across devices.
             </motion.p>
-            <motion.div variants={fadeUp} custom={3} className="flex flex-wrap items-center justify-center gap-4 text-sm text-white/40">
+            <motion.div variants={slideRight} custom={3} className="flex flex-wrap items-center justify-center gap-4 text-sm text-white/40">
               <span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#b87333]" /> Mobile-optimized camera</span>
               <span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#b87333]" /> Desktop trophy management</span>
               <span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#b87333]" /> Real-time sync</span>
@@ -498,26 +554,28 @@ export default function LandingPage() {
             viewport={{ once: true, amount: 0.3 }}
             className="text-center"
           >
-            <motion.div variants={fadeUp} custom={0} className="flex items-center justify-center gap-1 mb-6">
-              {[1, 2, 3, 4, 5].map((s) => (
-                <Star key={s} className="h-5 w-5 text-[#b87333] fill-[#b87333]" />
-              ))}
+            <motion.div variants={scaleIn} custom={0} className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#b87333]/20 bg-[#b87333]/10 mb-6">
+              <Trophy className="h-4 w-4 text-[#b87333]" />
+              <span className="text-sm text-[#b87333] font-medium">Early Access — Beta</span>
             </motion.div>
-            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-6" data-testid="text-socialproof-heading">
-              Join 2,500+ Hunters Preserving Their Legacy
+            <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-socialproof-heading">
+              We're Just Getting Started
             </motion.h2>
-            <motion.div variants={fadeUp} custom={2} className="grid grid-cols-1 sm:grid-cols-3 gap-8 mt-12">
+            <motion.p variants={fadeIn} custom={2} className="text-white/60 max-w-xl mx-auto text-lg mb-10">
+              Honor The Hunt is in early access. Sign up now to lock in free access to all paid features during the beta period and help us shape the platform.
+            </motion.p>
+            <motion.div variants={fadeUp} custom={3} className="grid grid-cols-1 sm:grid-cols-3 gap-8 mt-6">
               <div className="text-center">
-                <p className="text-4xl font-serif font-bold text-[#b87333]" data-testid="text-stat-trophies">15,000+</p>
-                <p className="text-white/50 text-sm mt-1">Trophies Documented</p>
+                <p className="text-4xl font-serif font-bold text-[#b87333]" data-testid="text-stat-trophies">10+</p>
+                <p className="text-white/50 text-sm mt-1">Features Shipped</p>
               </div>
               <div className="text-center">
-                <p className="text-4xl font-serif font-bold text-[#b87333]" data-testid="text-stat-species">350+</p>
-                <p className="text-white/50 text-sm mt-1">Species Identified</p>
+                <p className="text-4xl font-serif font-bold text-[#b87333]" data-testid="text-stat-species">3</p>
+                <p className="text-white/50 text-sm mt-1">Scoring Systems</p>
               </div>
               <div className="text-center">
-                <p className="text-4xl font-serif font-bold text-[#b87333]" data-testid="text-stat-countries">45+</p>
-                <p className="text-white/50 text-sm mt-1">Countries Represented</p>
+                <p className="text-4xl font-serif font-bold text-[#b87333]" data-testid="text-stat-countries">3</p>
+                <p className="text-white/50 text-sm mt-1">Room Themes</p>
               </div>
             </motion.div>
           </motion.div>
@@ -531,14 +589,14 @@ export default function LandingPage() {
             viewport={{ once: true, amount: 0.2 }}
             className="text-center mb-16"
           >
-            <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
-              Simple Pricing
+            <motion.p variants={fadeIn} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
+              Pricing
             </motion.p>
             <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-pricing-heading">
               Start Free, Upgrade When Ready
             </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
-              No credit card required. Begin documenting your hunts today and upgrade as your collection grows.
+            <motion.p variants={fadeIn} custom={2} className="text-white/60 max-w-2xl mx-auto text-lg">
+              No credit card required. All paid features are free during the beta period.
             </motion.p>
           </motion.div>
 
@@ -549,7 +607,7 @@ export default function LandingPage() {
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true, amount: 0.2 }}
-                variants={fadeUp}
+                variants={scaleIn}
                 custom={i}
                 className={`relative p-6 rounded-xl border ${
                   tier.highlighted
@@ -565,10 +623,19 @@ export default function LandingPage() {
                 )}
                 <h3 className="font-serif text-xl font-semibold mb-1">{tier.name}</h3>
                 <p className="text-white/50 text-sm mb-4">{tier.description}</p>
-                <div className="mb-6">
+                <div className="mb-2">
+                  {tier.originalPrice && (
+                    <span className="text-lg font-serif text-white/30 line-through mr-2">{tier.originalPrice}</span>
+                  )}
                   <span className="text-3xl font-serif font-bold">{tier.price}</span>
                   <span className="text-white/40 text-sm ml-1">{tier.period}</span>
                 </div>
+                {tier.badge && (
+                  <div className="mb-4 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <span className="text-green-400 text-xs font-medium">{tier.badge}</span>
+                  </div>
+                )}
+                {!tier.badge && <div className="mb-4" />}
                 <ul className="space-y-3 mb-6">
                   {tier.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-white/70">
@@ -609,14 +676,14 @@ export default function LandingPage() {
             whileInView="visible"
             viewport={{ once: true, amount: 0.3 }}
           >
-            <motion.div variants={fadeUp} custom={0} className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#b87333]/10 mb-6">
+            <motion.div variants={scaleIn} custom={0} className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#b87333]/10 mb-6">
               <Trophy className="h-8 w-8 text-[#b87333]" />
             </motion.div>
             <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-serif font-bold mb-4" data-testid="text-finalcta-heading">
-              Ready to Preserve Your Legacy?
+              Start Documenting Your Hunts
             </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-white/60 text-lg mb-8 max-w-xl mx-auto">
-              Join thousands of hunters who trust Honor The Hunt to document, protect, and share their greatest achievements.
+            <motion.p variants={fadeIn} custom={2} className="text-white/60 text-lg mb-8 max-w-xl mx-auto">
+              Create your free account and try every feature during our beta launch — no credit card, no commitment.
             </motion.p>
             <motion.div variants={fadeUp} custom={3}>
               <Link href="/login?mode=signup">

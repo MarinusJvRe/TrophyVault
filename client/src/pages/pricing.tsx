@@ -12,12 +12,31 @@ const fadeUp = {
   }),
 };
 
+const fadeIn = {
+  hidden: { opacity: 0 },
+  visible: (i: number) => ({
+    opacity: 1,
+    transition: { delay: i * 0.12, duration: 0.5, ease: "easeOut" as const },
+  }),
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: (i: number) => ({
+    opacity: 1,
+    scale: 1,
+    transition: { delay: i * 0.08, duration: 0.5, ease: "easeOut" as const },
+  }),
+};
+
 const tiers = [
   {
     name: "Free",
     price: "$0",
+    originalPrice: null as string | null,
     period: "forever",
-    description: "Perfect for getting started with your digital trophy room",
+    badge: null as string | null,
+    description: "Get started with your digital trophy room",
     cta: "Get Started",
     highlighted: false,
     features: [
@@ -29,14 +48,17 @@ const tiers = [
       "Basic species database",
       "SCI scoring system",
       "3 weapons in safe",
+      "Community feed access",
       "Email support",
     ],
   },
   {
     name: "Paid",
-    price: "$9.99",
+    price: "$0",
+    originalPrice: "$9.99",
     period: "/month",
-    description: "Unlock the full power of Honor The Hunt for serious hunters",
+    badge: "100% off — Free for first 3 months (Beta Launch)",
+    description: "Full access for dedicated hunters",
     cta: "Get Started",
     highlighted: true,
     features: [
@@ -50,24 +72,25 @@ const tiers = [
       "Trophy certificates",
       "Unlimited weapons in safe",
       "Leaderboard access",
-      "Custom room layouts",
+      "Groups access",
       "Priority support",
     ],
   },
   {
     name: "Pro",
-    price: "$19.99",
+    price: "$0",
+    originalPrice: "$19.99",
     period: "/month",
-    description: "Professional tools for outfitters and hunting businesses",
+    badge: "100% off — Free for first 3 months (Beta Launch)",
+    description: "For outfitters and hunting professionals",
     cta: "Get Started",
     highlighted: false,
     features: [
       "Everything in Paid, plus:",
       "Referral program access",
       "Pro badge & verification",
-      "Business management tools",
-      "Client trophy management",
-      "Bulk upload & export",
+      "Pro tagging on trophies",
+      "Groups creation & management",
       "Dedicated support",
     ],
   },
@@ -83,7 +106,7 @@ const comparisonFeatures = [
       { name: "3D trophy models", free: "1", paid: "Unlimited", pro: "Unlimited" },
       { name: "Photo uploads", free: true, paid: true, pro: true },
       { name: "Species database access", free: "Basic", paid: "Full", pro: "Full" },
-      { name: "Bulk upload & export", free: false, paid: false, pro: true },
+      { name: "Pro tagging on trophies", free: false, paid: false, pro: true },
     ],
   },
   {
@@ -93,16 +116,19 @@ const comparisonFeatures = [
       { name: "Public trophy room", free: true, paid: true, pro: true },
       { name: "Private trophy rooms", free: false, paid: true, pro: true },
       { name: "Room themes", free: "1", paid: "All", pro: "All" },
-      { name: "Custom room layouts", free: false, paid: true, pro: true },
     ],
   },
   {
     category: "Community",
     icon: Users,
     features: [
+      { name: "Community feed", free: true, paid: true, pro: true },
+      { name: "Trophy applause", free: true, paid: true, pro: true },
       { name: "View community rooms", free: true, paid: true, pro: true },
       { name: "Rate other rooms", free: true, paid: true, pro: true },
       { name: "Leaderboard access", free: false, paid: true, pro: true },
+      { name: "Groups access", free: false, paid: true, pro: true },
+      { name: "Groups creation & management", free: false, paid: false, pro: true },
       { name: "Referral program", free: false, paid: false, pro: true },
     ],
   },
@@ -121,9 +147,9 @@ const comparisonFeatures = [
     icon: Shield,
     features: [
       { name: "Weapon safe", free: "3 items", paid: "Unlimited", pro: "Unlimited" },
+      { name: "Google / Apple sign-in", free: true, paid: true, pro: true },
+      { name: "Guided onboarding", free: true, paid: true, pro: true },
       { name: "Pro badge & verification", free: false, paid: false, pro: true },
-      { name: "Business management tools", free: false, paid: false, pro: true },
-      { name: "Client trophy management", free: false, paid: false, pro: true },
       { name: "Email support", free: true, paid: true, pro: true },
       { name: "Priority support", free: false, paid: true, pro: true },
       { name: "Dedicated support", free: false, paid: false, pro: true },
@@ -152,9 +178,9 @@ export default function PricingPage() {
       <section className="py-24 px-4 sm:px-6" data-testid="section-pricing-hero">
         <div className="max-w-5xl mx-auto text-center">
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
             className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3"
           >
             Pricing
@@ -169,13 +195,21 @@ export default function PricingPage() {
             Choose Your Plan
           </motion.h1>
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-white/60 text-lg max-w-2xl mx-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-white/60 text-lg max-w-2xl mx-auto mb-4"
           >
             Start free and upgrade as your collection grows. No credit card required.
           </motion.p>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-green-500/20 bg-green-500/10"
+          >
+            <span className="text-green-400 text-sm font-medium">Beta Launch — All paid features are free for the first 3 months</span>
+          </motion.div>
         </div>
       </section>
 
@@ -186,7 +220,7 @@ export default function PricingPage() {
               key={tier.name}
               initial="hidden"
               animate="visible"
-              variants={fadeUp}
+              variants={scaleIn}
               custom={i + 1}
               className={`relative p-8 rounded-xl border flex flex-col ${
                 tier.highlighted
@@ -202,10 +236,19 @@ export default function PricingPage() {
               )}
               <h3 className="font-serif text-2xl font-semibold mb-1">{tier.name}</h3>
               <p className="text-white/50 text-sm mb-6">{tier.description}</p>
-              <div className="mb-6">
+              <div className="mb-2">
+                {tier.originalPrice && (
+                  <span className="text-xl font-serif text-white/30 line-through mr-2">{tier.originalPrice}</span>
+                )}
                 <span className="text-4xl font-serif font-bold">{tier.price}</span>
                 <span className="text-white/40 text-sm ml-1">{tier.period}</span>
               </div>
+              {tier.badge && (
+                <div className="mb-6 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <span className="text-green-400 text-xs font-medium">{tier.badge}</span>
+                </div>
+              )}
+              {!tier.badge && <div className="mb-6" />}
 
               <ul className="space-y-3 mb-8 flex-1">
                 {tier.features.map((f) => (
@@ -241,14 +284,14 @@ export default function PricingPage() {
             viewport={{ once: true, amount: 0.1 }}
             className="text-center mb-16"
           >
-            <motion.p variants={fadeUp} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
+            <motion.p variants={fadeIn} custom={0} className="text-[#b87333] text-sm font-medium uppercase tracking-wider mb-3">
               Compare Plans
             </motion.p>
             <motion.h2 variants={fadeUp} custom={1} className="text-2xl sm:text-3xl font-serif font-bold mb-4" data-testid="text-comparison-heading">
-              Detailed Feature Comparison
+              Feature Comparison
             </motion.h2>
-            <motion.p variants={fadeUp} custom={2} className="text-white/50 max-w-xl mx-auto">
-              See exactly what's included in each plan so you can pick the right one for your needs.
+            <motion.p variants={fadeIn} custom={2} className="text-white/50 max-w-xl mx-auto">
+              See what's included in each plan.
             </motion.p>
           </motion.div>
 
@@ -267,7 +310,12 @@ export default function PricingPage() {
                   <span className={`font-serif font-bold text-lg ${tier.highlighted ? "text-[#b87333]" : "text-white"}`}>
                     {tier.name}
                   </span>
-                  <p className="text-xs text-white/40 mt-0.5">{tier.price}{tier.period !== "forever" ? tier.period : ""}</p>
+                  <div className="mt-0.5">
+                    {tier.originalPrice && (
+                      <span className="text-xs text-white/30 line-through mr-1">{tier.originalPrice}{tier.period !== "forever" ? tier.period : ""}</span>
+                    )}
+                    <span className="text-xs text-white/40">{tier.price}{tier.period !== "forever" ? tier.period : ""}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -369,9 +417,9 @@ export default function PricingPage() {
       </section>
 
       <section className="py-20 px-4 sm:px-6 text-center">
-        <h2 className="text-2xl sm:text-3xl font-serif font-bold mb-4">Ready to Start?</h2>
+        <h2 className="text-2xl sm:text-3xl font-serif font-bold mb-4">Ready to Try It?</h2>
         <p className="text-white/60 max-w-xl mx-auto mb-8">
-          Begin with a free account and upgrade anytime. No credit card required.
+          Create a free account and explore every feature during the beta — no credit card required.
         </p>
         <Link href="/login?mode=signup">
           <span
