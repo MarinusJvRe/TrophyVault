@@ -99,16 +99,18 @@ export default function TrophyDetail({ viewOnly, roomUserId, trophyId: propTroph
   const [editScoreUnit, setEditScoreUnit] = useState<string>('"');
   const [editScoreNum, setEditScoreNum] = useState<string>("");
   
+  const publicQueryFn = async () => {
+    const headers: Record<string, string> = {};
+    const token = getAuthToken();
+    if (token) headers["X-Auth-Token"] = token;
+    const res = await fetch(`/api/room/${ownerUserId}/trophy/${trophyId}`, { credentials: "include", headers });
+    if (!res.ok) throw new Error("Trophy not found");
+    return res.json();
+  };
+
   const { data: trophy, isLoading } = useQuery<Trophy>({
-    queryKey: isPublicView ? ["/api/room", ownerUserId, "trophy", trophyId] : ["/api/trophies", params?.id],
-    queryFn: isPublicView ? async () => {
-      const headers: Record<string, string> = {};
-      const token = getAuthToken();
-      if (token) headers["X-Auth-Token"] = token;
-      const res = await fetch(`/api/room/${ownerUserId}/trophy/${trophyId}`, { credentials: "include", headers });
-      if (!res.ok) throw new Error("Trophy not found");
-      return res.json();
-    } : undefined,
+    queryKey: isPublicView ? ["/api/room", ownerUserId, "trophy", trophyId] : ["/api/trophies", trophyId],
+    ...(isPublicView ? { queryFn: publicQueryFn } : {}),
     enabled: isPublicView ? (!!trophyId && !!ownerUserId) : (!!match && !!trophyId),
   });
 
