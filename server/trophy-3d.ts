@@ -325,9 +325,9 @@ export async function generate3DModel(
   const compressedPath = path.join(trophyUploadDir, compressedFilename);
   await compressGlb(glbPath, compressedPath);
 
-  if (croppedPath && fs.existsSync(croppedPath)) fs.unlinkSync(croppedPath);
-  if (fs.existsSync(noBgPath)) fs.unlinkSync(noBgPath);
-  if (glbPath !== compressedPath && fs.existsSync(glbPath)) fs.unlinkSync(glbPath);
+  try { if (croppedPath && fs.existsSync(croppedPath)) fs.unlinkSync(croppedPath); } catch (e) { console.warn("[3d-model] cleanup failed:", croppedPath, e); }
+  try { if (fs.existsSync(noBgPath)) fs.unlinkSync(noBgPath); } catch (e) { console.warn("[3d-model] cleanup failed:", noBgPath, e); }
+  try { if (glbPath !== compressedPath && fs.existsSync(glbPath)) fs.unlinkSync(glbPath); } catch (e) { console.warn("[3d-model] cleanup failed:", glbPath, e); }
 
   const glbUrl = `/uploads/trophies/${compressedFilename}`;
   const glbPreviewUrl = previewPath ? `/uploads/trophies/${path.basename(previewPath)}` : null;
@@ -367,8 +367,8 @@ export async function generateMountImageOnly(
     }
   }
 
-  if (croppedPath && fs.existsSync(croppedPath)) fs.unlinkSync(croppedPath);
-  if (fs.existsSync(noBgPath)) fs.unlinkSync(noBgPath);
+  try { if (croppedPath && fs.existsSync(croppedPath)) fs.unlinkSync(croppedPath); } catch (e) { console.warn("[mount-image] cleanup failed:", croppedPath, e); }
+  try { if (fs.existsSync(noBgPath)) fs.unlinkSync(noBgPath); } catch (e) { console.warn("[mount-image] cleanup failed:", noBgPath, e); }
 
   return { mountRenderUrl };
 }

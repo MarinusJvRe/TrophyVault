@@ -47,3 +47,11 @@ Honor The Hunt is built with a modern web stack. The **frontend** uses React wit
     -   `gltf-transform` and `draco3dgltf` (for GLB model compression)
 - **UI Libraries**: shadcn/ui, Framer Motion
 - **Payment Gateway**: Placeholder for future integration (not yet implemented)
+
+## Robustness & Production Readiness
+- **Error Boundary**: Top-level React ErrorBoundary in App.tsx catches rendering crashes and shows a recovery UI with reload button.
+- **Auth Token Consistency**: All frontend code uses the canonical `getAuthToken()` helper from `lib/auth-token.ts` — community feed, trophy detail, and all API calls use the same token source.
+- **Date Safety**: Trophy timeline uses a `safeDate()` utility that returns `null` for invalid dates, displaying "Unknown" instead of crashing or showing 1970.
+- **Canvas Safety**: `getCroppedBlob` in AddTrophyDialog checks for null canvas context instead of using non-null assertion.
+- **Background Task Cleanup**: `trophy-3d.ts` wraps temp file deletion in try/catch with warn-level logging to prevent background pipeline crashes from orphaned file handles.
+- **Loading States**: ProDashboard shows loading spinner while profile data loads, preventing flash of "no profile" state.

@@ -12,7 +12,7 @@ import type { ProProfile, Trophy } from "@shared/schema";
 export default function ProDashboard() {
   const [copied, setCopied] = useState(false);
 
-  const { data: profile } = useQuery<ProProfile>({
+  const { data: profile, isLoading: profileLoading } = useQuery<ProProfile>({
     queryKey: ["/api/pro/profile"],
   });
 
@@ -44,6 +44,16 @@ export default function ProDashboard() {
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  if (profileLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!profile) {
     return (

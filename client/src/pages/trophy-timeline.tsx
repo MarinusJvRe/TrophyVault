@@ -10,6 +10,17 @@ import { useState } from "react";
 import type { Trophy as TrophyType } from "@shared/schema";
 import jsPDF from "jspdf";
 
+const safeDate = (d: string | null | undefined): Date | null => {
+  if (!d) return null;
+  const parsed = new Date(d);
+  return isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const safeDateSort = (d: string | null | undefined): number => {
+  const parsed = safeDate(d);
+  return parsed ? parsed.getTime() : 0;
+};
+
 export default function TrophyTimeline() {
   const { data: trophies = [], isLoading } = useQuery<TrophyType[]>({
     queryKey: ["/api/trophies"],
@@ -20,12 +31,13 @@ export default function TrophyTimeline() {
   const [endDate, setEndDate] = useState("");
 
   const sortedTrophies = [...trophies].sort((a, b) =>
-    new Date(b.date).getTime() - new Date(a.date).getTime()
+    safeDateSort(b.date) - safeDateSort(a.date)
   );
 
   const groupedByYear: Record<string, TrophyType[]> = {};
   sortedTrophies.forEach(t => {
-    const year = new Date(t.date).getFullYear().toString();
+    const d = safeDate(t.date);
+    const year = d ? d.getFullYear().toString() : "Unknown";
     if (!groupedByYear[year]) groupedByYear[year] = [];
     groupedByYear[year].push(t);
   });
@@ -35,13 +47,13 @@ export default function TrophyTimeline() {
     .map(year => ({
       year,
       trophies: groupedByYear[year].sort((a, b) =>
-        new Date(b.date).getTime() - new Date(a.date).getTime()
+        safeDateSort(b.date) - safeDateSort(a.date)
       )
     }));
 
   const generatePDF = () => {
     const filtered = sortedTrophies.filter(t => {
-      const d = new Date(t.date);
+      const d = safeDate(t.date) || new Date(0);
       if (startDate && d < new Date(startDate)) return false;
       if (endDate && d > new Date(endDate + "T23:59:59")) return false;
       return true;
@@ -86,7 +98,7 @@ export default function TrophyTimeline() {
       }
 
       x = startX;
-      const dateStr = new Date(t.date).toLocaleDateString();
+      const dateStr = safeDate(t.date)?.toLocaleDateString() || "Unknown";
       const row = [
         dateStr,
         t.species || "",
@@ -214,10 +226,10 @@ export default function TrophyTimeline() {
 }
 
 function TimelineEntry({ trophy, index }: { trophy: TrophyType; index: number }) {
-  const dateStr = new Date(trophy.date).toLocaleDateString(undefined, {
+  const dateStr = safeDate(trophy.date)?.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
-  });
+  }) || "Unknown";
 
   return (
     <motion.div

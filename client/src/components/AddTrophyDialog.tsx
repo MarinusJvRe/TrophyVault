@@ -110,7 +110,8 @@ function getCroppedBlob(image: HTMLImageElement, crop: CropType): Promise<Blob> 
   const scaleY = image.naturalHeight / image.height;
   canvas.width = crop.width * scaleX;
   canvas.height = crop.height * scaleY;
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Failed to create canvas context");
   ctx.drawImage(
     image,
     crop.x * scaleX,

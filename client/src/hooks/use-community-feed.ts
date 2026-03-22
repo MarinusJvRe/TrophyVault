@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
+import { getAuthToken } from "@/lib/auth-token";
 
 const FEED_PAGE_SIZE = 20;
 
@@ -51,7 +52,7 @@ export function useCommunityFeed(feedMode: "global" | "following" = "global", fe
     queryKey: ["/api/community/feed", feedQueryParams],
     queryFn: async ({ pageParam = 0 }) => {
       const headers: Record<string, string> = {};
-      const token = localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token");
+      const token = getAuthToken();
       if (token) {
         headers["X-Auth-Token"] = token;
       }
