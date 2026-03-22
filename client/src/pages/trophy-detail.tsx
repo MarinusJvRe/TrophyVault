@@ -2,6 +2,7 @@ import Layout from "@/components/Layout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { getAuthToken } from "@/lib/auth-token";
 import { useState, useRef } from "react";
 import { 
   ArrowLeft, Share2, Target, MapPin, 
@@ -75,10 +76,10 @@ function parseStoredScore(value: string | null): { num: string; unit: string } {
 export default function TrophyDetail({ viewOnly, roomUserId, trophyId: propTrophyId }: { viewOnly?: boolean; roomUserId?: string; trophyId?: string }) {
   const [matchOwn, ownParams] = useRoute("/trophies/:id");
   const [matchPublic, publicParams] = useRoute("/room/:userId/trophy/:trophyId");
-  const isPublicView = viewOnly || !!matchPublic;
-  const trophyId = propTrophyId || (isPublicView ? (publicParams?.trophyId || ownParams?.id) : ownParams?.id);
-  const ownerUserId = isPublicView ? (roomUserId || publicParams?.userId) : undefined;
-  const match = matchOwn || matchPublic || (!!propTrophyId && !!roomUserId);
+  const isPublicView = !!(viewOnly || matchPublic);
+  const trophyId = propTrophyId || publicParams?.trophyId || ownParams?.id;
+  const ownerUserId = roomUserId || publicParams?.userId;
+  const match = !!(matchOwn || matchPublic || propTrophyId);
   const params = { id: trophyId };
 
   const { toast } = useToast();
@@ -101,16 +102,19 @@ export default function TrophyDetail({ viewOnly, roomUserId, trophyId: propTroph
   const { data: trophy, isLoading } = useQuery<Trophy>({
     queryKey: isPublicView ? ["/api/room", ownerUserId, "trophy", trophyId] : ["/api/trophies", params?.id],
     queryFn: isPublicView ? async () => {
-      const res = await fetch(`/api/room/${ownerUserId}/trophy/${trophyId}`, { credentials: "include" });
+      const headers: Record<string, string> = {};
+      const token = getAuthToken();
+      if (token) headers["X-Auth-Token"] = token;
+      const res = await fetch(`/api/room/${ownerUserId}/trophy/${trophyId}`, { credentials: "include", headers });
       if (!res.ok) throw new Error("Trophy not found");
       return res.json();
     } : undefined,
-    enabled: !!match && !!trophyId,
+    enabled: isPublicView ? (!!trophyId && !!ownerUserId) : (!!match && !!trophyId),
   });
 
   const { data: weapons = [] } = useQuery<Weapon[]>({
     queryKey: ["/api/weapons"],
-    enabled: !!match,
+    enabled: !!match || isPublicView,
   });
 
   const weapon = trophy?.weaponId ? weapons.find(w => w.id === trophy.weaponId) : null;
@@ -219,7 +223,13 @@ export default function TrophyDetail({ viewOnly, roomUserId, trophyId: propTroph
     });
   };
 
-  if (!match) return <div>Not found</div>;
+  if (!match) return (
+    <Layout>
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">Trophy not found</p>
+      </div>
+    </Layout>
+  );
 
   if (isLoading) {
     return (
